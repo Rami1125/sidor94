@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>אפליקציית נהגים - ח. סבן</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <style>
+        /* CSS styles for the driver's mobile app will go here */
+        body { font-family: 'Rubik', sans-serif; margin: 0; padding: 15px; }
+        h1 { font-size: 1.5rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>הסידור שלי להיום</h1>
+    </header>
+
+    <main id="orders-list">
+        <!-- The list of assigned orders for the driver will be rendered here -->
+        <p>טוען סידור עבודה...</p>
+    </main>
+
+    <script>
+        // The URL for our deployed Google Apps Script "Manoa"
+        const API_URL = 'YOUR_APPS_SCRIPT_DEPLOYMENT_URL';
+        const LOCATION_UPDATE_INTERVAL = 60000; // 60 seconds
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Driver App Initialized');
+            
+            // 1. Register the Service Worker for PWA functionality and notifications
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service worker registered', reg))
+                    .catch(err => console.error('Service worker not registered', err));
+            }
+
+            // 2. Initialize OneSignal and get deviceId
+            // (OneSignal SDK code will be added here)
+            
+            // 3. Request permissions for notifications and location
+            requestPermissions();
+
+            // 4. Fetch the driver's orders
+            // fetchMyOrders();
+
+            // 5. Start sending location updates periodically
+            // setInterval(updateMyLocation, LOCATION_UPDATE_INTERVAL);
+        });
+
+        function requestPermissions() {
+            // Logic to ask the user for permission to show notifications
+            // and access their GPS location.
+            console.log('Requesting permissions...');
+        }
+
+        async function updateMyLocation() {
+            // Logic to get current GPS coordinates and send them to the backend
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const { latitude, longitude } = position.coords;
+                console.log(`Updating location: ${latitude}, ${longitude}`);
+                
+                // const response = await fetch(API_URL, {
+                //     method: 'POST',
+                //     body: JSON.stringify({
+                //         action: 'updateDriverLocation',
+                //         driverId: 'CURRENT_DRIVER_ID', // This needs to be stored after login
+                //         lat: latitude,
+                //         lng: longitude
+                //     })
+                // });
+                // const result = await response.json();
+                // console.log(result.message);
+            });
+        }
+    </script>
+</body>
+</html>
