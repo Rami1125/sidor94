@@ -143,17 +143,23 @@
             showLoginView();
         });
         
-        enableFeaturesBtn.addEventListener('click', () => {
+        enableFeaturesBtn.addEventListener('click', async () => {
             permissionOverlay.style.display = 'none';
             const driverId = sessionStorage.getItem('driverId');
+            
+            // FIXED: Request permissions first
+            await OneSignal.Notifications.requestPermission();
+            
+            // Now initialize features which will check for granted permission
             initializeFeatures(driverId);
         });
 
         async function checkAndRequestPermissions(driverId) {
-            const notificationPermission = await OneSignal.Notifications.getPermission();
+            // FIXED: Check the permission property directly
+            const isPushEnabled = OneSignal.Notifications.permission;
             const geoPermissionStatus = await navigator.permissions.query({name: 'geolocation'});
 
-            if (notificationPermission !== 'granted' || geoPermissionStatus.state !== 'granted') {
+            if (!isPushEnabled || geoPermissionStatus.state !== 'granted') {
                 permissionOverlay.style.display = 'flex';
             } else {
                 initializeFeatures(driverId);
@@ -168,6 +174,7 @@
 
         async function initializeNotifications(driverId) {
             try {
+                // Login to OneSignal with external user ID
                 await OneSignal.login(driverId);
                 const playerId = OneSignal.User.onesignalId;
                 if (playerId) {
