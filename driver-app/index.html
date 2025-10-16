@@ -3,335 +3,289 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster - נהג</title>
-
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#3a86ff">
-
+    <title>DeliveryMaster - מרכז בקרה</title>
+    
     <!-- Fonts and Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "c711df10-6c87-4d81-889c-8e13963a155b",
-      safari_web_id: "web.onesignal.auto.45e32f52-047f-48ea-8b6f-5a9d2fcde2db",
-      notifyButton: {
-        enable: true,
-      },
-    });
-  });
-</script>
+
+    <!-- Leaflet Map Library -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
         :root {
-            --primary-color: #3a86ff; --secondary-color: #03045e; --background-color: #f0f2f5;
-            --text-color: #333; --white: #ffffff; --success: #2a9d8f; --warning: #fca311;
-            --danger: #dc3545; --info: #4cc9f0; --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            --border-radius: 12px;
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --background-color: #f8f9fa;
+            --text-color: #343a40;
+            --white: #ffffff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
         }
-        body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 0; color: var(--text-color); }
-        .view { display: none !important; } /* Use important to ensure override */
-        .view.active { display: flex !important; flex-direction: column; height: 100vh; }
-        #loginView { justify-content: center; align-items: center; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
-        .login-card { background: var(--white); padding: 40px; border-radius: var(--border-radius); box-shadow: var(--shadow); text-align: center; width: 90%; max-width: 400px; }
-        .login-card img { width: 100px; height: 100px; border-radius: 20px; margin-bottom: 20px; }
-        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 8px; font-size: 1.2rem; text-align: center; }
-        .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color: var(--white); border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer; }
-        #permissionOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 2000; display: none; justify-content: center; align-items: center; text-align: center; padding: 20px; }
-        .permission-card { background-color: #fff; color: #333; padding: 30px; border-radius: 12px; max-width: 350px; }
-        .permission-card h2 { color: var(--primary-color); }
-        .permission-card p { margin: 15px 0; }
-        .permission-card button { width: 100%; padding: 15px; font-size: 1.1em; background-color: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; }
-        .app-header { background: var(--primary-color); color: var(--white); padding: 15px 20px; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        main { flex-grow: 1; overflow-y: auto; }
-        .header-buttons { display: flex; align-items: center; gap: 15px; }
-        .header-buttons button { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
-        .order-list { padding: 15px; }
-        .order-card { background: var(--white); border-radius: var(--border-radius); margin-bottom: 15px; box-shadow: var(--shadow); border-right: 5px solid; }
-        .card-content { padding: 20px; }
-        .card-content h2 { font-size: 1.2rem; margin-bottom: 10px; }
-        .card-content p { margin: 5px 0; display: flex; align-items: center; gap: 10px; color: #555; }
-        .card-content p i { color: var(--primary-color); width: 20px; text-align: center; }
-        .card-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 15px; background-color: #f8f9fa; border-top: 1px solid #eee;}
-        .action-btn { background-color: var(--primary-color); color: var(--white); border: none; padding: 12px; border-radius: 8px; font-size: 1rem; cursor: pointer; text-align: center; text-decoration: none;}
-        .action-btn.start { background-color: var(--warning); }
-        .action-btn.complete { background-color: var(--success); }
-        .action-btn.navigate { background-color: var(--info); }
-        .action-btn:disabled { background-color: #ccc; cursor: not-allowed; }
-        .order-card[data-status="שויך"] { border-color: var(--info); }
-        .order-card[data-status="בדרך"] { border-color: var(--warning); }
-        .order-card[data-status="הושלם"] { border-color: var(--success); opacity: 0.7; }
+
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-color);
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1, h2 { text-align: center; margin-bottom: 20px; color: var(--primary-color); }
+        .main-layout { display: grid; grid-template-columns: 1fr 350px; gap: 20px; }
+        .card { background: var(--white); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 20px; }
+        #liveMap { height: 450px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; }
+        table { width: 100%; border-collapse: collapse; text-align: right; }
+        th, td { padding: 12px; border-bottom: 1px solid #dee2e6; }
+        th { background-color: #e9ecef; }
+        .status-badge { padding: 5px 10px; border-radius: 20px; color: var(--white); font-size: 0.9em; font-weight: 500; }
+        .status-חדש, .status-שויך { background-color: var(--info); }
+        .status-בדרך { background-color: var(--warning); color: #333; }
+        .status-הושלם { background-color: var(--success); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; }
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; }
+        .last-updated { text-align: center; color: var(--secondary-color); font-size: 0.9em; margin-top: 10px; }
+        .leaflet-popup-content { text-align: right; direction: rtl; }
+        .leaflet-popup-content h3 { margin: 0 0 5px 0; font-size: 1.1em; }
+        .marker-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; background: var(--primary-color); position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; }
+        .marker-pin::after { content: ''; width: 14px; height: 14px; margin: 8px 0 0 8px; background: #fff; position: absolute; border-radius: 50%; }
+        .custom-div-icon i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -150%); color: white; font-size: 1.2em; }
     </style>
 </head>
 <body>
-    
-    <div id="loginView" class="view">
-        <div class="login-card">
-            <img src="https://i.postimg.cc/ryPT3r29/image.png" alt="Company Logo">
-            <h1>כניסת נהג</h1>
-            <input type="text" id="driverIdInput" placeholder="הזן מספר נהג (לדוגמה: D01)">
-            <button id="loginBtn">כניסה</button>
-        </div>
-    </div>
 
-    <div id="mainView" class="view">
-         <header class="app-header">
-            <h1 id="welcomeMessage"></h1>
-            <div class="header-buttons">
-                <button id="installBtn" title="התקן אפליקציה" style="display: none;"><i class="fas fa-download"></i></button>
-                <button id="logoutBtn" title="התנתק"><i class="fas fa-sign-out-alt"></i></button>
+    <div class="container">
+        <h1><i class="fas fa-tachometer-alt"></i> DeliveryMaster - מרכז בקרה</h1>
+        
+        <div class="main-layout">
+            <div class="left-panel">
+                <div class="card">
+                    <h2><i class="fas fa-map-marked-alt"></i> מפה חיה</h2>
+                    <div id="liveMap"></div>
+                    <p class="last-updated">מיקומים מתעדכנים כל 30 שניות</p>
+                </div>
+
+                <div class="card">
+                    <h2><i class="fas fa-list-ul"></i> הזמנות להיום (<span id="todayDate"></span>)</h2>
+                    <table id="ordersTable">
+                        <thead>
+                            <tr>
+                                <th>לקוח</th>
+                                <th>כתובת</th>
+                                <th>שעה</th>
+                                <th>סטטוס</th>
+                                <th>נהג</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                     <p class="last-updated">רשימה מתעדכנת כל 15 שניות. עודכן לאחרונה: <span id="lastUpdatedTime"></span></p>
+                </div>
             </div>
-        </header>
-        <main>
-            <div id="orderList" class="order-list"></div>
-        </main>
-    </div>
 
-    <div id="permissionOverlay">
-        <div class="permission-card">
-            <h2><i class="fas fa-bell"></i> <i class="fas fa-map-marker-alt"></i> הפעלת שירותים חיוניים</h2>
-            <p>כדי לקבל עדכונים חיים ולשדר מיקום, יש לאשר שימוש בהתראות ובשירותי מיקום.</p>
-            <button id="enableFeaturesBtn">הפעל והמשך</button>
+            <div class="right-panel">
+                <div class="card">
+                    <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
+                    <form id="createOrderForm">
+                        <div class="form-group"><label for="customerName">שם לקוח</label><input type="text" id="customerName" required></div>
+                        <div class="form-group"><label for="address">כתובת</label><input type="text" id="address" required></div>
+                         <div class="form-group"><label for="orderTime">שעה</label><input type="time" id="orderTime" required></div>
+                        <button type="submit">צור הזמנה</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
-    
+
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbx38YRbtI1y2vItZoIHWR3EOhI8vUzBLKuRuTuFvr9taJt-Wffw4RhVa3SpLSNnnpCW/exec';
 
-        // DOM Elements
-        const loginView = document.getElementById('loginView');
-        const mainView = document.getElementById('mainView');
-        const permissionOverlay = document.getElementById('permissionOverlay');
-        const loginBtn = document.getElementById('loginBtn');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const enableFeaturesBtn = document.getElementById('enableFeaturesBtn');
-        const driverIdInput = document.getElementById('driverIdInput');
-        const welcomeMessage = document.getElementById('welcomeMessage');
-        const orderList = document.getElementById('orderList');
-        const installBtn = document.getElementById('installBtn');
+        const ordersTableBody = document.querySelector('#ordersTable tbody');
+        const createOrderForm = document.getElementById('createOrderForm');
+        const lastUpdatedTimeSpan = document.getElementById('lastUpdatedTime');
+        const todayDateSpan = document.getElementById('todayDate');
         
-        let deferredPrompt; 
+        let liveMap;
+        let driverMarkers = {}; 
 
-        // App Initialization
         document.addEventListener('DOMContentLoaded', () => {
-            const loggedInDriver = sessionStorage.getItem('driverId');
-            if (loggedInDriver) {
-                initApp(loggedInDriver);
-            } else {
-                switchView('loginView');
-            }
-            registerServiceWorker();
-        });
-
-        // Event Listeners
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            if (installBtn) installBtn.style.display = 'block';
-        });
-
-        installBtn.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                await deferredPrompt.userChoice;
-                deferredPrompt = null;
-                if (installBtn) installBtn.style.display = 'none';
-            }
-        });
-
-        loginBtn.addEventListener('click', () => {
-            const driverId = driverIdInput.value.trim().toUpperCase();
-            if (driverId) {
-                sessionStorage.setItem('driverId', driverId);
-                initApp(driverId);
-            }
-        });
-
-        logoutBtn.addEventListener('click', () => {
-            const driverId = sessionStorage.getItem('driverId');
-            if (window.OneSignal) OneSignal.logout();
-            stopLocationTracking(driverId);
-            sessionStorage.removeItem('driverId');
-            switchView('loginView');
-        });
-        
-        enableFeaturesBtn.addEventListener('click', async () => {
-            const driverId = sessionStorage.getItem('driverId');
-            permissionOverlay.style.display = 'none'; 
+            const today = new Date();
+            todayDateSpan.textContent = today.toLocaleDateString('he-IL');
             
-            try {
-                await OneSignal.Notifications.requestPermission();
-            } catch(e) {
-                console.error("Notification permission request failed", e);
-            } finally {
-                initializeFeatures(driverId);
-            }
+            initializeMap();
+            
+            fetchOrders();
+            fetchDrivers();
+            
+            updateMap(); 
+
+            setInterval(fetchOrders, 15000); 
+            setInterval(updateMap, 30000);
         });
 
-        // Core Functions
-        function initApp(driverId) {
-            switchView('mainView');
-            welcomeMessage.textContent = `משימות עבור ${driverId}`;
-            checkAndRequestPermissions(driverId);
-        }
+        function initializeMap() {
+            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            });
 
-        async function checkAndRequestPermissions(driverId) {
-            const isPushEnabled = OneSignal.Notifications.permission;
-            const geoPermissionStatus = await navigator.permissions.query({name: 'geolocation'});
+            // UPGRADED: Added satellite layer
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+	            attribution: 'Tiles &copy; Esri'
+            });
 
-            if (!isPushEnabled || geoPermissionStatus.state !== 'granted') {
-                permissionOverlay.style.display = 'flex';
-            } else {
-                permissionOverlay.style.display = 'none';
-                initializeFeatures(driverId);
-            }
-        }
-
-        function initializeFeatures(driverId) {
-            initializeNotifications(driverId);
-            startLocationTracking(driverId);
-            fetchDriverOrders(driverId);
-        }
-        
-        function registerServiceWorker() {
-             if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('./sw.js')
-                        .then(reg => console.log('Service Worker registered.', reg.scope))
-                        .catch(err => console.error('Service Worker registration failed:', err));
-                });
-            }
-        }
-
-        // --- Feature-specific Functions (Notifications, Location, Orders) ---
-        async function initializeNotifications(driverId) {
-            try {
-                await OneSignal.login(driverId);
-                const playerId = OneSignal.User.onesignalId;
-                if (playerId) registerDevice(driverId, playerId);
-            } catch (error) { console.error("OneSignal login failed:", error); }
-        }
-        
-        let locationIntervalId;
-        function startLocationTracking(driverId) {
-            if (locationIntervalId) clearInterval(locationIntervalId);
+            liveMap = L.map('liveMap', {
+                center: [32.0853, 34.7818],
+                zoom: 10,
+                layers: [standardLayer] // Default layer
+            });
             
-            const updateLocation = () => {
-                navigator.permissions.query({name: 'geolocation'}).then(status => {
-                    if (status.state === 'granted') {
-                        navigator.geolocation.getCurrentPosition(async (position) => {
-                            const { latitude, longitude } = position.coords;
-                            try {
-                                await fetch(API_URL, {
-                                    method: 'POST', mode: 'no-cors',
-                                    body: JSON.stringify({ action: 'updateDriverLocation', data: { driverId, latitude, longitude } })
-                                });
-                            } catch (error) { console.error('Failed to send location:', error); }
-                        }, (error) => {
-                            console.error('Geolocation error:', error);
-                        }, { enableHighAccuracy: true });
+            const baseMaps = {
+                "מפה רגילה": standardLayer,
+                "תצוגת לוויין": satelliteLayer
+            };
+
+            L.control.layers(baseMaps).addTo(liveMap);
+        }
+
+        async function updateMap() {
+             try {
+                const response = await fetch(`${API_URL}?action=getLiveMapData`);
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error(result.message);
+                
+                const driversData = result.data;
+
+                driversData.forEach(driver => {
+                    const latLng = [driver.latitude, driver.longitude];
+                    const popupContent = `<h3>${driver.name}</h3><p>עודכן: ${new Date(driver.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
+                    
+                    const icon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class='marker-pin'></div><i class='fas fa-truck'></i>`,
+                        iconSize: [30, 42],
+                        iconAnchor: [15, 42]
+                    });
+
+                    if (driverMarkers[driver.driverId]) {
+                        driverMarkers[driver.driverId].setLatLng(latLng).setPopupContent(popupContent);
                     } else {
-                        stopLocationTracking(driverId);
+                        const marker = L.marker(latLng, { icon: icon })
+                                          .addTo(liveMap)
+                                          .bindPopup(popupContent);
+                        driverMarkers[driver.driverId] = marker;
                     }
                 });
-            };
-            updateLocation();
-            locationIntervalId = setInterval(updateLocation, 60000);
-        }
 
-        function stopLocationTracking(driverId) {
-            if (locationIntervalId) {
-                clearInterval(locationIntervalId);
-                locationIntervalId = null;
-                console.log(`Stopped location tracking for ${driverId}.`);
+            } catch (error) {
+                console.error('Error updating map:', error);
             }
         }
 
-        async function registerDevice(driverId, deviceId) {
+        async function fetchOrders() {
+            const todayStr = new Date().toISOString().split('T')[0];
             try {
-                await fetch(API_URL, {
-                    method: 'POST', mode: 'no-cors',
-                    body: JSON.stringify({ action: 'registerDriverDevice', data: { driverId, deviceId } })
-                });
-            } catch (error) { console.error('Error registering device:', error); }
-        }
-        
-        async function fetchDriverOrders(driverId) {
-            orderList.innerHTML = '<p>טוען משימות...</p>';
-            const today = new Date().toISOString().split('T')[0];
-            try {
-                const response = await fetch(`${API_URL}?action=getOrders&date=${today}&driverId=${driverId}`);
+                const response = await fetch(`${API_URL}?action=getOrders&date=${todayStr}`);
                 const result = await response.json();
                 if (result.status === 'success') {
                     renderOrders(result.data);
+                    lastUpdatedTimeSpan.textContent = new Date().toLocaleTimeString('he-IL');
                 } else { throw new Error(result.message); }
-            } catch (error) {
-                orderList.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
-            }
+            } catch (error) { console.error('Error fetching orders:', error); }
         }
 
         function renderOrders(orders) {
-            if (!orders || orders.length === 0) {
-                orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
-                return;
+            ordersTableBody.innerHTML = '';
+            if (orders.length === 0) {
+                 ordersTableBody.innerHTML = '<tr><td colspan="5">אין הזמנות להיום.</td></tr>';
+                 return;
             }
-            orderList.innerHTML = orders.sort((a,b) => a.orderTime.localeCompare(b.orderTime)).map(order => {
-                const isStartDisabled = !(order.status === 'שויך');
-                const isCompleteDisabled = !(order.status === 'בדרך');
-                const navUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`;
-                return `
-                <div class="order-card" data-status="${order.status}">
-                    <div class="card-content">
-                        <h2>${order.customerName}</h2>
-                        <p><i class="fas fa-clock"></i> <strong>שעה:</strong> ${order.orderTime}</p>
-                        <p><i class="fas fa-map-marker-alt"></i> <strong>כתובת:</strong> ${order.address}</p>
-                        <p><i class="fas fa-warehouse"></i> <strong>מחסן:</strong> ${order.warehouse}</p>
-                        <p><i class="fas fa-info-circle"></i> <strong>סטטוס:</strong> ${order.status}</p>
-                    </div>
-                    <div class="card-actions">
-                         <button class="action-btn start" onclick="updateOrderStatus(event, '${order.orderId}', 'בדרך')" ${isStartDisabled ? 'disabled' : ''}> <i class="fas fa-route"></i> התחל </button>
-                         <a href="${navUrl}" target="_blank" class="action-btn navigate"> <i class="fas fa-diamond-turn-right"></i> נווט </a>
-                         <button class="action-btn complete" onclick="updateOrderStatus(event, '${order.orderId}', 'הושלם')" ${isCompleteDisabled ? 'disabled' : ''}> <i class="fas fa-check-circle"></i> סיים </button>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        async function updateOrderStatus(event, orderId, newStatus) {
-            const btn = event.currentTarget;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            try {
-                await fetch(API_URL, {
-                    method: 'POST', mode: 'no-cors',
-                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
-                });
-                fetchDriverOrders(sessionStorage.getItem('driverId'));
-            } catch (error) {
-                console.error("Error updating status:", error);
-                btn.disabled = false;
-            }
+            
+            orders
+                .sort((a,b) => a.orderTime.localeCompare(b.orderTime))
+                .forEach(order => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${order.customerName}</td>
+                    <td>${order.address}</td>
+                    <td>${order.orderTime}</td>
+                    <td><span class="status-badge status-${order.status}">${order.status}</span></td>
+                    <td id="driver-cell-${order.orderId}">${order.driverId || 'לא שויך'}</td>
+                `;
+                ordersTableBody.appendChild(row);
+            });
+            
+            addDriverDropdownsToTable(orders);
         }
         
-        // --- View Management ---
-        function switchView(viewId) {
-            document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-            const viewToShow = document.getElementById(viewId);
-            if(viewToShow) viewToShow.classList.add('active');
-        }
+         async function addDriverDropdownsToTable(orders) {
+            try {
+                const driversResponse = await fetch(`${API_URL}?action=getDrivers`);
+                const driversResult = await driversResponse.json();
+                if (driversResult.status !== 'success') return;
+                const drivers = driversResult.data;
 
-        function showMainView(driverId) {
-            welcomeMessage.textContent = `משימות עבור ${driverId}`;
-            switchView('mainView');
-        }
+                orders.forEach(order => {
+                    const cell = document.getElementById(`driver-cell-${order.orderId}`);
+                    if (!cell) return;
 
-        function showLoginView() {
-            switchView('loginView');
+                    const select = document.createElement('select');
+                    select.innerHTML = '<option value="">בחר נהג...</option>';
+                    drivers.forEach(driver => {
+                        const option = document.createElement('option');
+                        option.value = driver.driverId;
+                        option.textContent = driver.name;
+                        if (driver.driverId === order.driverId) option.selected = true;
+                        select.appendChild(option);
+                    });
+                    
+                    select.addEventListener('change', (e) => updateOrderDriver(order.orderId, e.target.value));
+                    cell.innerHTML = '';
+                    cell.appendChild(select);
+                });
+            } catch (error) { console.error("Error adding driver dropdowns:", error); }
         }
+        
+        async function updateOrderDriver(orderId, driverId) {
+             try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: driverId } } })
+                });
+                fetchOrders();
+            } catch (error) { console.error("Error updating driver:", error); }
+        }
+        
+        async function fetchDrivers() { /* This logic is now inside addDriverDropdownsToTable */ }
+        
+        createOrderForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const orderData = {
+                customerName: document.getElementById('customerName').value,
+                address: document.getElementById('address').value,
+                orderTime: document.getElementById('orderTime').value,
+                orderDate: new Date().toISOString().split('T')[0]
+            };
+            
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: 'createOrder', data: orderData })
+                });
+                createOrderForm.reset();
+                fetchOrders();
+            } catch (error) { console.error('Error creating order:', error); }
+        });
     </script>
 </body>
 </html>
