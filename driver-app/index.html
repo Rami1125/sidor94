@@ -44,7 +44,6 @@
         .permission-card h2 { color: var(--primary-color); }
         .permission-card p { margin: 15px 0; }
         .permission-card button { width: 100%; padding: 15px; font-size: 1.1em; background-color: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; }
-        /* Main App View styles from previous versions */
         .app-header { background: var(--primary-color); color: var(--white); padding: 15px 20px; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
         .order-list { padding: 15px; }
         .order-card { background: var(--white); border-radius: var(--border-radius); margin-bottom: 15px; box-shadow: var(--shadow); border-right: 5px solid; }
@@ -116,16 +115,11 @@
                 showLoginView();
             }
 
-            // NEW: Register the Service Worker to make the app installable
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
                     navigator.serviceWorker.register('./sw.js')
-                        .then(registration => {
-                            console.log('Service Worker registered successfully:', registration.scope);
-                        })
-                        .catch(err => {
-                            console.error('Service Worker registration failed:', err);
-                        });
+                        .then(reg => console.log('Service Worker registered.', reg.scope))
+                        .catch(err => console.error('Service Worker registration failed:', err));
                 });
             }
         });
@@ -184,7 +178,7 @@
         
         let locationIntervalId;
         function startLocationTracking(driverId) {
-            if (locationIntervalId) clearInterval(locationIntervalId); // Clear any existing interval
+            if (locationIntervalId) clearInterval(locationIntervalId);
             
             const updateLocation = () => {
                 navigator.geolocation.getCurrentPosition(async (position) => {
@@ -200,8 +194,8 @@
                 }, { enableHighAccuracy: true });
             };
             
-            updateLocation(); // Send location immediately
-            locationIntervalId = setInterval(updateLocation, 60000); // And then every 60 seconds
+            updateLocation();
+            locationIntervalId = setInterval(updateLocation, 60000);
         }
 
         function stopLocationTracking(driverId) {
