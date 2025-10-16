@@ -13,20 +13,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- NEW: OneSignal SDK -->
+    <!-- OneSignal SDK -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       OneSignalDeferred.push(function(OneSignal) {
         OneSignal.init({
-          // חשוב: החלף עם המזהה האמיתי שלך
+          // ===================================================
+          // חשוב: החלף עם המזהה האמיתי שלך מחשבון OneSignal
+          // ===================================================
           appId: "YOUR_ONESIGNAL_APP_ID", 
         });
       });
     </script>
 
     <style>
-        /* ... (CSS remains the same) ... */
         :root {
             --primary-color: #3a86ff;
             --secondary-color: #03045e;
@@ -35,6 +36,7 @@
             --white: #ffffff;
             --success: #2a9d8f;
             --warning: #fca311;
+            --danger: #dc3545;
             --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             --border-radius: 12px;
         }
@@ -117,14 +119,37 @@
 <body>
 
     <div class="notification" id="notification"></div>
-    <div id="loginView"><!-- ... (login html remains the same) ... --></div>
-    <div id="mainView"><!-- ... (main view html remains the same) ... --></div>
+    
+    <div id="loginView">
+        <div class="login-card">
+            <h1><i class="fas fa-truck"></i> כניסת נהג</h1>
+            <input type="text" id="driverIdInput" placeholder="הזן מספר נהג (לדוגמה: D01)">
+            <button id="loginBtn">כניסה</button>
+        </div>
+    </div>
+
+    <div id="mainView">
+        <header class="app-header">
+            <h1 id="welcomeMessage">ברוך הבא</h1>
+            <button id="logoutBtn" title="התנתק"><i class="fas fa-sign-out-alt"></i></button>
+        </header>
+        <main>
+            <div id="orderList" class="order-list"></div>
+        </main>
+    </div>
 
     <script>
-        // חשוב: החלף עם כתובת ה-API החדשה שתקבל אחרי הפרסום
-        const API_URL = 'YOUR_NEW_API_URL_HERE';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbx38YRbtI1y2vItZoIHWR3EOhI8vUzBLKuRuTuFvr9taJt-Wffw4RhVa3SpLSNnnpCW/exec';
 
-        // ... (DOM Elements remain the same) ...
+        // DOM Elements
+        const loginView = document.getElementById('loginView');
+        const mainView = document.getElementById('mainView');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const driverIdInput = document.getElementById('driverIdInput');
+        const welcomeMessage = document.getElementById('welcomeMessage');
+        const orderList = document.getElementById('orderList');
+        const notification = document.getElementById('notification');
         
         // App Logic
         document.addEventListener('DOMContentLoaded', () => {
@@ -132,7 +157,6 @@
             if (loggedInDriver) {
                 showMainView(loggedInDriver);
                 fetchDriverOrders(loggedInDriver);
-                // NEW: Initialize notifications for logged-in user
                 initializeNotifications(loggedInDriver);
             }
         });
@@ -143,24 +167,28 @@
                 sessionStorage.setItem('driverId', driverId);
                 showMainView(driverId);
                 fetchDriverOrders(driverId);
-                // NEW: Initialize notifications on new login
                 initializeNotifications(driverId);
             }
         });
 
         logoutBtn.addEventListener('click', () => {
             sessionStorage.removeItem('driverId');
-            // Optional: Unsubscribe from notifications on logout
-            OneSignal.logout();
+            if (window.OneSignal) {
+                OneSignal.logout();
+            }
             showLoginView();
         });
 
         // NEW FUNCTION to handle notification initialization and device registration
         async function initializeNotifications(driverId) {
-            await OneSignal.login(driverId);
-            const playerId = OneSignal.User.onesignalId;
-            if (playerId) {
-                registerDevice(driverId, playerId);
+            try {
+                await OneSignal.login(driverId);
+                const playerId = OneSignal.User.onesignalId;
+                if (playerId) {
+                    registerDevice(driverId, playerId);
+                }
+            } catch (error) {
+                console.error("OneSignal login failed:", error);
             }
         }
 
@@ -181,7 +209,99 @@
             }
         }
         
-        // ... (All other functions like fetchDriverOrders, renderOrders, etc., remain the same) ...
+        async function fetchDriverOrders(driverId) {
+            orderList.innerHTML = '<p>טוען משימות...</p>';
+            const today = new Date().toISOString().split('T')[0];
+            try {
+                const response = await fetch(`${API_URL}?action=getOrders&date=${today}&driverId=${driverId}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    renderOrders(result.data);
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                orderList.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
+            }
+        }
+        
+        function renderOrders(orders) {
+            if (!orders || orders.length === 0) {
+                orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
+                return;
+            }
+
+            orderList.innerHTML = orders
+                .sort((a,b) => a.orderTime.localeCompare(b.orderTime))
+                .map(order => {
+                const isStartDisabled = !(order.status === 'שויך');
+                const isCompleteDisabled = !(order.status === 'בדרך');
+                return `
+                <div class="order-card" data-status="${order.status}">
+                    <div class="card-content">
+                        <h2>${order.customerName}</h2>
+                        <p><i class="fas fa-clock"></i> <strong>שעה:</strong> ${order.orderTime}</p>
+                        <p><i class="fas fa-map-marker-alt"></i> <strong>כתובת:</strong> ${order.address}</p>
+                        <p><i class="fas fa-warehouse"></i> <strong>מחסן:</strong> ${order.warehouse}</p>
+                        <p><i class="fas fa-info-circle"></i> <strong>סטטוס:</strong> ${order.status}</p>
+                    </div>
+                    <div class="card-actions">
+                         <button class="action-btn start" onclick="updateOrderStatus(event, '${order.orderId}', 'בדרך')" ${isStartDisabled ? 'disabled' : ''}>
+                            <i class="fas fa-route"></i> התחל נסיעה
+                        </button>
+                        <button class="action-btn complete" onclick="updateOrderStatus(event, '${order.orderId}', 'הושלם')" ${isCompleteDisabled ? 'disabled' : ''}>
+                            <i class="fas fa-check-circle"></i> סיים משימה
+                        </button>
+                    </div>
+                </div>
+            `}).join('');
+        }
+        
+        async function updateOrderStatus(event, orderId, newStatus) {
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
+                });
+                showNotification(`סטטוס הזמנה עודכן ל: ${newStatus}`, 'success');
+                fetchDriverOrders(sessionStorage.getItem('driverId'));
+            } catch (error) {
+                showNotification(`שגיאה בעדכון סטטוס: ${error.message}`, 'error');
+                btn.disabled = false;
+            }
+        }
+
+        function showMainView(driverId) {
+            welcomeMessage.textContent = `משימות עבור ${driverId}`;
+            loginView.style.display = 'none';
+            mainView.style.display = 'block';
+        }
+
+        function showLoginView() {
+            mainView.style.display = 'none';
+            loginView.style.display = 'flex';
+        }
+        
+        function showNotification(message, type = 'success') {
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg failed: ', err));
+            });
+        }
     </script>
 
 </body>
