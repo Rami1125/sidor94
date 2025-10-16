@@ -1,0 +1,21 @@
+{
+"name": "DeliveryMaster Driver",
+"short_name": "DM Driver",
+"start_url": "index.html",
+"display": "standalone",
+"background_color": "#f0f2f5",
+"theme_color": "#3a86ff",
+"orientation": "portrait-primary",
+"icons": [
+{
+"src": "https://www.google.com/search?q=https://rami1125.github.io/sidor94/driver-app/icon-192.png",
+"type": "image/png",
+"sizes": "192x192"
+},
+{
+"src": "https://www.google.com/search?q=https://rami1125.github.io/sidor94/driver-app/icon-512.png",
+"type": "image/png",
+"sizes": "512x512"
+}
+]
+}
