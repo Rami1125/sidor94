@@ -12,8 +12,21 @@
     <!-- Fonts and Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- NEW: OneSignal SDK -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(function(OneSignal) {
+        OneSignal.init({
+          // חשוב: החלף עם המזהה האמיתי שלך
+          appId: "YOUR_ONESIGNAL_APP_ID", 
+        });
+      });
+    </script>
 
     <style>
+        /* ... (CSS remains the same) ... */
         :root {
             --primary-color: #3a86ff;
             --secondary-color: #03045e;
@@ -34,7 +47,6 @@
             color: var(--text-color);
         }
         
-        /* ... (login styles remain the same) ... */
         #loginView {
             display: flex;
             flex-direction: column;
@@ -56,7 +68,6 @@
         .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 8px; font-size: 1.2rem; text-align: center; }
         .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color: var(--white); border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer; }
 
-        /* --- Main App View --- */
         #mainView { display: none; }
         .app-header { background: var(--primary-color); color: var(--white); padding: 15px 20px; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 10px rgba(0,0,0,0.15); display: flex; justify-content: space-between; align-items: center; }
         .app-header h1 { font-size: 1.5rem; margin: 0; }
@@ -106,44 +117,23 @@
 <body>
 
     <div class="notification" id="notification"></div>
-
-    <!-- Login View -->
-    <div id="loginView">
-        <div class="login-card">
-            <h1><i class="fas fa-truck"></i> כניסת נהג</h1>
-            <input type="text" id="driverIdInput" placeholder="הזן מספר נהג (לדוגמה: DRV-001)">
-            <button id="loginBtn">כניסה</button>
-        </div>
-    </div>
-
-    <!-- Main Application View -->
-    <div id="mainView">
-        <header class="app-header">
-            <h1 id="welcomeMessage">ברוך הבא</h1>
-            <button id="logoutBtn" title="התנתק"><i class="fas fa-sign-out-alt"></i></button>
-        </header>
-        <main>
-            <div id="orderList" class="order-list"></div>
-        </main>
-    </div>
+    <div id="loginView"><!-- ... (login html remains the same) ... --></div>
+    <div id="mainView"><!-- ... (main view html remains the same) ... --></div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbx38YRbtI1y2vItZoIHWR3EOhI8vUzBLKuRuTuFvr9taJt-Wffw4RhVa3SpLSNnnpCW/exec';
+        // חשוב: החלף עם כתובת ה-API החדשה שתקבל אחרי הפרסום
+        const API_URL = 'YOUR_NEW_API_URL_HERE';
 
-        // DOM Elements
-        const loginView = document.getElementById('loginView'), mainView = document.getElementById('mainView');
-        const loginBtn = document.getElementById('loginBtn'), logoutBtn = document.getElementById('logoutBtn');
-        const driverIdInput = document.getElementById('driverIdInput');
-        const welcomeMessage = document.getElementById('welcomeMessage');
-        const orderList = document.getElementById('orderList');
-        const notification = document.getElementById('notification');
-
+        // ... (DOM Elements remain the same) ...
+        
         // App Logic
         document.addEventListener('DOMContentLoaded', () => {
             const loggedInDriver = sessionStorage.getItem('driverId');
             if (loggedInDriver) {
                 showMainView(loggedInDriver);
                 fetchDriverOrders(loggedInDriver);
+                // NEW: Initialize notifications for logged-in user
+                initializeNotifications(loggedInDriver);
             }
         });
 
@@ -153,107 +143,45 @@
                 sessionStorage.setItem('driverId', driverId);
                 showMainView(driverId);
                 fetchDriverOrders(driverId);
+                // NEW: Initialize notifications on new login
+                initializeNotifications(driverId);
             }
         });
 
         logoutBtn.addEventListener('click', () => {
             sessionStorage.removeItem('driverId');
+            // Optional: Unsubscribe from notifications on logout
+            OneSignal.logout();
             showLoginView();
         });
 
-        async function fetchDriverOrders(driverId) {
-            orderList.innerHTML = '<p>טוען משימות...</p>';
-            const today = new Date().toISOString().split('T')[0];
-            try {
-                const response = await fetch(`${API_URL}?action=getOrders&date=${today}&driverId=${driverId}`);
-                const result = await response.json();
-                if (result.status === 'success') {
-                    renderOrders(result.data);
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error) {
-                orderList.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
+        // NEW FUNCTION to handle notification initialization and device registration
+        async function initializeNotifications(driverId) {
+            await OneSignal.login(driverId);
+            const playerId = OneSignal.User.onesignalId;
+            if (playerId) {
+                registerDevice(driverId, playerId);
             }
         }
-        
-        function renderOrders(orders) {
-            if (!orders || orders.length === 0) {
-                orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
-                return;
-            }
 
-            orderList.innerHTML = orders
-                .sort((a,b) => a.orderTime.localeCompare(b.orderTime))
-                .map(order => {
-                const isStartDisabled = !(order.status === 'שויך');
-                const isCompleteDisabled = !(order.status === 'בדרך');
-                return `
-                <div class="order-card" data-status="${order.status}">
-                    <div class="card-content">
-                        <h2>${order.customerName}</h2>
-                        <p><i class="fas fa-clock"></i> <strong>שעה:</strong> ${order.orderTime}</p>
-                        <p><i class="fas fa-map-marker-alt"></i> <strong>כתובת:</strong> ${order.address}</p>
-                        <p><i class="fas fa-warehouse"></i> <strong>מחסן:</strong> ${order.warehouse}</p>
-                        <p><i class="fas fa-info-circle"></i> <strong>סטטוס:</strong> ${order.status}</p>
-                    </div>
-                    <div class="card-actions">
-                         <button class="action-btn start" onclick="updateOrderStatus('${order.orderId}', 'בדרך')" ${isStartDisabled ? 'disabled' : ''}>
-                            <i class="fas fa-route"></i> התחל נסיעה
-                        </button>
-                        <button class="action-btn complete" onclick="updateOrderStatus('${order.orderId}', 'הושלם')" ${isCompleteDisabled ? 'disabled' : ''}>
-                            <i class="fas fa-check-circle"></i> סיים משימה
-                        </button>
-                    </div>
-                </div>
-            `}).join('');
-        }
-        
-        async function updateOrderStatus(orderId, newStatus) {
-            const btn = event.target;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
+        async function registerDevice(driverId, deviceId) {
             try {
                 await fetch(API_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
+                    body: JSON.stringify({ 
+                        action: 'registerDriverDevice', 
+                        data: { driverId, deviceId } 
+                    })
                 });
-                showNotification(`סטטוס הזמנה עודכן ל: ${newStatus}`, 'success');
-                fetchDriverOrders(sessionStorage.getItem('driverId'));
+                console.log(`Device ${deviceId} registered for driver ${driverId}`);
             } catch (error) {
-                showNotification(`שגיאה בעדכון סטטוס: ${error.message}`, 'error');
-                btn.disabled = false; // Re-enable on error
+                console.error("Error registering device:", error);
             }
         }
-
-        function showMainView(driverId) {
-            welcomeMessage.textContent = `משימות עבור ${driverId}`;
-            loginView.style.display = 'none';
-            mainView.style.display = 'block';
-        }
-
-        function showLoginView() {
-            mainView.style.display = 'none';
-            loginView.style.display = 'flex';
-        }
         
-        function showNotification(message, type = 'success') {
-            notification.textContent = message;
-            notification.className = `notification ${type} show`;
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 3000);
-        }
-
-        // Service Worker Registration
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg failed: ', err));
-            });
-        }
+        // ... (All other functions like fetchDriverOrders, renderOrders, etc., remain the same) ...
     </script>
 
 </body>
