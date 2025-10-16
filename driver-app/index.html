@@ -110,51 +110,40 @@
         const enableFeaturesBtn = document.getElementById('enableFeaturesBtn');
         const driverIdInput = document.getElementById('driverIdInput');
         const welcomeMessage = document.getElementById('welcomeMessage');
-        const orderList = document.getElementById('orderlist');
+        const orderList = document.getElementById('orderList'); // Corrected ID
         const installBtn = document.getElementById('installBtn');
         
         let deferredPrompt; 
 
         // --- App Initialization ---
-        
-        // This function is the single entry point to the app logic,
-        // ensuring OneSignal is ready.
-        async function startApp() {
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        OneSignalDeferred.push(async function(OneSignal) {
             try {
                 await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
-                
-                const loggedInDriver = sessionStorage.getItem('driverId');
-                if (loggedInDriver) {
-                    initApp(loggedInDriver);
-                } else {
-                    switchView('loginView');
-                }
+                initializeApp(false); // OneSignal is ready
             } catch (e) {
                 console.error("OneSignal init failed:", e);
-                // Fallback for when OneSignal fails (e.g., due to IndexedDB)
-                const loggedInDriver = sessionStorage.getItem('driverId');
-                 if (loggedInDriver) {
-                    initApp(loggedInDriver, true); // Pass a flag to skip notification logic
-                } else {
-                    switchView('loginView');
-                }
+                initializeApp(true); // OneSignal failed, skip notification features
             }
-        }
+        });
 
-        // Push the startApp function into the OneSignal deferred queue.
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        OneSignalDeferred.push(startApp);
-
-
-        document.addEventListener('DOMContentLoaded', () => {
-            loginBtn.addEventListener('click', onLogin);
+        function initializeApp(oneSignalFailed = false) {
+            // Attach all event listeners now that the DOM and scripts are ready
+            loginBtn.addEventListener('click', () => onLogin(oneSignalFailed));
             logoutBtn.addEventListener('click', onLogout);
-            enableFeaturesBtn.addEventListener('click', onEnableFeatures);
+            enableFeaturesBtn.addEventListener('click', () => onEnableFeatures(oneSignalFailed));
             installBtn.addEventListener('click', onInstall);
             
             registerServiceWorker();
-        });
 
+            const loggedInDriver = sessionStorage.getItem('driverId');
+            if (loggedInDriver) {
+                initApp(loggedInDriver, oneSignalFailed);
+            } else {
+                switchView('loginView');
+            }
+        }
+        
         // --- Event Listeners & Handlers ---
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
@@ -162,11 +151,11 @@
             if (installBtn) installBtn.style.display = 'block';
         });
 
-        function onLogin() {
+        function onLogin(oneSignalFailed) {
             const driverId = driverIdInput.value.trim().toUpperCase();
             if (driverId) {
                 sessionStorage.setItem('driverId', driverId);
-                initApp(driverId);
+                initApp(driverId, oneSignalFailed);
             }
         }
 
@@ -178,17 +167,19 @@
             switchView('loginView');
         }
 
-        async function onEnableFeatures() {
+        async function onEnableFeatures(oneSignalFailed) {
             const driverId = sessionStorage.getItem('driverId');
             permissionOverlay.style.display = 'none'; 
             
-            try {
-                await OneSignal.Notifications.requestPermission();
-            } catch(e) {
-                console.error("Notification permission request failed", e);
-            } finally {
-                initializeFeatures(driverId);
+            if (!oneSignalFailed) {
+                try {
+                    await OneSignal.Notifications.requestPermission();
+                } catch(e) {
+                    console.error("Notification permission request failed", e);
+                }
             }
+            // Always initialize features, even if permissions are denied
+            initializeFeatures(driverId, oneSignalFailed);
         }
 
         async function onInstall() {
@@ -201,17 +192,17 @@
         }
 
         // --- Core Functions ---
-        function initApp(driverId, skipOneSignal = false) {
+        function initApp(driverId, oneSignalFailed = false) {
             switchView('mainView');
             welcomeMessage.textContent = `משימות עבור ${driverId}`;
-            checkAndRequestPermissions(driverId, skipOneSignal);
+            checkAndRequestPermissions(driverId, oneSignalFailed);
         }
 
-        async function checkAndRequestPermissions(driverId, skipOneSignal = false) {
+        async function checkAndRequestPermissions(driverId, oneSignalFailed = false) {
             const geoPermissionStatus = await navigator.permissions.query({name: 'geolocation'});
             
-            let isPushEnabled = false;
-            if (!skipOneSignal) {
+            let isPushEnabled = true; // Assume enabled if OneSignal failed
+            if (!oneSignalFailed) {
                 isPushEnabled = OneSignal.Notifications.permission;
             }
 
@@ -219,12 +210,12 @@
                 permissionOverlay.style.display = 'flex';
             } else {
                 permissionOverlay.style.display = 'none';
-                initializeFeatures(driverId, skipOneSignal);
+                initializeFeatures(driverId, oneSignalFailed);
             }
         }
 
-        function initializeFeatures(driverId, skipOneSignal = false) {
-            if (!skipOneSignal) {
+        function initializeFeatures(driverId, oneSignalFailed = false) {
+            if (!oneSignalFailed) {
                 initializeNotifications(driverId);
             }
             startLocationTracking(driverId);
@@ -295,9 +286,7 @@
         }
         
         async function fetchDriverOrders(driverId) {
-            const orderListEl = document.getElementById('orderList');
-            if (!orderListEl) return;
-            orderListEl.innerHTML = '<p>טוען משימות...</p>';
+            orderList.innerHTML = '<p>טוען משימות...</p>';
             const today = new Date().toISOString().split('T')[0];
             try {
                 const response = await fetch(`${API_URL}?action=getOrders&date=${today}&driverId=${driverId}`);
@@ -306,19 +295,16 @@
                     renderOrders(result.data);
                 } else { throw new Error(result.message); }
             } catch (error) {
-                orderListEl.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
+                orderList.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
             }
         }
 
         function renderOrders(orders) {
-            const orderListEl = document.getElementById('orderList');
-            if (!orderListEl) return;
-
             if (!orders || orders.length === 0) {
-                orderListEl.innerHTML = '<p>אין לך משימות להיום.</p>';
+                orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
                 return;
             }
-            orderListEl.innerHTML = orders.sort((a,b) => a.orderTime.localeCompare(b.orderTime)).map(order => {
+            orderList.innerHTML = orders.sort((a,b) => a.orderTime.localeCompare(b.orderTime)).map(order => {
                 const isStartDisabled = !(order.status === 'שויך');
                 const isCompleteDisabled = !(order.status === 'בדרך');
                 const navUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`;
