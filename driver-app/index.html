@@ -110,20 +110,34 @@
         const enableFeaturesBtn = document.getElementById('enableFeaturesBtn');
         const driverIdInput = document.getElementById('driverIdInput');
         const welcomeMessage = document.getElementById('welcomeMessage');
-        const orderList = document.getElementById('orderList');
+        const orderList = document.getElementById('orderlist');
         const installBtn = document.getElementById('installBtn');
         
         let deferredPrompt; 
 
         // --- App Initialization ---
-
-        // This function will run ONLY after OneSignal is fully loaded.
-        function startApp() {
-            const loggedInDriver = sessionStorage.getItem('driverId');
-            if (loggedInDriver) {
-                initApp(loggedInDriver);
-            } else {
-                switchView('loginView');
+        
+        // This function is the single entry point to the app logic,
+        // ensuring OneSignal is ready.
+        async function startApp() {
+            try {
+                await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
+                
+                const loggedInDriver = sessionStorage.getItem('driverId');
+                if (loggedInDriver) {
+                    initApp(loggedInDriver);
+                } else {
+                    switchView('loginView');
+                }
+            } catch (e) {
+                console.error("OneSignal init failed:", e);
+                // Fallback for when OneSignal fails (e.g., due to IndexedDB)
+                const loggedInDriver = sessionStorage.getItem('driverId');
+                 if (loggedInDriver) {
+                    initApp(loggedInDriver, true); // Pass a flag to skip notification logic
+                } else {
+                    switchView('loginView');
+                }
             }
         }
 
@@ -187,26 +201,32 @@
         }
 
         // --- Core Functions ---
-        function initApp(driverId) {
+        function initApp(driverId, skipOneSignal = false) {
             switchView('mainView');
             welcomeMessage.textContent = `משימות עבור ${driverId}`;
-            checkAndRequestPermissions(driverId);
+            checkAndRequestPermissions(driverId, skipOneSignal);
         }
 
-        async function checkAndRequestPermissions(driverId) {
-            const isPushEnabled = OneSignal.Notifications.permission;
+        async function checkAndRequestPermissions(driverId, skipOneSignal = false) {
             const geoPermissionStatus = await navigator.permissions.query({name: 'geolocation'});
+            
+            let isPushEnabled = false;
+            if (!skipOneSignal) {
+                isPushEnabled = OneSignal.Notifications.permission;
+            }
 
             if (!isPushEnabled || geoPermissionStatus.state !== 'granted') {
                 permissionOverlay.style.display = 'flex';
             } else {
                 permissionOverlay.style.display = 'none';
-                initializeFeatures(driverId);
+                initializeFeatures(driverId, skipOneSignal);
             }
         }
 
-        function initializeFeatures(driverId) {
-            initializeNotifications(driverId);
+        function initializeFeatures(driverId, skipOneSignal = false) {
+            if (!skipOneSignal) {
+                initializeNotifications(driverId);
+            }
             startLocationTracking(driverId);
             fetchDriverOrders(driverId);
         }
@@ -269,13 +289,15 @@
             try {
                 await fetch(API_URL, {
                     method: 'POST', mode: 'no-cors',
-                    body: JSON.stringify({ action: 'registerDriverDevice', data: { driverId, deviceId } })
+                    body: JSON.stringify({ action: 'registerDevice', data: { driverId, deviceId } })
                 });
             } catch (error) { console.error('Error registering device:', error); }
         }
         
         async function fetchDriverOrders(driverId) {
-            orderList.innerHTML = '<p>טוען משימות...</p>';
+            const orderListEl = document.getElementById('orderList');
+            if (!orderListEl) return;
+            orderListEl.innerHTML = '<p>טוען משימות...</p>';
             const today = new Date().toISOString().split('T')[0];
             try {
                 const response = await fetch(`${API_URL}?action=getOrders&date=${today}&driverId=${driverId}`);
@@ -284,16 +306,19 @@
                     renderOrders(result.data);
                 } else { throw new Error(result.message); }
             } catch (error) {
-                orderList.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
+                orderListEl.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
             }
         }
 
         function renderOrders(orders) {
+            const orderListEl = document.getElementById('orderList');
+            if (!orderListEl) return;
+
             if (!orders || orders.length === 0) {
-                orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
+                orderListEl.innerHTML = '<p>אין לך משימות להיום.</p>';
                 return;
             }
-            orderList.innerHTML = orders.sort((a,b) => a.orderTime.localeCompare(b.orderTime)).map(order => {
+            orderListEl.innerHTML = orders.sort((a,b) => a.orderTime.localeCompare(b.orderTime)).map(order => {
                 const isStartDisabled = !(order.status === 'שויך');
                 const isCompleteDisabled = !(order.status === 'בדרך');
                 const navUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`;
