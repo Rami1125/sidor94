@@ -49,6 +49,9 @@
         .order-list { padding: 15px; }
         .order-card { background: var(--white); border-radius: var(--border-radius); margin-bottom: 15px; box-shadow: var(--shadow); border-right: 5px solid; }
         .card-content { padding: 20px; }
+        .card-content h2 { font-size: 1.2rem; margin-bottom: 10px; }
+        .card-content p { margin: 5px 0; display: flex; align-items: center; gap: 10px; color: #555; }
+        .card-content p i { color: var(--primary-color); width: 20px; text-align: center; }
         .card-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 15px; background-color: #f8f9fa; border-top: 1px solid #eee;}
         .action-btn { background-color: var(--primary-color); color: var(--white); border: none; padding: 12px; border-radius: 8px; font-size: 1rem; cursor: pointer; text-align: center; text-decoration: none;}
         .action-btn.start { background-color: var(--warning); }
@@ -111,6 +114,19 @@
                 checkAndRequestPermissions(loggedInDriver);
             } else {
                 showLoginView();
+            }
+
+            // NEW: Register the Service Worker to make the app installable
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('./sw.js')
+                        .then(registration => {
+                            console.log('Service Worker registered successfully:', registration.scope);
+                        })
+                        .catch(err => {
+                            console.error('Service Worker registration failed:', err);
+                        });
+                });
             }
         });
 
@@ -196,10 +212,72 @@
             }
         }
 
-        async function registerDevice(driverId, deviceId) { /* ... same as before ... */ }
-        async function fetchDriverOrders(driverId) { /* ... same as before ... */ }
-        function renderOrders(orders) { /* ... same as before ... */ }
-        async function updateOrderStatus(event, orderId, newStatus) { /* ... same as before ... */ }
+        async function registerDevice(driverId, deviceId) {
+            try {
+                await fetch(API_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    body: JSON.stringify({ action: 'registerDriverDevice', data: { driverId, deviceId } })
+                });
+                console.log(`Device ${deviceId} registered for driver ${driverId}`);
+            } catch (error) { console.error('Error registering device:', error); }
+        }
+        
+        async function fetchDriverOrders(driverId) {
+            orderList.innerHTML = '<p>טוען משימות...</p>';
+            const today = new Date().toISOString().split('T')[0];
+            try {
+                const response = await fetch(`${API_URL}?action=getOrders&date=${today}&driverId=${driverId}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    renderOrders(result.data);
+                } else { throw new Error(result.message); }
+            } catch (error) {
+                orderList.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
+            }
+        }
+
+        function renderOrders(orders) {
+            if (!orders || orders.length === 0) {
+                orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
+                return;
+            }
+            orderList.innerHTML = orders.sort((a,b) => a.orderTime.localeCompare(b.orderTime)).map(order => {
+                const isStartDisabled = !(order.status === 'שויך');
+                const isCompleteDisabled = !(order.status === 'בדרך');
+                const navUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`;
+                return `
+                <div class="order-card" data-status="${order.status}">
+                    <div class="card-content">
+                        <h2>${order.customerName}</h2>
+                        <p><i class="fas fa-clock"></i> <strong>שעה:</strong> ${order.orderTime}</p>
+                        <p><i class="fas fa-map-marker-alt"></i> <strong>כתובת:</strong> ${order.address}</p>
+                        <p><i class="fas fa-warehouse"></i> <strong>מחסן:</strong> ${order.warehouse}</p>
+                        <p><i class="fas fa-info-circle"></i> <strong>סטטוס:</strong> ${order.status}</p>
+                    </div>
+                    <div class="card-actions">
+                         <button class="action-btn start" onclick="updateOrderStatus(event, '${order.orderId}', 'בדרך')" ${isStartDisabled ? 'disabled' : ''}> <i class="fas fa-route"></i> התחל </button>
+                         <a href="${navUrl}" target="_blank" class="action-btn navigate"> <i class="fas fa-diamond-turn-right"></i> נווט </a>
+                         <button class="action-btn complete" onclick="updateOrderStatus(event, '${order.orderId}', 'הושלם')" ${isCompleteDisabled ? 'disabled' : ''}> <i class="fas fa-check-circle"></i> סיים </button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function updateOrderStatus(event, orderId, newStatus) {
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try {
+                await fetch(API_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
+                });
+                fetchDriverOrders(sessionStorage.getItem('driverId'));
+            } catch (error) {
+                console.error("Error updating status:", error);
+                btn.disabled = false;
+            }
+        }
 
         function showMainView(driverId) {
             welcomeMessage.textContent = `משימות עבור ${driverId}`;
