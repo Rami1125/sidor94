@@ -45,6 +45,8 @@
         .permission-card p { margin: 15px 0; }
         .permission-card button { width: 100%; padding: 15px; font-size: 1.1em; background-color: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; }
         .app-header { background: var(--primary-color); color: var(--white); padding: 15px 20px; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+        .header-buttons { display: flex; align-items: center; gap: 15px; }
+        .header-buttons button { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
         .order-list { padding: 15px; }
         .order-card { background: var(--white); border-radius: var(--border-radius); margin-bottom: 15px; box-shadow: var(--shadow); border-right: 5px solid; }
         .card-content { padding: 20px; }
@@ -76,7 +78,10 @@
     <div id="mainView" class="view">
          <header class="app-header">
             <h1 id="welcomeMessage"></h1>
-            <button id="logoutBtn" title="התנתק"><i class="fas fa-sign-out-alt"></i></button>
+            <div class="header-buttons">
+                <button id="installBtn" title="התקן אפליקציה" style="display: none;"><i class="fas fa-download"></i></button>
+                <button id="logoutBtn" title="התנתק"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
         </header>
         <main>
             <div id="orderList" class="order-list"></div>
@@ -104,7 +109,10 @@
         const driverIdInput = document.getElementById('driverIdInput');
         const welcomeMessage = document.getElementById('welcomeMessage');
         const orderList = document.getElementById('orderList');
+        const installBtn = document.getElementById('installBtn');
         
+        let deferredPrompt; // Stores the install prompt event
+
         // App Logic
         document.addEventListener('DOMContentLoaded', () => {
             const loggedInDriver = sessionStorage.getItem('driverId');
@@ -122,6 +130,28 @@
                         .catch(err => console.error('Service Worker registration failed:', err));
                 });
             }
+        });
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'block';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response to the install prompt: ${outcome}`);
+                deferredPrompt = null;
+                installBtn.style.display = 'none';
+            }
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            installBtn.style.display = 'none';
+            console.log('PWA was installed');
         });
 
         loginBtn.addEventListener('click', () => {
@@ -146,16 +176,11 @@
         enableFeaturesBtn.addEventListener('click', async () => {
             permissionOverlay.style.display = 'none';
             const driverId = sessionStorage.getItem('driverId');
-            
-            // FIXED: Request permissions first
             await OneSignal.Notifications.requestPermission();
-            
-            // Now initialize features which will check for granted permission
             initializeFeatures(driverId);
         });
 
         async function checkAndRequestPermissions(driverId) {
-            // FIXED: Check the permission property directly
             const isPushEnabled = OneSignal.Notifications.permission;
             const geoPermissionStatus = await navigator.permissions.query({name: 'geolocation'});
 
@@ -174,7 +199,6 @@
 
         async function initializeNotifications(driverId) {
             try {
-                // Login to OneSignal with external user ID
                 await OneSignal.login(driverId);
                 const playerId = OneSignal.User.onesignalId;
                 if (playerId) {
@@ -186,7 +210,6 @@
         let locationIntervalId;
         function startLocationTracking(driverId) {
             if (locationIntervalId) clearInterval(locationIntervalId);
-            
             const updateLocation = () => {
                 navigator.geolocation.getCurrentPosition(async (position) => {
                     const { latitude, longitude } = position.coords;
@@ -200,7 +223,6 @@
                     console.error('Geolocation error:', error);
                 }, { enableHighAccuracy: true });
             };
-            
             updateLocation();
             locationIntervalId = setInterval(updateLocation, 60000);
         }
