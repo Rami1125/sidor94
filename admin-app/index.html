@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- NEW: Leaflet Map Library -->
+    <!-- Leaflet Map Library -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -36,91 +36,28 @@
             color: var(--text-color);
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        h1, h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: var(--primary-color);
-        }
-
-        .main-layout {
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: 20px;
-        }
-
-        .card {
-            background: var(--white);
-            padding: 20px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            margin-bottom: 20px;
-        }
-        
-        /* NEW: Map Styling */
-        #liveMap {
-            height: 450px;
-            width: 100%;
-            border-radius: var(--border-radius);
-            border: 1px solid #ddd;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: right;
-        }
-        th, td {
-            padding: 12px;
-            border-bottom: 1px solid #dee2e6;
-        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1, h2 { text-align: center; margin-bottom: 20px; color: var(--primary-color); }
+        .main-layout { display: grid; grid-template-columns: 1fr 350px; gap: 20px; }
+        .card { background: var(--white); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 20px; }
+        #liveMap { height: 450px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; }
+        table { width: 100%; border-collapse: collapse; text-align: right; }
+        th, td { padding: 12px; border-bottom: 1px solid #dee2e6; }
         th { background-color: #e9ecef; }
-
-        .status-badge {
-            padding: 5px 10px;
-            border-radius: 20px;
-            color: var(--white);
-            font-size: 0.9em;
-            font-weight: 500;
-        }
+        .status-badge { padding: 5px 10px; border-radius: 20px; color: var(--white); font-size: 0.9em; font-weight: 500; }
         .status-חדש, .status-שויך { background-color: var(--info); }
         .status-בדרך { background-color: var(--warning); color: #333; }
         .status-הושלם { background-color: var(--success); }
-
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #ced4da;
-        }
-
-        button {
-            background-color: var(--primary-color);
-            color: var(--white);
-            border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-        }
-
+        .form-group input, .form-group select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; }
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; }
         .last-updated { text-align: center; color: var(--secondary-color); font-size: 0.9em; margin-top: 10px; }
-        
-        /* Leaflet popup customization */
-        .leaflet-popup-content {
-            text-align: right;
-            direction: rtl;
-        }
-        .leaflet-popup-content h3 {
-            margin: 0 0 5px 0;
-            font-size: 1.1em;
-        }
+        .leaflet-popup-content { text-align: right; direction: rtl; }
+        .leaflet-popup-content h3 { margin: 0 0 5px 0; font-size: 1.1em; }
+        .marker-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; background: var(--primary-color); position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; }
+        .marker-pin::after { content: ''; width: 14px; height: 14px; margin: 8px 0 0 8px; background: #fff; position: absolute; border-radius: 50%; }
+        .custom-div-icon i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -150%); color: white; font-size: 1.2em; }
     </style>
 </head>
 <body>
@@ -149,7 +86,6 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Orders will be populated here -->
                         </tbody>
                     </table>
                      <p class="last-updated">רשימה מתעדכנת כל 15 שניות. עודכן לאחרונה: <span id="lastUpdatedTime"></span></p>
@@ -160,18 +96,9 @@
                 <div class="card">
                     <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
                     <form id="createOrderForm">
-                        <div class="form-group">
-                            <label for="customerName">שם לקוח</label>
-                            <input type="text" id="customerName" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="address">כתובת</label>
-                            <input type="text" id="address" required>
-                        </div>
-                         <div class="form-group">
-                            <label for="orderTime">שעה</label>
-                            <input type="time" id="orderTime" required>
-                        </div>
+                        <div class="form-group"><label for="customerName">שם לקוח</label><input type="text" id="customerName" required></div>
+                        <div class="form-group"><label for="address">כתובת</label><input type="text" id="address" required></div>
+                         <div class="form-group"><label for="orderTime">שעה</label><input type="time" id="orderTime" required></div>
                         <button type="submit">צור הזמנה</button>
                     </form>
                 </div>
@@ -187,65 +114,71 @@
         const lastUpdatedTimeSpan = document.getElementById('lastUpdatedTime');
         const todayDateSpan = document.getElementById('todayDate');
         
-        // NEW: Map variables
         let liveMap;
-        let driverMarkers = {}; // Object to store driver markers
+        let driverMarkers = {}; 
 
-        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             todayDateSpan.textContent = today.toLocaleDateString('he-IL');
             
-            initializeMap(); // NEW
+            initializeMap();
             
             fetchOrders();
             fetchDrivers();
             
-            updateMap(); // NEW: Initial map update
+            updateMap(); 
 
-            setInterval(fetchOrders, 15000); // Refresh orders every 15 seconds
-            setInterval(updateMap, 30000); // NEW: Refresh map every 30 seconds
+            setInterval(fetchOrders, 15000); 
+            setInterval(updateMap, 30000);
         });
 
-        // NEW: Function to initialize the map
         function initializeMap() {
-            liveMap = L.map('liveMap').setView([32.0853, 34.7818], 10); // Centered on Tel Aviv
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            }).addTo(liveMap);
+            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            });
+
+            // UPGRADED: Added satellite layer
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+	            attribution: 'Tiles &copy; Esri'
+            });
+
+            liveMap = L.map('liveMap', {
+                center: [32.0853, 34.7818],
+                zoom: 10,
+                layers: [standardLayer] // Default layer
+            });
+            
+            const baseMaps = {
+                "מפה רגילה": standardLayer,
+                "תצוגת לוויין": satelliteLayer
+            };
+
+            L.control.layers(baseMaps).addTo(liveMap);
         }
 
-        // NEW: Function to update the map with driver locations
         async function updateMap() {
              try {
                 const response = await fetch(`${API_URL}?action=getLiveMapData`);
                 const result = await response.json();
-
                 if (result.status !== 'success') throw new Error(result.message);
                 
                 const driversData = result.data;
 
                 driversData.forEach(driver => {
                     const latLng = [driver.latitude, driver.longitude];
-                    const popupContent = `
-                        <h3>${driver.name}</h3>
-                        <p>עודכן לאחרונה: ${new Date(driver.lastUpdate).toLocaleTimeString('he-IL')}</p>
-                    `;
+                    const popupContent = `<h3>${driver.name}</h3><p>עודכן: ${new Date(driver.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
+                    
+                    const icon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class='marker-pin'></div><i class='fas fa-truck'></i>`,
+                        iconSize: [30, 42],
+                        iconAnchor: [15, 42]
+                    });
 
                     if (driverMarkers[driver.driverId]) {
-                        // Marker exists, update its position and popup
                         driverMarkers[driver.driverId].setLatLng(latLng).setPopupContent(popupContent);
                     } else {
-                        // Create new marker
-                        const icon = L.divIcon({
-                            className: 'custom-div-icon',
-                            html: `<div style='background-color: var(--primary-color);' class='marker-pin'></div><i class='fas fa-truck'></i>`,
-                            iconSize: [30, 42],
-                            iconAnchor: [15, 42]
-                        });
-
-                        const marker = L.marker(latLng, { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448628.png', iconSize: [38, 38] }) })
+                        const marker = L.marker(latLng, { icon: icon })
                                           .addTo(liveMap)
                                           .bindPopup(popupContent);
                         driverMarkers[driver.driverId] = marker;
@@ -257,7 +190,6 @@
             }
         }
 
-
         async function fetchOrders() {
             const todayStr = new Date().toISOString().split('T')[0];
             try {
@@ -266,12 +198,8 @@
                 if (result.status === 'success') {
                     renderOrders(result.data);
                     lastUpdatedTimeSpan.textContent = new Date().toLocaleTimeString('he-IL');
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error) {
-                console.error('Error fetching orders:', error);
-            }
+                } else { throw new Error(result.message); }
+            } catch (error) { console.error('Error fetching orders:', error); }
         }
 
         function renderOrders(orders) {
@@ -295,41 +223,35 @@
                 ordersTableBody.appendChild(row);
             });
             
-            // This is where we will add driver assignment logic in the future
             addDriverDropdownsToTable(orders);
         }
         
-        // This function will be enhanced later, for now it just populates
          async function addDriverDropdownsToTable(orders) {
-            const driversResponse = await fetch(`${API_URL}?action=getDrivers`);
-            const driversResult = await driversResponse.json();
-            if (driversResult.status !== 'success') return;
-            const drivers = driversResult.data;
+            try {
+                const driversResponse = await fetch(`${API_URL}?action=getDrivers`);
+                const driversResult = await driversResponse.json();
+                if (driversResult.status !== 'success') return;
+                const drivers = driversResult.data;
 
-            orders.forEach(order => {
-                const cell = document.getElementById(`driver-cell-${order.orderId}`);
-                if (!cell) return;
+                orders.forEach(order => {
+                    const cell = document.getElementById(`driver-cell-${order.orderId}`);
+                    if (!cell) return;
 
-                const select = document.createElement('select');
-                select.innerHTML = '<option value="">בחר נהג...</option>';
-                drivers.forEach(driver => {
-                    const option = document.createElement('option');
-                    option.value = driver.driverId;
-                    option.textContent = driver.name;
-                    if (driver.driverId === order.driverId) {
-                        option.selected = true;
-                    }
-                    select.appendChild(option);
+                    const select = document.createElement('select');
+                    select.innerHTML = '<option value="">בחר נהג...</option>';
+                    drivers.forEach(driver => {
+                        const option = document.createElement('option');
+                        option.value = driver.driverId;
+                        option.textContent = driver.name;
+                        if (driver.driverId === order.driverId) option.selected = true;
+                        select.appendChild(option);
+                    });
+                    
+                    select.addEventListener('change', (e) => updateOrderDriver(order.orderId, e.target.value));
+                    cell.innerHTML = '';
+                    cell.appendChild(select);
                 });
-                
-                select.addEventListener('change', async (e) => {
-                    const newDriverId = e.target.value;
-                    await updateOrderDriver(order.orderId, newDriverId);
-                });
-
-                cell.innerHTML = '';
-                cell.appendChild(select);
-            });
+            } catch (error) { console.error("Error adding driver dropdowns:", error); }
         }
         
         async function updateOrderDriver(orderId, driverId) {
@@ -339,13 +261,10 @@
                     mode: 'no-cors',
                     body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: driverId } } })
                 });
-                fetchOrders(); // Refresh the list to show changes
-            } catch (error) {
-                console.error("Error updating driver:", error);
-            }
+                fetchOrders();
+            } catch (error) { console.error("Error updating driver:", error); }
         }
         
-         // Placeholder for fetchDrivers, as it's part of the logic for the dropdowns
         async function fetchDrivers() { /* This logic is now inside addDriverDropdownsToTable */ }
         
         createOrderForm.addEventListener('submit', async (e) => {
@@ -365,9 +284,7 @@
                 });
                 createOrderForm.reset();
                 fetchOrders();
-            } catch (error) {
-                console.error('Error creating order:', error);
-            }
+            } catch (error) { console.error('Error creating order:', error); }
         });
     </script>
 </body>
