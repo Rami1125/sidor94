@@ -6,7 +6,7 @@
     <title>DeliveryMaster - נהג</title>
 
     <!-- PWA Manifest -->
-<link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#3a86ff">
 
     <!-- Fonts and Icons -->
@@ -32,8 +32,9 @@
             --border-radius: 12px;
         }
         body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 0; color: var(--text-color); }
-        .view { display: none !important; } /* Use important to ensure override */
-        .view.active { display: block !important; }
+        .view { display: none; } /* Default state: hidden */
+        .view.active { display: block; } /* Active state: visible */
+
         #loginView { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
         .login-card { background: var(--white); padding: 40px; border-radius: var(--border-radius); box-shadow: var(--shadow); text-align: center; width: 90%; max-width: 400px; }
         .login-card img { width: 100px; height: 100px; border-radius: 20px; margin-bottom: 20px; }
@@ -66,7 +67,7 @@
 </head>
 <body>
     
-    <div id="loginView" class="view">
+    <div id="loginView" class="view active">
         <div class="login-card">
             <img src="https://i.postimg.cc/ryPT3r29/image.png" alt="Company Logo">
             <h1>כניסת נהג</h1>
@@ -157,8 +158,8 @@
         });
         
         enableFeaturesBtn.addEventListener('click', async () => {
-            permissionOverlay.style.display = 'none';
             const driverId = sessionStorage.getItem('driverId');
+            permissionOverlay.style.display = 'none'; 
             
             try {
                 await OneSignal.Notifications.requestPermission();
