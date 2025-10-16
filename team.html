@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="60"> <!-- מרענן את הדף כל 60 שניות -->
+    <title>Dashboard תפעולי - ח. סבן</title>
+    <style>
+        body { 
+            font-family: 'Rubik', sans-serif; 
+            background-color: #f0f2f5; 
+            margin: 0;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h1 { 
+            color: #1c3d5a;
+            font-size: 2rem;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .main-content {
+            grid-column: 2 / 3;
+        }
+        .sidebar {
+            grid-column: 1 / 2;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #map {
+            width: 100%;
+            height: 60vh;
+            background-color: #e9e9e9;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            border-bottom: 2px solid #4a90e2;
+            padding-bottom: 10px;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .orders-list-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .orders-list-item:last-child {
+            border-bottom: none;
+        }
+        .order-customer { font-weight: bold; }
+        .order-driver-ali { color: #3498db; }
+        .order-driver-hakmat { color: #2ecc71; }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            .main-content, .sidebar {
+                grid-column: 1 / -1;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Dashboard תפעולי - מבט בזמן אמת</h1>
+    </header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h2><i class="fas fa-list-ul"></i> סידור עבודה להיום</h2>
+            <div id="orders-list">
+                <!-- רשימת ההזמנות תטען כאן -->
+                <p>טוען נתונים...</p>
+            </div>
+        </aside>
+        <main class="main-content">
+             <h2><i class="fas fa-map-marked-alt"></i> מפת צי רכב</h2>
+             <div id="map">
+                <!-- כאן תוטמע מפה חיה -->
+             </div>
+        </main>
+    </div>
+
+    <script>
+        const API_URL = 'YOUR_APPS_SCRIPT_DEPLOYMENT_URL';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Viewer App Initialized');
+            // כאן יתווספו קריאות API לקבלת נתוני הזמנות ומיקומים
+            // ורינדורם על המפה וברשימה.
+            // הפונקציות יהיו לקריאה בלבד.
+        });
+    </script>
+</body>
+</html>
