@@ -32,10 +32,9 @@
             --border-radius: 12px;
         }
         body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 0; color: var(--text-color); }
-        .view { display: none; } /* Default state: hidden */
-        .view.active { display: block; } /* Active state: visible */
-
-        #loginView { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
+        .view { display: none !important; } /* Use important to ensure override */
+        .view.active { display: flex !important; flex-direction: column; height: 100vh; }
+        #loginView { justify-content: center; align-items: center; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
         .login-card { background: var(--white); padding: 40px; border-radius: var(--border-radius); box-shadow: var(--shadow); text-align: center; width: 90%; max-width: 400px; }
         .login-card img { width: 100px; height: 100px; border-radius: 20px; margin-bottom: 20px; }
         .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 8px; font-size: 1.2rem; text-align: center; }
@@ -45,7 +44,8 @@
         .permission-card h2 { color: var(--primary-color); }
         .permission-card p { margin: 15px 0; }
         .permission-card button { width: 100%; padding: 15px; font-size: 1.1em; background-color: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; }
-        .app-header { background: var(--primary-color); color: var(--white); padding: 15px 20px; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+        .app-header { background: var(--primary-color); color: var(--white); padding: 15px 20px; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        main { flex-grow: 1; overflow-y: auto; }
         .header-buttons { display: flex; align-items: center; gap: 15px; }
         .header-buttons button { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
         .order-list { padding: 15px; }
@@ -67,7 +67,7 @@
 </head>
 <body>
     
-    <div id="loginView" class="view active">
+    <div id="loginView" class="view">
         <div class="login-card">
             <img src="https://i.postimg.cc/ryPT3r29/image.png" alt="Company Logo">
             <h1>כניסת נהג</h1>
@@ -120,7 +120,7 @@
             if (loggedInDriver) {
                 initApp(loggedInDriver);
             } else {
-                showLoginView();
+                switchView('loginView');
             }
             registerServiceWorker();
         });
@@ -154,7 +154,7 @@
             if (window.OneSignal) OneSignal.logout();
             stopLocationTracking(driverId);
             sessionStorage.removeItem('driverId');
-            showLoginView();
+            switchView('loginView');
         });
         
         enableFeaturesBtn.addEventListener('click', async () => {
@@ -172,7 +172,8 @@
 
         // Core Functions
         function initApp(driverId) {
-            showMainView(driverId);
+            switchView('mainView');
+            welcomeMessage.textContent = `משימות עבור ${driverId}`;
             checkAndRequestPermissions(driverId);
         }
 
@@ -315,15 +316,19 @@
         }
         
         // --- View Management ---
+        function switchView(viewId) {
+            document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+            const viewToShow = document.getElementById(viewId);
+            if(viewToShow) viewToShow.classList.add('active');
+        }
+
         function showMainView(driverId) {
             welcomeMessage.textContent = `משימות עבור ${driverId}`;
-            loginView.classList.remove('active');
-            mainView.classList.add('active');
+            switchView('mainView');
         }
 
         function showLoginView() {
-            mainView.classList.remove('active');
-            loginView.classList.add('active');
+            switchView('loginView');
         }
     </script>
 </body>
