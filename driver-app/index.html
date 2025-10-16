@@ -3,80 +3,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>אפליקציית נהגים - ח. סבן</title>
-    
+    <title>DeliveryMaster - נהג</title>
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
-    
+    <meta name="theme-color" content="#3a86ff">
+
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
-        /* CSS styles for the driver's mobile app will go here */
-        body { font-family: 'Rubik', sans-serif; margin: 0; padding: 15px; }
-        h1 { font-size: 1.5rem; }
+        :root {
+            --primary-color: #3a86ff;
+            --secondary-color: #03045e;
+            --background-color: #f0f2f5;
+            --text-color: #333;
+            --white: #ffffff;
+            --success: #2a9d8f;
+            --warning: #fca311;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 12px;
+        }
+
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 0;
+            color: var(--text-color);
+        }
+        
+        /* ... (login styles remain the same) ... */
+        #loginView {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+        .login-card {
+            background: var(--white);
+            padding: 40px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+        .login-card h1 { color: var(--secondary-color); margin-bottom: 25px; }
+        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 8px; font-size: 1.2rem; text-align: center; }
+        .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color: var(--white); border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer; }
+
+        /* --- Main App View --- */
+        #mainView { display: none; }
+        .app-header { background: var(--primary-color); color: var(--white); padding: 15px 20px; position: sticky; top: 0; z-index: 10; box-shadow: 0 2px 10px rgba(0,0,0,0.15); display: flex; justify-content: space-between; align-items: center; }
+        .app-header h1 { font-size: 1.5rem; margin: 0; }
+        #logoutBtn { background: none; border: none; color: var(--white); font-size: 1.5rem; cursor: pointer; }
+
+        .order-list { padding: 15px; }
+        .order-card { background: var(--white); border-radius: var(--border-radius); margin-bottom: 15px; box-shadow: var(--shadow); border-right: 5px solid; transition: border-color 0.3s; }
+        
+        .order-card[data-status="שויך"] { border-color: var(--primary-color); }
+        .order-card[data-status="בדרך"] { border-color: var(--warning); }
+        .order-card[data-status="הושלם"] { border-color: var(--success); opacity: 0.7; }
+
+        .card-content { padding: 20px; }
+        .card-content h2 { font-size: 1.2rem; margin-bottom: 10px; }
+        .card-content p { margin: 5px 0; display: flex; align-items: center; gap: 10px; color: #555; }
+        .card-content p i { color: var(--primary-color); width: 20px; text-align: center; }
+        
+        .card-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #eee;
+        }
+        .action-btn {
+            background-color: var(--primary-color);
+            color: var(--white);
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .action-btn.start { background-color: var(--warning); }
+        .action-btn.complete { background-color: var(--success); }
+        .action-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        .notification { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 8px; color: var(--white); box-shadow: var(--shadow); z-index: 1001; transition: bottom 0.5s ease; }
+        .notification.show { bottom: 20px; }
+        .notification.success { background-color: var(--success); }
+        .notification.error { background-color: var(--danger); }
     </style>
 </head>
 <body>
-    <header>
-        <h1>הסידור שלי להיום</h1>
-    </header>
 
-    <main id="orders-list">
-        <!-- The list of assigned orders for the driver will be rendered here -->
-        <p>טוען סידור עבודה...</p>
-    </main>
+    <div class="notification" id="notification"></div>
+
+    <!-- Login View -->
+    <div id="loginView">
+        <div class="login-card">
+            <h1><i class="fas fa-truck"></i> כניסת נהג</h1>
+            <input type="text" id="driverIdInput" placeholder="הזן מספר נהג (לדוגמה: DRV-001)">
+            <button id="loginBtn">כניסה</button>
+        </div>
+    </div>
+
+    <!-- Main Application View -->
+    <div id="mainView">
+        <header class="app-header">
+            <h1 id="welcomeMessage">ברוך הבא</h1>
+            <button id="logoutBtn" title="התנתק"><i class="fas fa-sign-out-alt"></i></button>
+        </header>
+        <main>
+            <div id="orderList" class="order-list"></div>
+        </main>
+    </div>
 
     <script>
-        // The URL for our deployed Google Apps Script "Manoa"
         const API_URL = 'https://script.google.com/macros/s/AKfycbyArVx35Fhcp2DVN9nTa4wp6IGx4I9obRsediUkeIx6mvaKOw8cU3yPF2DokAR_IJ8/exec';
-        const LOCATION_UPDATE_INTERVAL = 60000; // 60 seconds
 
+        // DOM Elements
+        const loginView = document.getElementById('loginView'), mainView = document.getElementById('mainView');
+        const loginBtn = document.getElementById('loginBtn'), logoutBtn = document.getElementById('logoutBtn');
+        const driverIdInput = document.getElementById('driverIdInput');
+        const welcomeMessage = document.getElementById('welcomeMessage');
+        const orderList = document.getElementById('orderList');
+        const notification = document.getElementById('notification');
+
+        // App Logic
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('Driver App Initialized');
-            
-            // 1. Register the Service Worker for PWA functionality and notifications
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('Service worker registered', reg))
-                    .catch(err => console.error('Service worker not registered', err));
+            const loggedInDriver = sessionStorage.getItem('driverId');
+            if (loggedInDriver) {
+                showMainView(loggedInDriver);
+                fetchDriverOrders(loggedInDriver);
             }
-
-            // 2. Initialize OneSignal and get deviceId
-            // (OneSignal SDK code will be added here)
-            
-            // 3. Request permissions for notifications and location
-            requestPermissions();
-
-            // 4. Fetch the driver's orders
-            // fetchMyOrders();
-
-            // 5. Start sending location updates periodically
-            // setInterval(updateMyLocation, LOCATION_UPDATE_INTERVAL);
         });
 
-        function requestPermissions() {
-            // Logic to ask the user for permission to show notifications
-            // and access their GPS location.
-            console.log('Requesting permissions...');
+        loginBtn.addEventListener('click', () => {
+            const driverId = driverIdInput.value.trim();
+            if (driverId) {
+                sessionStorage.setItem('driverId', driverId);
+                showMainView(driverId);
+                fetchDriverOrders(driverId);
+            }
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            sessionStorage.removeItem('driverId');
+            showLoginView();
+        });
+
+        async function fetchDriverOrders(driverId) {
+            orderList.innerHTML = '<p>טוען משימות...</p>';
+            const today = new Date().toISOString().split('T')[0];
+            try {
+                const response = await fetch(`${API_URL}?action=getOrders&date=${today}&driverId=${driverId}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    renderOrders(result.data);
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                orderList.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
+            }
+        }
+        
+        function renderOrders(orders) {
+            if (!orders || orders.length === 0) {
+                orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
+                return;
+            }
+
+            orderList.innerHTML = orders
+                .sort((a,b) => a.orderTime.localeCompare(b.orderTime))
+                .map(order => {
+                const isStartDisabled = !(order.status === 'שויך');
+                const isCompleteDisabled = !(order.status === 'בדרך');
+                return `
+                <div class="order-card" data-status="${order.status}">
+                    <div class="card-content">
+                        <h2>${order.customerName}</h2>
+                        <p><i class="fas fa-clock"></i> <strong>שעה:</strong> ${order.orderTime}</p>
+                        <p><i class="fas fa-map-marker-alt"></i> <strong>כתובת:</strong> ${order.address}</p>
+                        <p><i class="fas fa-warehouse"></i> <strong>מחסן:</strong> ${order.warehouse}</p>
+                        <p><i class="fas fa-info-circle"></i> <strong>סטטוס:</strong> ${order.status}</p>
+                    </div>
+                    <div class="card-actions">
+                         <button class="action-btn start" onclick="updateOrderStatus('${order.orderId}', 'בדרך')" ${isStartDisabled ? 'disabled' : ''}>
+                            <i class="fas fa-route"></i> התחל נסיעה
+                        </button>
+                        <button class="action-btn complete" onclick="updateOrderStatus('${order.orderId}', 'הושלם')" ${isCompleteDisabled ? 'disabled' : ''}>
+                            <i class="fas fa-check-circle"></i> סיים משימה
+                        </button>
+                    </div>
+                </div>
+            `}).join('');
+        }
+        
+        async function updateOrderStatus(orderId, newStatus) {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
+                });
+                showNotification(`סטטוס הזמנה עודכן ל: ${newStatus}`, 'success');
+                fetchDriverOrders(sessionStorage.getItem('driverId'));
+            } catch (error) {
+                showNotification(`שגיאה בעדכון סטטוס: ${error.message}`, 'error');
+                btn.disabled = false; // Re-enable on error
+            }
         }
 
-        async function updateMyLocation() {
-            // Logic to get current GPS coordinates and send them to the backend
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                const { latitude, longitude } = position.coords;
-                console.log(`Updating location: ${latitude}, ${longitude}`);
-                
-                // const response = await fetch(API_URL, {
-                //     method: 'POST',
-                //     body: JSON.stringify({
-                //         action: 'updateDriverLocation',
-                //         driverId: 'CURRENT_DRIVER_ID', // This needs to be stored after login
-                //         lat: latitude,
-                //         lng: longitude
-                //     })
-                // });
-                // const result = await response.json();
-                // console.log(result.message);
+        function showMainView(driverId) {
+            welcomeMessage.textContent = `משימות עבור ${driverId}`;
+            loginView.style.display = 'none';
+            mainView.style.display = 'block';
+        }
+
+        function showLoginView() {
+            mainView.style.display = 'none';
+            loginView.style.display = 'flex';
+        }
+        
+        function showNotification(message, type = 'success') {
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log('SW reg failed: ', err));
             });
         }
     </script>
+
 </body>
 </html>
+
