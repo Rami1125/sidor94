@@ -93,10 +93,11 @@
             display: inline-block;
         }
 
-        .status-new { background-color: #00b4d8; }
-        .status-assigned { background-color: var(--warning); }
-        .status-completed { background-color: #2a9d8f; }
-        .status-cancelled { background-color: #e63946; }
+        .status-חדש { background-color: #00b4d8; }
+        .status-שויך { background-color: #4361ee; }
+        .status-בדרך { background-color: var(--warning); }
+        .status-הושלם { background-color: #2a9d8f; }
+        .status-בוטל { background-color: #e63946; }
 
         .loader {
             text-align: center;
@@ -144,8 +145,8 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             fetchAndRenderOrders();
-            // Auto-refresh data every 60 seconds
-            setInterval(fetchAndRenderOrders, 60000);
+            // Auto-refresh data every 15 seconds
+            setInterval(fetchAndRenderOrders, 15000);
         });
 
         async function fetchAndRenderOrders() {
@@ -182,7 +183,7 @@
                             <td>${order.address}</td>
                             <td>${order.orderTime}</td>
                             <td>${order.driverId || 'לא שויך'}</td>
-                            <td>${getStatusBadge(order.status)}</td>
+                            <td><span class="status status-${order.status || 'חדש'}">${order.status || 'חדש'}</span></td>
                         `;
                         ordersTableBody.appendChild(row);
                     });
@@ -198,18 +199,6 @@
 
         function setErrorState(message) {
             ordersTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: red;">שגיאה: ${message}</td></tr>`;
-        }
-
-        function getStatusBadge(status) {
-            let statusClass = 'status-new';
-            let statusText = status || 'חדש';
-
-            switch (statusText) {
-                case 'שויך': statusClass = 'status-assigned'; break;
-                case 'הושלם': statusClass = 'status-completed'; break;
-                case 'בוטל': statusClass = 'status-cancelled'; break;
-            }
-            return `<span class="status ${statusClass}">${statusText}</span>`;
         }
     </script>
 
