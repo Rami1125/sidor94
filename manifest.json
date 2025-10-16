@@ -1,6 +1,8 @@
 {
 "short_name": "נהגים",
 "name": "DeliveryMaster - אפליקציית נהגים",
+"lang": "he-IL",
+"description": "אפליקציית נהגים לניהול משימות, ניווט ועדכונים בזמן אמת.",
 "icons": [
 {
 "src": "https://i.postimg.cc/ryPT3r29/image.png",
@@ -15,7 +17,8 @@
 "purpose": "any maskable"
 }
 ],
-"start_url": ".",
+"start_url": "./index.html",
+"scope": "./",
 "display": "standalone",
 "orientation": "portrait-primary",
 "background_color": "#f0f2f5",
