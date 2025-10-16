@@ -55,7 +55,10 @@
         .last-updated { text-align: center; color: var(--secondary-color); font-size: 0.9em; margin-top: 10px; }
         .leaflet-popup-content { text-align: right; direction: rtl; }
         .leaflet-popup-content h3 { margin: 0 0 5px 0; font-size: 1.1em; }
-        .marker-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; background: var(--primary-color); position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; }
+        .custom-div-icon { position: relative; }
+        .marker-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; }
+        .driver-available .marker-pin { background-color: var(--success); }
+        .driver-on-route .marker-pin { background-color: var(--warning); }
         .marker-pin::after { content: ''; width: 14px; height: 14px; margin: 8px 0 0 8px; background: #fff; position: absolute; border-radius: 50%; }
         .custom-div-icon i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -150%); color: white; font-size: 1.2em; }
     </style>
@@ -68,9 +71,9 @@
         <div class="main-layout">
             <div class="left-panel">
                 <div class="card">
-                    <h2><i class="fas fa-map-marked-alt"></i> מפה חיה</h2>
+                    <h2><i class="fas fa-map-marked-alt"></i> מפה טקטית חיה</h2>
                     <div id="liveMap"></div>
-                    <p class="last-updated">מיקומים מתעדכנים כל 30 שניות</p>
+                    <p class="last-updated">מידע מתעדכן כל 30 שניות</p>
                 </div>
 
                 <div class="card">
@@ -115,7 +118,8 @@
         const todayDateSpan = document.getElementById('todayDate');
         
         let liveMap;
-        let driverMarkers = {}; 
+        let driverMarkers = {};
+        let orderMarkersLayer = L.layerGroup(); // Layer for pending orders
 
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -124,8 +128,6 @@
             initializeMap();
             
             fetchOrders();
-            fetchDrivers();
-            
             updateMap(); 
 
             setInterval(fetchOrders, 15000); 
@@ -133,27 +135,18 @@
         });
 
         function initializeMap() {
-            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap'
-            });
-
-            // UPGRADED: Added satellite layer
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-	            attribution: 'Tiles &copy; Esri'
-            });
+            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
 
             liveMap = L.map('liveMap', {
                 center: [32.0853, 34.7818],
                 zoom: 10,
-                layers: [standardLayer] // Default layer
+                layers: [standardLayer]
             });
             
-            const baseMaps = {
-                "מפה רגילה": standardLayer,
-                "תצוגת לוויין": satelliteLayer
-            };
-
+            const baseMaps = { "מפה": standardLayer, "לוויין": satelliteLayer };
             L.control.layers(baseMaps).addTo(liveMap);
+            orderMarkersLayer.addTo(liveMap);
         }
 
         async function updateMap() {
@@ -162,28 +155,56 @@
                 const result = await response.json();
                 if (result.status !== 'success') throw new Error(result.message);
                 
-                const driversData = result.data;
+                const { drivers, pendingOrders } = result.data;
 
-                driversData.forEach(driver => {
-                    const latLng = [driver.latitude, driver.longitude];
-                    const popupContent = `<h3>${driver.name}</h3><p>עודכן: ${new Date(driver.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
-                    
+                // Update drivers
+                drivers.forEach(driver => {
+                    if (!driver.location) return;
+
+                    const latLng = [driver.location.latitude, driver.location.longitude];
+                    const isOnRoute = !!driver.activeOrder;
+                    const statusClass = isOnRoute ? 'driver-on-route' : 'driver-available';
+                    let popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
+                    if(isOnRoute) {
+                        popupContent += `<p>יעד: ${driver.activeOrder.customerName}</p>`;
+                    }
+
                     const icon = L.divIcon({
-                        className: 'custom-div-icon',
+                        className: `custom-div-icon ${statusClass}`,
                         html: `<div class='marker-pin'></div><i class='fas fa-truck'></i>`,
                         iconSize: [30, 42],
                         iconAnchor: [15, 42]
                     });
 
                     if (driverMarkers[driver.driverId]) {
-                        driverMarkers[driver.driverId].setLatLng(latLng).setPopupContent(popupContent);
+                        driverMarkers[driver.driverId].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
                     } else {
-                        const marker = L.marker(latLng, { icon: icon })
+                        driverMarkers[driver.driverId] = L.marker(latLng, { icon: icon })
                                           .addTo(liveMap)
                                           .bindPopup(popupContent);
-                        driverMarkers[driver.driverId] = marker;
                     }
                 });
+                
+                // Update pending orders
+                orderMarkersLayer.clearLayers(); // Clear old orders
+                pendingOrders.forEach(order => {
+                    // Placeholder coordinates - geocoding is needed for real addresses
+                    // For now, let's place them randomly around Tel Aviv for visualization
+                    const lat = 32.0853 + (Math.random() - 0.5) * 0.1;
+                    const lng = 34.7818 + (Math.random() - 0.5) * 0.1;
+
+                    const orderIcon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class='marker-pin' style='background-color: var(--danger);'></div><i class='fas fa-box'></i>`,
+                        iconSize: [30, 42],
+                        iconAnchor: [15, 42]
+                    });
+                     
+                    const orderPopup = `<h3>הזמנה פנויה</h3><p>${order.customerName}</p><p>${order.address}</p>`;
+
+                    L.marker([lat, lng], { icon: orderIcon }).bindPopup(orderPopup).addTo(orderMarkersLayer);
+                });
+
 
             } catch (error) {
                 console.error('Error updating map:', error);
@@ -264,8 +285,6 @@
                 fetchOrders();
             } catch (error) { console.error("Error updating driver:", error); }
         }
-        
-        async function fetchDrivers() { /* This logic is now inside addDriverDropdownsToTable */ }
         
         createOrderForm.addEventListener('submit', async (e) => {
             e.preventDefault();
