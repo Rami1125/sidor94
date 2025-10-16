@@ -32,8 +32,8 @@
             --border-radius: 12px;
         }
         body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 0; color: var(--text-color); }
-        .view { display: none; }
-        .view.active { display: block; }
+        .view { display: none !important; } /* Use important to ensure override */
+        .view.active { display: block !important; }
         #loginView { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
         .login-card { background: var(--white); padding: 40px; border-radius: var(--border-radius); box-shadow: var(--shadow); text-align: center; width: 90%; max-width: 400px; }
         .login-card img { width: 100px; height: 100px; border-radius: 20px; margin-bottom: 20px; }
@@ -66,7 +66,7 @@
 </head>
 <body>
     
-    <div id="loginView" class="view active">
+    <div id="loginView" class="view">
         <div class="login-card">
             <img src="https://i.postimg.cc/ryPT3r29/image.png" alt="Company Logo">
             <h1>כניסת נהג</h1>
@@ -111,52 +111,32 @@
         const orderList = document.getElementById('orderList');
         const installBtn = document.getElementById('installBtn');
         
-        let deferredPrompt; // Stores the install prompt event
+        let deferredPrompt; 
 
-        // App Logic
+        // App Initialization
         document.addEventListener('DOMContentLoaded', () => {
             const loggedInDriver = sessionStorage.getItem('driverId');
             if (loggedInDriver) {
-                showMainView(loggedInDriver);
-                checkAndRequestPermissions(loggedInDriver);
+                initApp(loggedInDriver);
             } else {
                 showLoginView();
             }
-
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('./sw.js')
-                        .then(reg => console.log('Service Worker registered.', reg.scope))
-                        .catch(err => console.error('Service Worker registration failed:', err));
-                });
-            }
+            registerServiceWorker();
         });
 
-        // Listen for the browser's install prompt
+        // Event Listeners
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            if (installBtn) {
-               installBtn.style.display = 'block';
-            }
+            if (installBtn) installBtn.style.display = 'block';
         });
 
-        // Handle the install button click
         installBtn.addEventListener('click', async () => {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
+                await deferredPrompt.userChoice;
                 deferredPrompt = null;
-                if (installBtn) {
-                    installBtn.style.display = 'none';
-                }
-            }
-        });
-
-        window.addEventListener('appinstalled', () => {
-            deferredPrompt = null;
-            if(installBtn) {
-                installBtn.style.display = 'none';
+                if (installBtn) installBtn.style.display = 'none';
             }
         });
 
@@ -164,35 +144,36 @@
             const driverId = driverIdInput.value.trim().toUpperCase();
             if (driverId) {
                 sessionStorage.setItem('driverId', driverId);
-                showMainView(driverId);
-                checkAndRequestPermissions(driverId);
+                initApp(driverId);
             }
         });
 
         logoutBtn.addEventListener('click', () => {
             const driverId = sessionStorage.getItem('driverId');
-            if (window.OneSignal) {
-                 OneSignal.logout();
-            }
+            if (window.OneSignal) OneSignal.logout();
             stopLocationTracking(driverId);
             sessionStorage.removeItem('driverId');
             showLoginView();
         });
         
         enableFeaturesBtn.addEventListener('click', async () => {
+            permissionOverlay.style.display = 'none';
             const driverId = sessionStorage.getItem('driverId');
-            permissionOverlay.style.display = 'none'; // Hide overlay immediately
             
             try {
-                // Request notifications
                 await OneSignal.Notifications.requestPermission();
             } catch(e) {
                 console.error("Notification permission request failed", e);
             } finally {
-                // Always try to initialize, even if permissions fail
                 initializeFeatures(driverId);
             }
         });
+
+        // Core Functions
+        function initApp(driverId) {
+            showMainView(driverId);
+            checkAndRequestPermissions(driverId);
+        }
 
         async function checkAndRequestPermissions(driverId) {
             const isPushEnabled = OneSignal.Notifications.permission;
@@ -211,14 +192,23 @@
             startLocationTracking(driverId);
             fetchDriverOrders(driverId);
         }
+        
+        function registerServiceWorker() {
+             if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('./sw.js')
+                        .then(reg => console.log('Service Worker registered.', reg.scope))
+                        .catch(err => console.error('Service Worker registration failed:', err));
+                });
+            }
+        }
 
+        // --- Feature-specific Functions (Notifications, Location, Orders) ---
         async function initializeNotifications(driverId) {
             try {
                 await OneSignal.login(driverId);
                 const playerId = OneSignal.User.onesignalId;
-                if (playerId) {
-                    registerDevice(driverId, playerId);
-                }
+                if (playerId) registerDevice(driverId, playerId);
             } catch (error) { console.error("OneSignal login failed:", error); }
         }
         
@@ -227,7 +217,6 @@
             if (locationIntervalId) clearInterval(locationIntervalId);
             
             const updateLocation = () => {
-                // Check for permission before trying to get location
                 navigator.permissions.query({name: 'geolocation'}).then(status => {
                     if (status.state === 'granted') {
                         navigator.geolocation.getCurrentPosition(async (position) => {
@@ -242,7 +231,6 @@
                             console.error('Geolocation error:', error);
                         }, { enableHighAccuracy: true });
                     } else {
-                        console.log("Geolocation permission not granted. Stopping tracking.");
                         stopLocationTracking(driverId);
                     }
                 });
@@ -255,7 +243,7 @@
             if (locationIntervalId) {
                 clearInterval(locationIntervalId);
                 locationIntervalId = null;
-                 console.log(`Stopped location tracking for ${driverId}.`);
+                console.log(`Stopped location tracking for ${driverId}.`);
             }
         }
 
@@ -265,7 +253,6 @@
                     method: 'POST', mode: 'no-cors',
                     body: JSON.stringify({ action: 'registerDriverDevice', data: { driverId, deviceId } })
                 });
-                console.log(`Device ${deviceId} registered for driver ${driverId}`);
             } catch (error) { console.error('Error registering device:', error); }
         }
         
@@ -325,7 +312,8 @@
                 btn.disabled = false;
             }
         }
-
+        
+        // --- View Management ---
         function showMainView(driverId) {
             welcomeMessage.textContent = `משימות עבור ${driverId}`;
             loginView.classList.remove('active');
