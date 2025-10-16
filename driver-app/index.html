@@ -135,7 +135,9 @@
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            installBtn.style.display = 'block';
+            if (installBtn) {
+               installBtn.style.display = 'block';
+            }
         });
 
         installBtn.addEventListener('click', async () => {
@@ -144,13 +146,17 @@
                 const { outcome } = await deferredPrompt.userChoice;
                 console.log(`User response to the install prompt: ${outcome}`);
                 deferredPrompt = null;
-                installBtn.style.display = 'none';
+                if (installBtn) {
+                    installBtn.style.display = 'none';
+                }
             }
         });
 
         window.addEventListener('appinstalled', () => {
             deferredPrompt = null;
-            installBtn.style.display = 'none';
+            if(installBtn) {
+                installBtn.style.display = 'none';
+            }
             console.log('PWA was installed');
         });
 
