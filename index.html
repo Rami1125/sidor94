@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - ניהול</title>
+    
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary-color: #3a86ff;
+            --secondary-color: #03045e;
+            --background-color: #f8f9fa;
+            --text-color: #343a40;
+            --light-gray: #dee2e6;
+            --white: #ffffff;
+            --success: #2a9d8f;
+            --danger: #e63946;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background-color: var(--secondary-color);
+            color: var(--white);
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 25px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 25px;
+        }
+
+        .card {
+            background-color: var(--white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 25px;
+        }
+
+        .card h2 {
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            color: var(--secondary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--light-gray);
+            border-radius: 5px;
+            font-family: 'Rubik', sans-serif;
+            font-size: 1rem;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: var(--white);
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: #3178e6;
+        }
+        
+        .btn i {
+            margin-inline-end: 8px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: right;
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        thead {
+            background-color: #e9ecef;
+        }
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            color: var(--white);
+            font-weight: 500;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+
+        .status-new { background-color: #00b4d8; }
+        .status-assigned { background-color: #fca311; }
+        .status-completed { background-color: var(--success); }
+        .status-cancelled { background-color: var(--danger); }
+        
+        /* Loader and Notification Styles */
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loader {
+            border: 8px solid var(--light-gray);
+            border-top: 8px solid var(--primary-color);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 25px;
+            border-radius: var(--border-radius);
+            color: var(--white);
+            box-shadow: var(--shadow);
+            z-index: 1001;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        .notification.show {
+            opacity: 1;
+        }
+        .notification.success { background-color: var(--success); }
+        .notification.error { background-color: var(--danger); }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="loader-overlay" id="loader">
+        <div class="loader"></div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-cogs"></i> DeliveryMaster - לוח ניהול</h1>
+        </header>
+
+        <main>
+            <aside class="create-order-panel">
+                <div class="card">
+                    <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
+                    <form id="createOrderForm">
+                        <div class="form-group">
+                            <label for="customerName">שם לקוח</label>
+                            <input type="text" id="customerName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="address">כתובת</label>
+                            <input type="text" id="address" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="orderDate">תאריך</label>
+                            <input type="date" id="orderDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="orderTime">שעה</label>
+                            <input type="time" id="orderTime" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="deliveryType">סוג הובלה</label>
+                            <input type="text" id="deliveryType" value="הובלת משאית">
+                        </div>
+                        <div class="form-group">
+                            <label for="warehouse">מחסן</label>
+                            <select id="warehouse">
+                                <option value="התלמיד">התלמיד</option>
+                                <option value="החרש">החרש</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="notes">הערות</label>
+                            <textarea id="notes" rows="3"></textarea>
+                        </div>
+                        <button type="submit" class="btn" id="createOrderBtn">
+                            <i class="fas fa-paper-plane"></i> צור הזמנה
+                        </button>
+                    </form>
+                </div>
+            </aside>
+            <section class="orders-panel">
+                <div class="card">
+                    <h2><i class="fas fa-list-ul"></i> הזמנות להיום</h2>
+                    <div class="table-container">
+                        <table id="ordersTable">
+                            <thead>
+                                <tr>
+                                    <th>מזהה</th>
+                                    <th>לקוח</th>
+                                    <th>כתובת</th>
+                                    <th>שעה</th>
+                                    <th>נהג</th>
+                                    <th>סטטוס</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Order rows will be inserted here by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyArVx35Fhcp2DVN9nTa4wp6IGx4I9obRsediUkeIx6mvaKOw8cU3yPF2DokAR_IJ8/exec';
+
+        // --- DOM ELEMENTS ---
+        const loader = document.getElementById('loader');
+        const notification = document.getElementById('notification');
+        const createOrderForm = document.getElementById('createOrderForm');
+        const ordersTableBody = document.querySelector('#ordersTable tbody');
+        const createOrderBtn = document.getElementById('createOrderBtn');
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set default date to today
+            document.getElementById('orderDate').value = new Date().toISOString().split('T')[0];
+            
+            // Fetch today's orders on load
+            fetchOrders();
+
+            // Setup event listener for form submission
+            createOrderForm.addEventListener('submit', handleCreateOrder);
+        });
+
+        // --- API FUNCTIONS ---
+
+        /**
+         * Fetches orders for a specific date (defaults to today)
+         */
+        async function fetchOrders() {
+            showLoader();
+            const date = new Date().toISOString().split('T')[0]; // For now, always fetch today
+            
+            try {
+                const response = await fetch(`${API_URL}?action=getOrders&date=${date}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    renderOrdersTable(result.data);
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                showNotification(`שגיאה בטעינת הזמנות: ${error.message}`, 'error');
+                renderOrdersTable([]); // Clear table on error
+            } finally {
+                hideLoader();
+            }
+        }
+
+        /**
+         * Handles the creation of a new order
+         * @param {Event} event The form submission event
+         */
+        async function handleCreateOrder(event) {
+            event.preventDefault();
+            
+            const orderData = {
+                customerName: document.getElementById('customerName').value,
+                address: document.getElementById('address').value,
+                orderDate: document.getElementById('orderDate').value,
+                orderTime: document.getElementById('orderTime').value,
+                deliveryType: document.getElementById('deliveryType').value,
+                warehouse: document.getElementById('warehouse').value,
+                notes: document.getElementById('notes').value
+            };
+            
+            showLoader();
+            createOrderBtn.disabled = true;
+            createOrderBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שולח...';
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Required for simple POST to Apps Script
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'createOrder', data: orderData })
+                });
+                
+                // Because of 'no-cors', we can't read the response. We assume success.
+                showNotification('ההזמנה נוצרה בהצלחה!', 'success');
+                createOrderForm.reset();
+                document.getElementById('orderDate').value = new Date().toISOString().split('T')[0]; // Reset date to today
+                fetchOrders(); // Refresh the list
+
+            } catch (error) {
+                 showNotification(`שגיאה ביצירת הזמנה: ${error.message}`, 'error');
+            } finally {
+                hideLoader();
+                createOrderBtn.disabled = false;
+                createOrderBtn.innerHTML = '<i class="fas fa-paper-plane"></i> צור הזמנה';
+            }
+        }
+
+
+        // --- UI RENDERING FUNCTIONS ---
+        
+        /**
+         * Renders the rows in the orders table
+         * @param {Array<object>} orders An array of order objects
+         */
+        function renderOrdersTable(orders) {
+            ordersTableBody.innerHTML = ''; // Clear existing rows
+
+            if (!orders || orders.length === 0) {
+                ordersTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">לא נמצאו הזמנות להיום.</td></tr>';
+                return;
+            }
+
+            orders.forEach(order => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${order.orderId.substring(4, 9)}</td>
+                    <td>${order.customerName}</td>
+                    <td>${order.address}</td>
+                    <td>${order.orderTime}</td>
+                    <td>${order.driverId || 'לא שויך'}</td>
+                    <td><span class="status status-new">${order.status}</span></td>
+                `;
+                ordersTableBody.appendChild(row);
+            });
+        }
+        
+        // --- UTILITY FUNCTIONS ---
+        
+        function showLoader() {
+            loader.style.display = 'flex';
+        }
+
+        function hideLoader() {
+            loader.style.display = 'none';
+        }
+
+        function showNotification(message, type = 'success') {
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+    </script>
+</body>
+</html>
+
