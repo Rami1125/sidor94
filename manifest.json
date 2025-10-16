@@ -1,21 +1,24 @@
 {
-"name": "DeliveryMaster Driver",
-"short_name": "DM Driver",
-"start_url": "index.html",
-"display": "standalone",
-"background_color": "#f0f2f5",
-"theme_color": "#3a86ff",
-"orientation": "portrait-primary",
+"short_name": "נהגים",
+"name": "DeliveryMaster - אפליקציית נהגים",
 "icons": [
 {
-"src": "https://www.google.com/search?q=https://rami1125.github.io/sidor94/driver-app/icon-192.png",
+"src": "https://i.postimg.cc/ryPT3r29/image.png🚛",
 "type": "image/png",
-"sizes": "192x192"
+"sizes": "192x192",
+"purpose": "any maskable"
 },
 {
-"src": "https://www.google.com/search?q=https://rami1125.github.io/sidor94/driver-app/icon-512.png",
+"src": "https://i.postimg.cc/ryPT3r29/image.png🚛",
 "type": "image/png",
-"sizes": "512x512"
+"sizes": "512x512",
+"purpose": "any maskable"
 }
-]
+],
+"start_url": ".",
+"display": "standalone",
+"orientation": "portrait-primary",
+"background_color": "#f0f2f5",
+"theme_color": "#3a86ff",
+"description": "אפליקציית נהגים לניהול משימות ועדכונים בזמן אמת."
 }
