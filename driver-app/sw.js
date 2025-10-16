@@ -1,34 +1,42 @@
-/**
- * This is the Service Worker file for the Driver's PWA.
- * It handles background tasks like caching and push notifications.
- */
+const CACHE_NAME = 'deliverymaster-driver-v1';
+// This list should include all the core files needed for the app to run offline.
+const urlsToCache = [
+  './', // The root of the directory
+  './index.html',
+  './manifest.json',
+  'https://i.postimg.cc/ryPT3r29/image.png' // The app logo
+];
 
-self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing...');
-  // You can add logic here to pre-cache essential app assets
+// Install event: Fires when the service worker is first installed.
+self.addEventListener('install', event => {
+  // We wait until the installation is complete.
+  event.waitUntil(
+    // Open the cache by name.
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('Opened cache and caching core files.');
+        // Add all the specified URLs to the cache.
+        return cache.addAll(urlsToCache);
+      })
+  );
+  self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...');
+// Fetch event: Fires every time the app requests a resource (like a page, script, or image).
+self.addEventListener('fetch', event => {
+  // We respond to the request with a cached resource or by fetching it from the network.
+  event.respondWith(
+    // Check if the request exists in our cache.
+    caches.match(event.request)
+      .then(response => {
+        // If we found a match in the cache, return the cached version.
+        if (response) {
+          return response;
+        }
+        // If the resource is not in the cache, fetch it from the network.
+        return fetch(event.request);
+      }
+    )
+  );
 });
 
-self.addEventListener('fetch', (event) => {
-  // This event fires for every network request.
-  // You can add caching strategies here (e.g., cache-first for static assets).
-  event.respondWith(fetch(event.request));
-});
-
-// Listen for push notifications from OneSignal
-self.addEventListener('push', (event) => {
-  console.log('Service Worker: Push received.', event.data.text());
-  
-  const data = event.data.json();
-  const title = data.title || 'התראה חדשה';
-  const options = {
-    body: data.body,
-    icon: '/assets/icon-192.png', // You'll need to add an icon
-    badge: '/assets/badge.png',   // and a badge
-  };
-
-  event.waitUntil(self.registration.showNotification(title, options));
-});
