@@ -3,105 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="60"> <!-- מרענן את הדף כל 60 שניות -->
-    <title>Dashboard תפעולי - ח. סבן</title>
+    <title>DeliveryMaster - תצוגה</title>
+
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
-        body { 
-            font-family: 'Rubik', sans-serif; 
-            background-color: #f0f2f5; 
+        :root {
+            --primary-color: #2a9d8f;
+            --secondary-color: #264653;
+            --background-color: #f8f9fa;
+            --text-color: #343a40;
+            --light-gray: #dee2e6;
+            --white: #ffffff;
+            --warning: #fca311;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+        }
+
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
             margin: 0;
             padding: 20px;
         }
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        h1 { 
-            color: #1c3d5a;
-            font-size: 2rem;
-        }
+
         .container {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 20px;
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
         }
-        .main-content {
-            grid-column: 2 / 3;
-        }
-        .sidebar {
-            grid-column: 1 / 2;
-            background-color: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        #map {
-            width: 100%;
-            height: 60vh;
-            background-color: #e9e9e9;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h2 {
-            border-bottom: 2px solid #4a90e2;
-            padding-bottom: 10px;
-            margin-top: 0;
-            margin-bottom: 15px;
-        }
-        .orders-list-item {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        .orders-list-item:last-child {
-            border-bottom: none;
-        }
-        .order-customer { font-weight: bold; }
-        .order-driver-ali { color: #3498db; }
-        .order-driver-hakmat { color: #2ecc71; }
 
-        @media (max-width: 900px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-            .main-content, .sidebar {
-                grid-column: 1 / -1;
-            }
+        header {
+            background-color: var(--secondary-color);
+            color: var(--white);
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 25px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+        }
+        
+        #lastUpdated {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .card {
+            background-color: var(--white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 25px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: right;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--light-gray);
+            vertical-align: middle;
+        }
+
+        thead {
+            background-color: #e9ecef;
+        }
+        
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            color: var(--white);
+            font-weight: 500;
+            font-size: 0.8rem;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .status-new { background-color: #00b4d8; }
+        .status-assigned { background-color: var(--warning); }
+        .status-completed { background-color: #2a9d8f; }
+        .status-cancelled { background-color: #e63946; }
+
+        .loader {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2rem;
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>Dashboard תפעולי - מבט בזמן אמת</h1>
-    </header>
-
     <div class="container">
-        <aside class="sidebar">
-            <h2><i class="fas fa-list-ul"></i> סידור עבודה להיום</h2>
-            <div id="orders-list">
-                <!-- רשימת ההזמנות תטען כאן -->
-                <p>טוען נתונים...</p>
+        <header>
+            <h1><i class="fas fa-eye"></i> תצוגת הזמנות בזמן אמת</h1>
+            <span id="lastUpdated"></span>
+        </header>
+
+        <main>
+            <div class="card">
+                <div class="table-container">
+                    <table id="ordersTable">
+                        <thead>
+                            <tr>
+                                <th>מזהה</th>
+                                <th>לקוח</th>
+                                <th>כתובת</th>
+                                <th>שעה</th>
+                                <th>נהג</th>
+                                <th>סטטוס</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </aside>
-        <main class="main-content">
-             <h2><i class="fas fa-map-marked-alt"></i> מפת צי רכב</h2>
-             <div id="map">
-                <!-- כאן תוטמע מפה חיה -->
-             </div>
         </main>
     </div>
 
     <script>
-        const API_URL = 'YOUR_APPS_SCRIPT_DEPLOYMENT_URL';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyArVx35Fhcp2DVN9nTa4wp6IGx4I9obRsediUkeIx6mvaKOw8cU3yPF2DokAR_IJ8/exec';
+        
+        const ordersTableBody = document.querySelector('#ordersTable tbody');
+        const lastUpdatedSpan = document.getElementById('lastUpdated');
 
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('Viewer App Initialized');
-            // כאן יתווספו קריאות API לקבלת נתוני הזמנות ומיקומים
-            // ורינדורם על המפה וברשימה.
-            // הפונקציות יהיו לקריאה בלבד.
+            fetchAndRenderOrders();
+            // Auto-refresh data every 60 seconds
+            setInterval(fetchAndRenderOrders, 60000);
         });
+
+        async function fetchAndRenderOrders() {
+            setLoadingState();
+            const today = new Date().toISOString().split('T')[0];
+
+            try {
+                const response = await fetch(`${API_URL}?action=getOrders&date=${today}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    renderTable(result.data);
+                } else {
+                    setErrorState(result.message);
+                }
+            } catch (error) {
+                setErrorState(error.message);
+            }
+        }
+
+        function renderTable(orders) {
+            ordersTableBody.innerHTML = ''; // Clear table
+
+            if (!orders || orders.length === 0) {
+                ordersTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">לא נמצאו הזמנות להיום.</td></tr>';
+            } else {
+                orders
+                    .sort((a, b) => a.orderTime.localeCompare(b.orderTime)) // Sort by time
+                    .forEach(order => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${order.orderId.substring(4, 9)}</td>
+                            <td>${order.customerName}</td>
+                            <td>${order.address}</td>
+                            <td>${order.orderTime}</td>
+                            <td>${order.driverId || 'לא שויך'}</td>
+                            <td>${getStatusBadge(order.status)}</td>
+                        `;
+                        ordersTableBody.appendChild(row);
+                    });
+            }
+            
+            const now = new Date();
+            lastUpdatedSpan.textContent = `עודכן לאחרונה: ${now.toLocaleTimeString('he-IL')}`;
+        }
+
+        function setLoadingState() {
+            ordersTableBody.innerHTML = '<tr><td colspan="6" class="loader"><i class="fas fa-spinner fa-spin"></i> טוען נתונים...</td></tr>';
+        }
+
+        function setErrorState(message) {
+            ordersTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: red;">שגיאה: ${message}</td></tr>`;
+        }
+
+        function getStatusBadge(status) {
+            let statusClass = 'status-new';
+            let statusText = status || 'חדש';
+
+            switch (statusText) {
+                case 'שויך': statusClass = 'status-assigned'; break;
+                case 'הושלם': statusClass = 'status-completed'; break;
+                case 'בוטל': statusClass = 'status-cancelled'; break;
+            }
+            return `<span class="status ${statusClass}">${statusText}</span>`;
+        }
     </script>
+
 </body>
 </html>
+
