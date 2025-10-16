@@ -132,6 +132,7 @@
             }
         });
 
+        // Listen for the browser's install prompt
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
@@ -140,11 +141,11 @@
             }
         });
 
+        // Handle the install button click
         installBtn.addEventListener('click', async () => {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
-                console.log(`User response to the install prompt: ${outcome}`);
                 deferredPrompt = null;
                 if (installBtn) {
                     installBtn.style.display = 'none';
@@ -157,7 +158,6 @@
             if(installBtn) {
                 installBtn.style.display = 'none';
             }
-            console.log('PWA was installed');
         });
 
         loginBtn.addEventListener('click', () => {
@@ -180,10 +180,18 @@
         });
         
         enableFeaturesBtn.addEventListener('click', async () => {
-            permissionOverlay.style.display = 'none';
             const driverId = sessionStorage.getItem('driverId');
-            await OneSignal.Notifications.requestPermission();
-            initializeFeatures(driverId);
+            permissionOverlay.style.display = 'none'; // Hide overlay immediately
+            
+            try {
+                // Request notifications
+                await OneSignal.Notifications.requestPermission();
+            } catch(e) {
+                console.error("Notification permission request failed", e);
+            } finally {
+                // Always try to initialize, even if permissions fail
+                initializeFeatures(driverId);
+            }
         });
 
         async function checkAndRequestPermissions(driverId) {
@@ -193,6 +201,7 @@
             if (!isPushEnabled || geoPermissionStatus.state !== 'granted') {
                 permissionOverlay.style.display = 'flex';
             } else {
+                permissionOverlay.style.display = 'none';
                 initializeFeatures(driverId);
             }
         }
@@ -216,18 +225,27 @@
         let locationIntervalId;
         function startLocationTracking(driverId) {
             if (locationIntervalId) clearInterval(locationIntervalId);
+            
             const updateLocation = () => {
-                navigator.geolocation.getCurrentPosition(async (position) => {
-                    const { latitude, longitude } = position.coords;
-                    try {
-                        await fetch(API_URL, {
-                            method: 'POST', mode: 'no-cors',
-                            body: JSON.stringify({ action: 'updateDriverLocation', data: { driverId, latitude, longitude } })
-                        });
-                    } catch (error) { console.error('Failed to send location:', error); }
-                }, (error) => {
-                    console.error('Geolocation error:', error);
-                }, { enableHighAccuracy: true });
+                // Check for permission before trying to get location
+                navigator.permissions.query({name: 'geolocation'}).then(status => {
+                    if (status.state === 'granted') {
+                        navigator.geolocation.getCurrentPosition(async (position) => {
+                            const { latitude, longitude } = position.coords;
+                            try {
+                                await fetch(API_URL, {
+                                    method: 'POST', mode: 'no-cors',
+                                    body: JSON.stringify({ action: 'updateDriverLocation', data: { driverId, latitude, longitude } })
+                                });
+                            } catch (error) { console.error('Failed to send location:', error); }
+                        }, (error) => {
+                            console.error('Geolocation error:', error);
+                        }, { enableHighAccuracy: true });
+                    } else {
+                        console.log("Geolocation permission not granted. Stopping tracking.");
+                        stopLocationTracking(driverId);
+                    }
+                });
             };
             updateLocation();
             locationIntervalId = setInterval(updateLocation, 60000);
