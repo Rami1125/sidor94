@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - תצוגה</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#264653">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary-color: #2a9d8f;
+            --secondary-color: #264653;
+            --background-color: #f8f9fa;
+            --text-color: #343a40;
+            --light-gray: #dee2e6;
+            --white: #ffffff;
+            --warning: #fca311;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+            --success: #2a9d8f;
+            --danger: #e63946;
+            --info: #00b4d8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--secondary-color), #1a3340);
+            color: var(--white);
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 25px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #lastUpdated {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        select, input, button {
+            padding: 10px 15px;
+            border: 1px solid var(--light-gray);
+            border-radius: var(--border-radius);
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--white);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background-color: #23867a;
+        }
+
+        .card {
+            background-color: var(--white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: var(--border-radius);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: right;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--light-gray);
+            vertical-align: middle;
+        }
+
+        thead {
+            background-color: #e9ecef;
+            position: sticky;
+            top: 0;
+        }
+        
+        tbody tr {
+            transition: background-color 0.2s;
+        }
+        
+        tbody tr:hover {
+            background-color: rgba(42, 157, 143, 0.05);
+        }
+        
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            color: var(--white);
+            font-weight: 500;
+            font-size: 0.8rem;
+            text-align: center;
+            display: inline-block;
+            min-width: 80px;
+        }
+
+        .status-חדש { background-color: var(--info); }
+        .status-שויך { background-color: #4361ee; }
+        .status-בדרך { background-color: var(--warning); }
+        .status-הושלם { background-color: var(--success); }
+        .status-בוטל { background-color: var(--danger); }
+
+        .loader {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2rem;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transform: translateX(-150%);
+            transition: transform 0.5s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            text-align: center;
+            border-top: 4px solid var(--primary-color);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .new-order {
+            animation: highlight 2s ease;
+        }
+
+        @keyframes highlight {
+            0% { background-color: rgba(42, 157, 143, 0.3); }
+            100% { background-color: transparent; }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .filter-group {
+                width: 100%;
+            }
+            
+            select, input {
+                flex: 1;
+            }
+            
+            th, td {
+                padding: 8px 10px;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background-color: #121212;
+                --text-color: #e0e0e0;
+                --white: #1e1e1e;
+                --light-gray: #333;
+            }
+            
+            thead {
+                background-color: #2d2d2d;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-shipping-fast"></i> DeliveryMaster - לוח בקרה</h1>
+            <span id="lastUpdated"></span>
+        </header>
+
+        <div class="stats" id="statsContainer">
+            <!-- Statistics will be loaded here -->
+        </div>
+
+        <div class="controls">
+            <div class="filter-group">
+                <label for="statusFilter">סטטוס:</label>
+                <select id="statusFilter">
+                    <option value="all">הכל</option>
+                    <option value="חדש">חדש</option>
+                    <option value="שויך">שויך</option>
+                    <option value="בדרך">בדרך</option>
+                    <option value="הושלם">הושלם</option>
+                    <option value="בוטל">בוטל</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="driverFilter">נהג:</label>
+                <select id="driverFilter">
+                    <option value="all">הכל</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="search">חיפוש:</label>
+                <input type="text" id="search" placeholder="חיפוש לפי לקוח או כתובת">
+            </div>
+            
+            <button id="refreshBtn">
+                <i class="fas fa-sync-alt"></i> רענן
+            </button>
+            
+            <button id="notificationsBtn">
+                <i class="fas fa-bell"></i> התראות
+            </button>
+        </div>
+
+        <main>
+            <div class="card">
+                <div class="table-container">
+                    <table id="ordersTable">
+                        <thead>
+                            <tr>
+                                <th>מזהה</th>
+                                <th>לקוח</th>
+                                <th>כתובת</th>
+                                <th>שעה</th>
+                                <th>נהג</th>
+                                <th>סטטוס</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="notification" id="notification">
+        <i class="fas fa-info-circle"></i>
+        <span id="notificationText"></span>
+    </div>
+
+    <script>
+        const API_URL = 'https://script.google.com/macros/s/AKfycbx38YRbtI1y2vItZoIHWR3EOhI8vUzBLKuRuTuFvr9taJt-Wffw4RhVa3SpLSNnnpCW/exec';
+        
+        const ordersTableBody = document.querySelector('#ordersTable tbody');
+        const lastUpdatedSpan = document.getElementById('lastUpdated');
+        const statusFilter = document.getElementById('statusFilter');
+        const driverFilter = document.getElementById('driverFilter');
+        const searchInput = document.getElementById('search');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const notificationsBtn = document.getElementById('notificationsBtn');
+        const notification = document.getElementById('notification');
+        const notificationText = document.getElementById('notificationText');
+        const statsContainer = document.getElementById('statsContainer');
+
+        let allOrders = [];
+        let previousOrders = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Register service worker for PWA functionality
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('SW registered'))
+                    .catch(error => console.log('SW registration failed'));
+            }
+
+            fetchAndRenderOrders();
+            // Auto-refresh data every 15 seconds
+            setInterval(fetchAndRenderOrders, 15000);
+            
+            // Set up event listeners
+            statusFilter.addEventListener('change', filterOrders);
+            driverFilter.addEventListener('change', filterOrders);
+            searchInput.addEventListener('input', filterOrders);
+            refreshBtn.addEventListener('click', fetchAndRenderOrders);
+            notificationsBtn.addEventListener('click', toggleNotifications);
+        });
+
+        async function fetchAndRenderOrders() {
+            setLoadingState();
+            const today = new Date().toISOString().split('T')[0];
+
+            try {
+                const response = await fetch(`${API_URL}?action=getOrders&date=${today}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    previousOrders = [...allOrders];
+                    allOrders = result.data;
+                    renderTable(allOrders);
+                    updateStats(allOrders);
+                    populateDriverFilter(allOrders);
+                    checkForNewOrders();
+                } else {
+                    setErrorState(result.message);
+                }
+            } catch (error) {
+                setErrorState(error.message);
+            }
+        }
+
+        function renderTable(orders) {
+            ordersTableBody.innerHTML = ''; // Clear table
+
+            if (!orders || orders.length === 0) {
+                ordersTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">לא נמצאו הזמנות להיום.</td></tr>';
+            } else {
+                orders
+                    .sort((a, b) => a.orderTime.localeCompare(b.orderTime)) // Sort by time
+                    .forEach(order => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${order.orderId.substring(4, 9)}</td>
+                            <td>${order.customerName}</td>
+                            <td>${order.address}</td>
+                            <td>${order.orderTime}</td>
+                            <td>${order.driverId || 'לא שויך'}</td>
+                            <td><span class="status status-${order.status || 'חדש'}">${order.status || 'חדש'}</span></td>
+                        `;
+                        ordersTableBody.appendChild(row);
+                    });
+            }
+            
+            const now = new Date();
+            lastUpdatedSpan.textContent = `עודכן לאחרונה: ${now.toLocaleTimeString('he-IL')}`;
+        }
+
+        function filterOrders() {
+            const status = statusFilter.value;
+            const driver = driverFilter.value;
+            const searchTerm = searchInput.value.toLowerCase();
+            
+            let filteredOrders = allOrders;
+            
+            if (status !== 'all') {
+                filteredOrders = filteredOrders.filter(order => order.status === status);
+            }
+            
+            if (driver !== 'all') {
+                filteredOrders = filteredOrders.filter(order => 
+                    order.driverId === driver || (driver === 'unassigned' && !order.driverId)
+                );
+            }
+            
+            if (searchTerm) {
+                filteredOrders = filteredOrders.filter(order => 
+                    order.customerName.toLowerCase().includes(searchTerm) || 
+                    order.address.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            renderTable(filteredOrders);
+        }
+
+        function populateDriverFilter(orders) {
+            const drivers = new Set();
+            orders.forEach(order => {
+                if (order.driverId) {
+                    drivers.add(order.driverId);
+                }
+            });
+            
+            driverFilter.innerHTML = '<option value="all">הכל</option><option value="unassigned">לא שויך</option>';
+            drivers.forEach(driver => {
+                const option = document.createElement('option');
+                option.value = driver;
+                option.textContent = driver;
+                driverFilter.appendChild(option);
+            });
+        }
+
+        function updateStats(orders) {
+            const stats = {
+                total: orders.length,
+                new: orders.filter(o => o.status === 'חדש').length,
+                assigned: orders.filter(o => o.status === 'שויך').length,
+                inProgress: orders.filter(o => o.status === 'בדרך').length,
+                completed: orders.filter(o => o.status === 'הושלם').length,
+                cancelled: orders.filter(o => o.status === 'בוטל').length
+            };
+            
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${stats.total}</div>
+                    <div class="stat-label">סה"כ הזמנות</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.new}</div>
+                    <div class="stat-label">הזמנות חדשות</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.assigned}</div>
+                    <div class="stat-label">שויכו לנהג</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.inProgress}</div>
+                    <div class="stat-label">בדרך ליעד</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.completed}</div>
+                    <div class="stat-label">הושלמו</div>
+                </div>
+            `;
+        }
+
+        function checkForNewOrders() {
+            if (previousOrders.length === 0) return;
+            
+            const newOrders = allOrders.filter(newOrder => 
+                !previousOrders.some(oldOrder => oldOrder.orderId === newOrder.orderId)
+            );
+            
+            if (newOrders.length > 0) {
+                showNotification(`נוספו ${newOrders.length} הזמנות חדשות`);
+                
+                // Highlight new orders in the table
+                setTimeout(() => {
+                    const rows = ordersTableBody.querySelectorAll('tr');
+                    rows.forEach((row, index) => {
+                        if (index < newOrders.length) {
+                            row.classList.add('new-order');
+                        }
+                    });
+                }, 100);
+            }
+        }
+
+        function showNotification(message) {
+            notificationText.textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 5000);
+        }
+
+        function toggleNotifications() {
+            if (!("Notification" in window)) {
+                showNotification("הדפדפן שלך לא תומך בהתראות");
+                return;
+            }
+            
+            if (Notification.permission === "granted") {
+                showNotification("התראות כבר פעילות");
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        showNotification("התראות הופעלו בהצלחה!");
+                    }
+                });
+            }
+        }
+
+        function setLoadingState() {
+            ordersTableBody.innerHTML = '<tr><td colspan="6" class="loader"><i class="fas fa-spinner fa-spin"></i> טוען נתונים...</td></tr>';
+        }
+
+        function setErrorState(message) {
+            ordersTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: red;">שגיאה: ${message}</td></tr>`;
+        }
+    </script>
+
+</body>
+</html>
