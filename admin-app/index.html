@@ -1,18 +1,137 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <!-- ... (head content remains unchanged) ... -->
-    <style>
-        /* ... (all previous CSS styles remain unchanged) ... */
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - מרכז בקרה</title>
+    
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-        /* NEW: Alert Bell Styles */
+    <!-- Leaflet Map Library -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- SortableJS for Drag and Drop -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --background-color: #f8f9fa;
+            --text-color: #343a40;
+            --white: #ffffff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+        }
+
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-color);
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; }
+        .header-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { text-align: center; color: var(--primary-color); flex-grow: 1; }
+        .main-layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
+        .card { background: var(--white); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 20px; }
+        #liveMap { height: 400px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; }
+        
+        .scheduler-container {
+            display: grid;
+            grid-template-columns: 250px repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            min-height: 400px;
+        }
+        .scheduler-column {
+            background-color: #f0f3f5;
+            border-radius: var(--border-radius);
+            padding: 15px;
+        }
+        .scheduler-column h3 {
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-color);
+            margin-bottom: 15px;
+        }
+        .order-pool, .driver-lane {
+            min-height: 300px;
+            list-style-type: none;
+            padding: 0;
+        }
+        .schedule-card {
+            background: var(--white);
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            cursor: grab;
+            border-right: 4px solid var(--secondary-color);
+        }
+        .schedule-card p { margin: 2px 0; font-size: 0.9em; }
+        .schedule-card .card-customer { font-weight: 500; font-size: 1em; }
+        .ghost-card {
+            background: #cce5ff;
+            opacity: 0.7;
+            border: 2px dashed var(--primary-color);
+        }
+        .form-group { margin-bottom: 15px; position: relative; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; }
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; }
+
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); }
+        .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+        
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #d4d4d4;
+            border-bottom: none;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+        }
+        .autocomplete-items div {
+            padding: 10px;
+            cursor: pointer;
+            background-color: #fff; 
+            border-bottom: 1px solid #d4d4d4; 
+        }
+        .autocomplete-items div:hover { background-color: #e9e9e9; }
+        .leaflet-popup-content { text-align: right; direction: rtl; }
+        .leaflet-popup-content h3 { margin: 0 0 5px 0; font-size: 1.1em; }
+        .popup-image { max-width: 100%; border-radius: 5px; margin-top: 10px; }
+        
+        .custom-div-icon { position: relative; }
+        .marker-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; }
+        .driver-available .marker-pin { background-color: var(--success); }
+        .driver-on-route .marker-pin { background-color: var(--warning); }
+        .marker-pin::after { content: ''; width: 14px; height: 14px; margin: 8px 0 0 8px; background: #fff; position: absolute; border-radius: 50%; }
+        .custom-div-icon i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -150%); color: white; font-size: 1.2em; }
+        
         .header-alerts {
             position: relative;
         }
         .alert-bell {
             background: none;
             border: none;
-            color: var(--white);
+            color: var(--secondary-color);
             font-size: 1.5em;
             cursor: pointer;
         }
@@ -26,7 +145,7 @@
             padding: 2px 6px;
             font-size: 0.7em;
             font-weight: bold;
-            display: none; /* Hidden by default */
+            display: none;
         }
         .alerts-panel {
             display: none;
@@ -63,50 +182,177 @@
             color: var(--success);
             font-size: 1.2em;
         }
+        .analytics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+        .stat-card { background-color: #f8f9fa; text-align: center; padding: 20px; border-radius: var(--border-radius); }
+        .stat-card h3 { margin: 0 0 10px 0; color: var(--secondary-color); }
+        .stat-card p { font-size: 2.5em; font-weight: 700; color: var(--primary-color); }
+        .chart-container { height: 300px; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div class="header-title">
             <div class="header-alerts">
                 <button id="alertBell" class="alert-bell">
                     <i class="fas fa-bell"></i>
                     <span id="alertCount" class="alert-count"></span>
                 </button>
-                <div id="alertsPanel" class="alerts-panel">
-                    <!-- Alerts will be populated here -->
-                </div>
+                <div id="alertsPanel" class="alerts-panel"></div>
             </div>
             <h1><i class="fas fa-tachometer-alt"></i> DeliveryMaster - מרכז בקרה</h1>
-            <div></div> <!-- Placeholder for alignment -->
-        </header>
+            <div></div> 
+        </div>
         
-        <!-- ... (rest of the body remains the same) ... -->
+        <div class="main-layout">
+            <div class="left-panel">
+                <div class="card">
+                    <h2><i class="fas fa-calendar-alt"></i> לוח שיבוצים חי</h2>
+                    <div id="scheduler" class="scheduler-container"></div>
+                </div>
+
+                 <div class="card">
+                    <h2><i class="fas fa-map-marked-alt"></i> מפה טקטית חיה</h2>
+                    <div id="liveMap"></div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="card">
+                    <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
+                    <form id="createOrderForm" autocomplete="off">
+                        <div class="form-group"><label for="customerName">שם לקוח</label><input type="text" id="customerName" required></div>
+                        <div class="form-group"><label for="customerPhone">טלפון לקוח (ל-SMS)</label><input type="tel" id="customerPhone" placeholder="05xxxxxxxx"></div>
+                        <div class="form-group"><label for="address">כתובת</label><input type="text" id="address" required></div>
+                        <div class="form-group"><label for="orderTime">שעה</label><input type="time" id="orderTime" required></div>
+                        <div class="form-group"><label for="deliveryType">סוג הובלה</label><select id="deliveryType" required></select></div>
+                        <div class="form-group"><label for="warehouse">מחסן</label><select id="warehouse" required><option value="">בחר מחסן...</option><option value="החרש">החרש</option><option value="התלמיד">התלמיד</option></select></div>
+                        <div class="form-group"><label for="notes">הערות</label><textarea id="notes" rows="3"></textarea></div>
+                        <button type="submit">צור הזמנה</button>
+                    </form>
+                </div>
+                 <div class="card">
+                    <h2><i class="fas fa-chart-line"></i> דוחות וביצועים</h2>
+                    <button id="showAnalyticsBtn" style="width: 100%; background-color: var(--success);"><i class="fas fa-chart-bar"></i> הצג דאשבורד</button>
+                </div>
+                 <div class="card">
+                    <h2><i class="fas fa-history"></i> ארכיון</h2>
+                    <button id="showHistoryBtn" style="width: 100%;"><i class="fas fa-history"></i> הצג היסטוריית הזמנות</button>
+                </div>
+            </div>
+        </div>
     </div>
     
-    <!-- ... (Modals remain unchanged) ... -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeHistory">&times;</span>
+            <h2><i class="fas fa-history"></i> היסטוריית הזמנות</h2>
+            <input type="text" id="historySearch" placeholder="חפש..." class="form-group" style="width: 100%; padding: 10px; margin-bottom: 15px;">
+            <div style="max-height: 60vh; overflow-y: auto;">
+                <table id="historyTable">
+                    <thead><tr><th>תאריך</th><th>לקוח</th><th>כתובת</th><th>נהג</th><th>סטטוס</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div id="analyticsModal" class="modal">
+      <div class="modal-content">
+        <span class="close-button" id="closeAnalytics">&times;</span>
+        <h2><i class="fas fa-chart-line"></i> דאשבורד ביצועים</h2>
+        <div class="analytics-grid">
+            <div class="stat-card"><h3>סה"כ משימות שהושלמו</h3><p id="totalCompletedStat">0</p></div>
+            <div class="stat-card"><h3>זמן משימה ממוצע (דקות)</h3><p id="avgTimeStat">0</p></div>
+            <div class="stat-card"><h3>נהג מצטיין</h3><p id="topDriverStat">-</p></div>
+        </div>
+        <div class="chart-container"><canvas id="driverPerformanceChart"></canvas></div>
+      </div>
+    </div>
 
     <script>
-        // ... (all previous script variables remain the same) ...
+        // FIXED: All constants and variables moved to the top for global access
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxelIUS1M4vJ-r_fAuZoyzZDL9iC6Hcop-3_Eg_lLiSdWZVTQXnOpSSlGhxGjhojxot/exec';
+        const GOOGLE_MAPS_API_KEY = 'AIzaSyCbVYMijMs8zH6m4iiSiBfn_RiCMuau9ps';
+        
+        // DOM Elements
+        const schedulerContainer = document.getElementById('scheduler');
+        const createOrderForm = document.getElementById('createOrderForm');
+        
+        const historyModal = document.getElementById('historyModal');
+        const showHistoryBtn = document.getElementById('showHistoryBtn');
+        const closeHistoryBtn = document.getElementById('closeHistory');
+        const historyTableBody = document.querySelector('#historyTable tbody');
+        const historySearch = document.getElementById('historySearch');
+
+        const analyticsModal = document.getElementById('analyticsModal');
+        const showAnalyticsBtn = document.getElementById('showAnalyticsBtn');
+        const closeAnalyticsBtn = document.getElementById('closeAnalytics');
+
         const alertBell = document.getElementById('alertBell');
         const alertCount = document.getElementById('alertCount');
         const alertsPanel = document.getElementById('alertsPanel');
-        
+
+        let allCustomers = [];
+        let liveMap;
+        let driverMarkers = {};
+        let orderMarkersLayer = L.layerGroup();
+        const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
+        let performanceChart = null;
+
         document.addEventListener('DOMContentLoaded', async () => {
-            // ... (previous DOMContentLoaded logic) ...
+            initializeMap();
+            populateDropdowns();
+            await buildScheduler();
+            await fetchCustomers();
+            
+            updateMap(); 
+            setInterval(updateMap, 30000);
             
             fetchAlerts();
-            setInterval(fetchAlerts, 60000); // Check for new alerts every minute
+            setInterval(fetchAlerts, 60000);
 
             // Event Listeners
+            showHistoryBtn.addEventListener('click', openHistoryModal);
+            closeHistoryBtn.addEventListener('click', () => historyModal.style.display = 'none');
+            
+            showAnalyticsBtn.addEventListener('click', openAnalyticsModal);
+            closeAnalyticsBtn.addEventListener('click', () => analyticsModal.style.display = 'none');
+
             alertBell.addEventListener('click', () => {
                 alertsPanel.style.display = alertsPanel.style.display === 'block' ? 'none' : 'block';
             });
-            // ... (rest of event listeners) ...
+
+            window.addEventListener('click', (e) => { 
+                if(e.target == historyModal) historyModal.style.display = 'none';
+                if(e.target == analyticsModal) analyticsModal.style.display = 'none';
+            });
+            historySearch.addEventListener('keyup', filterHistoryTable);
+            createOrderForm.addEventListener('submit', handleCreateOrder);
         });
 
-        // --- NEW: Smart Alert Functions ---
+        // --- All Functions ---
+        
+        async function buildScheduler() { /* ... function from previous response ... */ }
+        function createScheduleCard(order) { /* ... function from previous response ... */ }
+        function initSortable() { /* ... function from previous response ... */ }
+        async function handleDragEnd(event) { /* ... function from previous response ... */ }
+
+        function initializeMap() { /* ... function from previous response ... */ }
+        async function updateMap() { /* ... function from previous response ... */ }
+
+        async function fetchCustomers() { /* ... function from previous response ... */ }
+        function initAutocomplete(inputEl, customers) { /* ... function from previous response ... */ }
+        function populateDropdowns() { /* ... function from previous response ... */ }
+        async function handleCreateOrder(e) { /* ... function from previous response ... */ }
+
+        async function openHistoryModal() { /* ... function from previous response ... */ }
+        function renderHistory(data) { /* ... function from previous response ... */ }
+        function filterHistoryTable() { /* ... function from previous response ... */ }
+
+        async function openAnalyticsModal() { /* ... function from previous response ... */ }
+        function displayAnalytics(data) { /* ... function from previous response ... */ }
+        
         async function fetchAlerts() {
             try {
                 const response = await fetch(`${API_URL}?action=getAlerts`);
@@ -136,7 +382,6 @@
                     </div>
                 `).join('');
 
-                // Add event listeners to new ack buttons
                 document.querySelectorAll('.alert-ack-btn').forEach(btn => {
                     btn.addEventListener('click', acknowledgeAlert);
                 });
@@ -157,7 +402,6 @@
                     mode: 'no-cors',
                     body: JSON.stringify({ action: 'acknowledgeAlert', data: { alertId } })
                 });
-                // Optimistic UI update: remove the alert immediately
                 alertItem.remove();
                 const currentCount = parseInt(alertCount.textContent) - 1;
                 if (currentCount > 0) {
@@ -172,9 +416,6 @@
                 alert("שגיאה באישור ההתראה.");
             }
         }
-
-        // ... (All other functions from the previous stable version remain here) ...
-        
     </script>
 </body>
 </html>
