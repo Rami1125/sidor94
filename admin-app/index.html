@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- NEW: SortableJS for Drag and Drop -->
+    <!-- SortableJS for Drag and Drop -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 
     <style>
@@ -45,7 +45,6 @@
         .card { background: var(--white); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 20px; }
         #liveMap { height: 400px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; }
         
-        /* NEW: Scheduler Styles */
         .scheduler-container {
             display: grid;
             grid-template-columns: 250px repeat(auto-fit, minmax(200px, 1fr));
@@ -84,8 +83,11 @@
             opacity: 0.7;
             border: 2px dashed var(--primary-color);
         }
+        .form-group { margin-bottom: 15px; position: relative; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; }
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; }
 
-        /* Modal Styles */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
         .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); }
         .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; }
@@ -115,9 +117,36 @@
             <div class="right-panel">
                 <div class="card">
                     <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
-                    <!-- Create Order Form (unchanged) -->
                     <form id="createOrderForm" autocomplete="off">
-                        <!-- ... form fields from previous version ... -->
+                        <div class="form-group">
+                            <label for="customerName">שם לקוח</label>
+                            <input type="text" id="customerName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="address">כתובת</label>
+                            <input type="text" id="address" required>
+                        </div>
+                         <div class="form-group">
+                            <label for="orderTime">שעה</label>
+                            <input type="time" id="orderTime" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="deliveryType">סוג הובלה</label>
+                            <select id="deliveryType" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="warehouse">מחסן</label>
+                            <select id="warehouse" required>
+                                <option value="">בחר מחסן...</option>
+                                <option value="החרש">החרש</option>
+                                <option value="התלמיד">התלמיד</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="notes">הערות</label>
+                            <textarea id="notes" rows="3"></textarea>
+                        </div>
+                        <button type="submit">צור הזמנה</button>
                     </form>
                 </div>
                  <div class="card">
@@ -128,32 +157,59 @@
         </div>
     </div>
     
-    <!-- History Modal (unchanged) -->
     <div id="historyModal" class="modal">
-      <!-- ... modal content from previous version ... -->
+      <div class="modal-content">
+        <span class="close-button">&times;</span>
+        <h2><i class="fas fa-history"></i> היסטוריית הזמנות</h2>
+        <input type="text" id="historySearch" placeholder="חפש..." class="form-group" style="width: 100%; padding: 10px; margin-bottom: 15px;">
+        <div style="max-height: 60vh; overflow-y: auto;">
+            <table id="historyTable">
+                <thead><tr><th>תאריך</th><th>לקוח</th><th>כתובת</th><th>נהג</th><th>סטטוס</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+      </div>
     </div>
 
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbxe44KC0_j7l3i7mD_qjbzhKdjxoj8n1qi_hcy-Vt4ca5_kBaObdaskRIiehfnpi4L9/exec';
         
-        // ... (DOM element declarations from previous version) ...
+        // DOM Elements
         const schedulerContainer = document.getElementById('scheduler');
+        const liveMapElement = document.getElementById('liveMap');
+        const createOrderForm = document.getElementById('createOrderForm');
+        const showHistoryBtn = document.getElementById('showHistoryBtn');
+        const historyModal = document.getElementById('historyModal');
+        const historySearch = document.getElementById('historySearch');
+        const historyTableBody = document.querySelector('#historyTable tbody');
+        const closeModalBtn = document.querySelector('.close-button');
+
+        let allCustomers = [];
+        let liveMap;
+        let driverMarkers = {};
+        const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
+
         
         document.addEventListener('DOMContentLoaded', async () => {
             initializeMap();
+            populateDropdowns();
             await buildScheduler();
+            await fetchCustomers();
             
             updateMap(); 
             setInterval(updateMap, 30000);
-            
-            // Other initializations...
-            const today = new Date();
-            // ... (rest of DOMContentLoaded)
+
+            // Event Listeners
+            showHistoryBtn.addEventListener('click', openHistoryModal);
+            closeModalBtn.addEventListener('click', () => historyModal.style.display = 'none');
+            window.addEventListener('click', (e) => { if(e.target == historyModal) historyModal.style.display = 'none' });
+            historySearch.addEventListener('keyup', filterHistoryTable);
+            createOrderForm.addEventListener('submit', handleCreateOrder);
         });
 
-        // --- NEW: Scheduler Functions ---
+        // --- Scheduler Functions ---
         async function buildScheduler() {
-            schedulerContainer.innerHTML = ''; // Clear existing
+            schedulerContainer.innerHTML = '';
             
             const driversResponse = await fetch(`${API_URL}?action=getDrivers`);
             const driversResult = await driversResponse.json();
@@ -163,7 +219,6 @@
             const ordersResult = await ordersResponse.json();
             const allTodayOrders = ordersResult.data;
 
-            // 1. Create Unassigned Orders Column
             const unassignedCol = document.createElement('div');
             unassignedCol.className = 'scheduler-column';
             unassignedCol.innerHTML = '<h3><i class="fas fa-box-open"></i> הזמנות פנויות</h3>';
@@ -173,7 +228,6 @@
             unassignedCol.appendChild(unassignedPool);
             schedulerContainer.appendChild(unassignedCol);
 
-            // 2. Create Columns for each Driver
             drivers.forEach(driver => {
                 const driverCol = document.createElement('div');
                 driverCol.className = 'scheduler-column';
@@ -186,17 +240,16 @@
                 schedulerContainer.appendChild(driverCol);
             });
 
-            // 3. Populate orders into columns
             allTodayOrders.forEach(order => {
                 const card = createScheduleCard(order);
-                if (order.driverId && document.getElementById(`driver-lane-${order.driverId}`)) {
-                    document.getElementById(`driver-lane-${order.driverId}`).appendChild(card);
+                const targetLane = document.getElementById(`driver-lane-${order.driverId}`);
+                if (order.driverId && targetLane) {
+                    targetLane.appendChild(card);
                 } else {
                     unassignedPool.appendChild(card);
                 }
             });
 
-            // 4. Initialize SortableJS
             initSortable();
         }
 
@@ -204,11 +257,7 @@
             const card = document.createElement('li');
             card.className = 'schedule-card';
             card.dataset.orderId = order.orderId;
-            card.innerHTML = `
-                <p class="card-customer">${order.customerName}</p>
-                <p><i class="fas fa-clock"></i> ${order.orderTime}</p>
-                <p><i class="fas fa-map-marker-alt"></i> ${order.address}</p>
-            `;
+            card.innerHTML = `<p class="card-customer">${order.customerName}</p><p><i class="fas fa-clock"></i> ${order.orderTime}</p><p><i class="fas fa-map-marker-alt"></i> ${order.address}</p>`;
             return card;
         }
 
@@ -216,40 +265,46 @@
             const pools = document.querySelectorAll('.order-pool, .driver-lane');
             pools.forEach(pool => {
                 new Sortable(pool, {
-                    group: 'orders',
-                    animation: 150,
-                    ghostClass: 'ghost-card',
-                    onEnd: handleDragEnd
+                    group: 'orders', animation: 150, ghostClass: 'ghost-card', onEnd: handleDragEnd
                 });
             });
         }
         
         async function handleDragEnd(event) {
             const orderId = event.item.dataset.orderId;
-            const newDriverId = event.to.dataset.driverId || ''; // Empty string if moved to unassigned
-            
-            console.log(`Moving order ${orderId} to driver ${newDriverId}`);
-
-             try {
-                event.item.style.opacity = '0.5'; // Visual feedback
+            const newDriverId = event.to.dataset.driverId || ''; 
+            try {
+                event.item.style.opacity = '0.5';
                 await fetch(API_URL, {
-                    method: 'POST', 
-                    mode: 'no-cors',
+                    method: 'POST', mode: 'no-cors',
                     body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: newDriverId } } })
                 });
                 event.item.style.opacity = '1';
-                // No full refresh needed, UI is already updated by SortableJS
             } catch (error) {
                 console.error("Error updating driver on drag:", error);
-                // Revert move visually on error
                 event.from.appendChild(event.item);
                 alert("שגיאה בעדכון השיבוץ.");
             }
         }
 
-
-        // ... (All other functions - map, form, history - remain largely unchanged) ...
+        // --- Map Functions ---
+        function initializeMap() {
+            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
+             liveMap = L.map('liveMap', {
+                center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer]
+            });
+        }
         
+        async function updateMap() { /* ... function from previous response ... */ }
+
+        // --- Form and History Functions ---
+        async function fetchCustomers() { /* ... function from previous response ... */ }
+        function initAutocomplete(inputEl, customers) { /* ... function from previous response ... */ }
+        function populateDropdowns() { /* ... function from previous response ... */ }
+        async function handleCreateOrder(e) { /* ... function from previous response ... */ }
+        async function openHistoryModal() { /* ... function from previous response ... */ }
+        function renderHistory(data) { /* ... function from previous response ... */ }
+        function filterHistoryTable() { /* ... function from previous response ... */ }
     </script>
 </body>
 </html>
