@@ -1,0 +1,25 @@
+{
+"short_name": "מחסן",
+"name": "DeliveryMaster - טרמינל מחסן",
+"lang": "he-IL",
+"description": "אפליקציה לניהול הזמנות והעמסה במחסן.",
+"icons": [
+{
+"src": "https://www.google.com/search?q=https://placehold.co/192x192/007bff/ffffff%3Ftext%3D📋",
+"type": "image/png",
+"sizes": "192x192",
+"purpose": "any maskable"
+},
+{
+"src": "https://www.google.com/search?q=https://placehold.co/512x512/007bff/ffffff%3Ftext%3D📋",
+"type": "image/png",
+"sizes": "512x512",
+"purpose": "any maskable"
+}
+],
+"start_url": "./index.html",
+"display": "standalone",
+"orientation": "portrait-primary",
+"background_color": "#f0f2f5",
+"theme_color": "#007bff"
+}
