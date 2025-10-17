@@ -110,6 +110,8 @@
             border-bottom: 1px solid #d4d4d4; 
         }
         .autocomplete-items div:hover { background-color: #e9e9e9; }
+        .leaflet-popup-content { text-align: right; direction: rtl; }
+        .leaflet-popup-content h3 { margin: 0 0 5px 0; font-size: 1.1em; }
     </style>
 </head>
 <body>
@@ -229,15 +231,15 @@
         // --- Scheduler Functions ---
         async function buildScheduler() {
             schedulerContainer.innerHTML = '';
-            
             try {
-                const driversResponse = await fetch(`${API_URL}?action=getDrivers`);
-                const driversResult = await driversResponse.json();
+                const [driversResult, ordersResult] = await Promise.all([
+                    fetch(`${API_URL}?action=getDrivers`).then(res => res.json()),
+                    fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`).then(res => res.json())
+                ]);
+
                 if(!driversResult.data) throw new Error("No drivers data received");
                 const drivers = driversResult.data.filter(d => d.status === 'פעיל');
 
-                const ordersResponse = await fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`);
-                const ordersResult = await ordersResponse.json();
                 if(!ordersResult.data) throw new Error("No orders data received");
                 const allTodayOrders = ordersResult.data;
 
@@ -290,9 +292,7 @@
         function initSortable() {
             const pools = document.querySelectorAll('.order-pool, .driver-lane');
             pools.forEach(pool => {
-                new Sortable(pool, {
-                    group: 'orders', animation: 150, ghostClass: 'ghost-card', onEnd: handleDragEnd
-                });
+                new Sortable(pool, { group: 'orders', animation: 150, ghostClass: 'ghost-card', onEnd: handleDragEnd });
             });
         }
         
@@ -301,10 +301,7 @@
             const newDriverId = event.to.dataset.driverId || ''; 
             try {
                 event.item.style.opacity = '0.5';
-                await fetch(API_URL, {
-                    method: 'POST', mode: 'no-cors',
-                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: newDriverId } } })
-                });
+                await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: newDriverId } } }) });
                 event.item.style.opacity = '1';
             } catch (error) {
                 console.error("Error updating driver on drag:", error);
@@ -316,9 +313,7 @@
         // --- Map Functions ---
         function initializeMap() {
             const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
-             liveMap = L.map('liveMap', {
-                center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer]
-            });
+             liveMap = L.map('liveMap', { center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer] });
             orderMarkersLayer.addTo(liveMap);
         }
         
@@ -379,7 +374,7 @@
         }
 
         function initAutocomplete(inputEl, customers) {
-            inputEl.addEventListener("input", function(e) {
+            inputEl.addEventListener("input", function() {
                 closeAllLists();
                 const val = this.value;
                 if (!val) { return false; }
@@ -392,7 +387,7 @@
                     if (customer.name.toLowerCase().includes(val.toLowerCase())) {
                         const item = document.createElement("DIV");
                         item.innerHTML = customer.name.replace(new RegExp(val, "gi"), "<strong>$&</strong>");
-                        item.addEventListener("click", function(e) {
+                        item.addEventListener("click", function() {
                             inputEl.value = customer.name;
                             document.getElementById("address").value = customer.defaultAddress || '';
                             closeAllLists();
@@ -404,9 +399,7 @@
             function closeAllLists(elmnt) {
                 const x = document.getElementsByClassName("autocomplete-items");
                 for (let i = 0; i < x.length; i++) {
-                    if (elmnt != x[i] && elmnt != inputEl) {
-                        x[i].parentNode.removeChild(x[i]);
-                    }
+                    if (elmnt != x[i] && elmnt != inputEl) x[i].parentNode.removeChild(x[i]);
                 }
             }
             document.addEventListener("click", (e) => closeAllLists(e.target));
@@ -435,13 +428,13 @@
                 orderDate: new Date().toISOString().split('T')[0]
             };
             try {
-                const response = await fetch(API_URL, {
+                await fetch(API_URL, {
                     method: 'POST', 
-                    headers: {'Content-Type': 'text/plain;charset=utf-8'}, // Use text/plain for no-cors
+                    headers: {'Content-Type': 'text/plain;charset=utf-8'},
                     body: JSON.stringify({ action: 'createOrder', data: orderData })
                 });
                 createOrderForm.reset();
-                buildScheduler(); // Refresh scheduler after creating order
+                buildScheduler(); 
             } catch (error) { console.error('Error creating order:', error); }
         }
         
@@ -449,7 +442,7 @@
             historyModal.style.display = 'block';
             historyTableBody.innerHTML = '<tr><td colspan="5">טוען היסטוריה...</td></tr>';
             try {
-                const response = await fetch(`${API_URL}?action=getHistory`);
+                const response = await fetch(`${API_TBD}?action=getHistory`);
                 const result = await response.json();
                 if (result.status === 'success' && result.data) {
                     renderHistory(result.data);
