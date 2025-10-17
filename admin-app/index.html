@@ -232,7 +232,12 @@
                     }
                 });
             });
-
+             function formatTimeOnly(isoString) {
+               if (!isoString) return '';
+              const date = new Date(isoString);
+               // מציג שעה ודקות בלבד לפי אזור הזמן שלך
+            return date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+            }
             function closeAllLists(elmnt) {
                 const x = document.getElementsByClassName("autocomplete-items");
                 for (let i = 0; i < x.length; i++) {
