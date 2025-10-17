@@ -5,127 +5,173 @@
     <style>
         /* ... (all previous CSS styles remain unchanged) ... */
 
-        /* NEW: Style for the optimize button */
-        .optimize-btn {
+        /* NEW: Alert Bell Styles */
+        .header-alerts {
+            position: relative;
+        }
+        .alert-bell {
             background: none;
             border: none;
-            color: var(--primary-color);
+            color: var(--white);
+            font-size: 1.5em;
             cursor: pointer;
-            font-size: 1.2em;
-            opacity: 0.6;
-            transition: opacity 0.2s;
         }
-        .optimize-btn:hover {
-            opacity: 1;
+        .alert-count {
+            position: absolute;
+            top: -5px;
+            right: -10px;
+            background-color: var(--danger);
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 0.7em;
+            font-weight: bold;
+            display: none; /* Hidden by default */
+        }
+        .alerts-panel {
+            display: none;
+            position: absolute;
+            top: 50px;
+            left: 0;
+            width: 350px;
+            background: var(--white);
+            color: var(--text-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            z-index: 100;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .alert-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .alert-item:last-child { border-bottom: none; }
+        .alert-icon { font-size: 1.5em; }
+        .alert-icon.warning { color: var(--warning); }
+        .alert-icon.danger { color: var(--danger); }
+        .alert-message { flex-grow: 1; }
+        .alert-message p { margin: 0; }
+        .alert-message small { color: var(--secondary-color); }
+        .alert-ack-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--success);
+            font-size: 1.2em;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <!-- ... (h1, main-layout, etc. unchanged) ... -->
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="header-alerts">
+                <button id="alertBell" class="alert-bell">
+                    <i class="fas fa-bell"></i>
+                    <span id="alertCount" class="alert-count"></span>
+                </button>
+                <div id="alertsPanel" class="alerts-panel">
+                    <!-- Alerts will be populated here -->
+                </div>
+            </div>
+            <h1><i class="fas fa-tachometer-alt"></i> DeliveryMaster - מרכז בקרה</h1>
+            <div></div> <!-- Placeholder for alignment -->
+        </header>
+        
+        <!-- ... (rest of the body remains the same) ... -->
     </div>
     
     <!-- ... (Modals remain unchanged) ... -->
 
     <script>
         // ... (all previous script variables remain the same) ...
+        const alertBell = document.getElementById('alertBell');
+        const alertCount = document.getElementById('alertCount');
+        const alertsPanel = document.getElementById('alertsPanel');
         
-        // --- Scheduler Functions ---
-        async function buildScheduler() {
-            schedulerContainer.innerHTML = '';
+        document.addEventListener('DOMContentLoaded', async () => {
+            // ... (previous DOMContentLoaded logic) ...
+            
+            fetchAlerts();
+            setInterval(fetchAlerts, 60000); // Check for new alerts every minute
+
+            // Event Listeners
+            alertBell.addEventListener('click', () => {
+                alertsPanel.style.display = alertsPanel.style.display === 'block' ? 'none' : 'block';
+            });
+            // ... (rest of event listeners) ...
+        });
+
+        // --- NEW: Smart Alert Functions ---
+        async function fetchAlerts() {
             try {
-                // ... (fetching drivers and orders remains the same) ...
-
-                drivers.forEach(driver => {
-                    const driverCol = document.createElement('div');
-                    driverCol.className = 'scheduler-column';
-                    // NEW: Added optimize button to the header
-                    driverCol.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h3><i class="fas fa-user-circle"></i> ${driver.name}</h3>
-                            <button class="optimize-btn" data-driver-id="${driver.driverId}" title="סדר מסלול אופטימלי">
-                                <i class="fas fa-magic"></i>
-                            </button>
-                        </div>`;
-                    const driverLane = document.createElement('ul');
-                    // ... (rest of driver column setup) ...
-                    driverCol.appendChild(driverLane);
-                    schedulerContainer.appendChild(driverCol);
-                });
-
-                // ... (populating orders remains the same) ...
-
-                initSortable();
-                
-                // NEW: Add event listeners to optimize buttons
-                document.querySelectorAll('.optimize-btn').forEach(btn => {
-                    btn.addEventListener('click', handleOptimizeRoute);
-                });
-
+                const response = await fetch(`${API_URL}?action=getAlerts`);
+                const result = await response.json();
+                if (result.status === 'success' && result.data) {
+                    renderAlerts(result.data);
+                }
             } catch (error) {
-                // ... (error handling) ...
+                console.error("Error fetching alerts:", error);
             }
         }
-        
-        // NEW: Function to handle route optimization
-        async function handleOptimizeRoute(event) {
-            const btn = event.currentTarget;
-            const driverId = btn.dataset.driverId;
-            const driverLane = document.getElementById(`driver-lane-${driverId}`);
-            const cards = Array.from(driverLane.children);
 
-            if (cards.length < 2) {
-                alert("יש צורך בלפחות שתי משימות כדי לבצע אופטימיזציה.");
-                return;
-            }
+        function renderAlerts(alerts) {
+            if (alerts.length > 0) {
+                alertCount.textContent = alerts.length;
+                alertCount.style.display = 'block';
+                alertsPanel.innerHTML = alerts.map(alert => `
+                    <div class="alert-item" data-id="${alert.alertId}">
+                        <div class="alert-icon ${alert.type}">
+                            <i class="fas ${alert.type === 'warning' ? 'fa-exclamation-triangle' : 'fa-exclamation-circle'}"></i>
+                        </div>
+                        <div class="alert-message">
+                            <p>${alert.message}</p>
+                            <small>${new Date(alert.timestamp).toLocaleString('he-IL')}</small>
+                        </div>
+                        <button class="alert-ack-btn" title="אשר טיפול"><i class="fas fa-check-circle"></i></button>
+                    </div>
+                `).join('');
 
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`;
-            btn.disabled = true;
-
-            const orders = await Promise.all(cards.map(async card => {
-                const orderId = card.dataset.orderId;
-                // We need to fetch the full order to get its address
-                const res = await fetch(`${API_URL}?action=getOrders&orderId=${orderId}`); // Note: getOrders would need a small tweak to support fetching a single order
-                const result = await res.json();
-                return { id: orderId, address: result.data[0].address };
-            }));
-
-            const startPoint = "החרש 10, הוד השרון"; // Should be fetched from settings
-            const waypoints = orders.map(o => o.address);
-
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'text/plain;charset=utf-8'},
-                    body: JSON.stringify({
-                        action: 'optimizeRoute',
-                        data: { start: startPoint, waypoints: waypoints }
-                    })
+                // Add event listeners to new ack buttons
+                document.querySelectorAll('.alert-ack-btn').forEach(btn => {
+                    btn.addEventListener('click', acknowledgeAlert);
                 });
-                const result = await response.json();
 
-                if (result.status === 'success' && result.data.optimizedOrder) {
-                    const optimizedOrder = result.data.optimizedOrder;
-                    
-                    // Create a new sorted array of cards
-                    const sortedCards = optimizedOrder.map(index => cards[index]);
+            } else {
+                alertCount.style.display = 'none';
+                alertsPanel.innerHTML = '<div style="padding: 20px; text-align: center;">אין התראות חדשות</div>';
+            }
+        }
 
-                    // Re-append cards to the lane in the new order
-                    sortedCards.forEach(card => driverLane.appendChild(card));
+        async function acknowledgeAlert(event) {
+            const alertItem = event.currentTarget.closest('.alert-item');
+            const alertId = alertItem.dataset.id;
+            
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: 'acknowledgeAlert', data: { alertId } })
+                });
+                // Optimistic UI update: remove the alert immediately
+                alertItem.remove();
+                const currentCount = parseInt(alertCount.textContent) - 1;
+                if (currentCount > 0) {
+                    alertCount.textContent = currentCount;
                 } else {
-                    throw new Error(result.message || "Optimization failed");
+                    alertCount.style.display = 'none';
+                    alertsPanel.innerHTML = '<div style="padding: 20px; text-align: center;">אין התראות חדשות</div>';
                 }
 
             } catch (error) {
-                console.error("Error optimizing route:", error);
-                alert("שגיאה בחישוב המסלול האופטימלי.");
-            } finally {
-                btn.innerHTML = `<i class="fas fa-magic"></i>`;
-                btn.disabled = false;
+                console.error("Error acknowledging alert:", error);
+                alert("שגיאה באישור ההתראה.");
             }
         }
-
 
         // ... (All other functions from the previous stable version remain here) ...
         
