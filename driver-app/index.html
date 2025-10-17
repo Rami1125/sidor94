@@ -110,7 +110,7 @@
         const enableFeaturesBtn = document.getElementById('enableFeaturesBtn');
         const driverIdInput = document.getElementById('driverIdInput');
         const welcomeMessage = document.getElementById('welcomeMessage');
-        const orderList = document.getElementById('orderList'); // Corrected ID
+        const orderList = document.getElementById('orderList');
         const installBtn = document.getElementById('installBtn');
         
         let deferredPrompt; 
@@ -178,7 +178,6 @@
                     console.error("Notification permission request failed", e);
                 }
             }
-            // Always initialize features, even if permissions are denied
             initializeFeatures(driverId, oneSignalFailed);
         }
 
@@ -201,7 +200,7 @@
         async function checkAndRequestPermissions(driverId, oneSignalFailed = false) {
             const geoPermissionStatus = await navigator.permissions.query({name: 'geolocation'});
             
-            let isPushEnabled = true; // Assume enabled if OneSignal failed
+            let isPushEnabled = true; 
             if (!oneSignalFailed) {
                 isPushEnabled = OneSignal.Notifications.permission;
             }
