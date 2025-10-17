@@ -271,7 +271,8 @@
     </div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxelIUS1M4vJ-r_fAuZoyzZDL9iC6Hcop-3_Eg_lLiSdWZVTQXnOpSSlGhxGjhojxot/exec';
+        // FIXED: All constants and variables moved to the top for global access
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxe44KC0_j7l3i7mD_qjbzhKdjxoj8n1qi_hcy-Vt4ca5_kBaObdaskRIiehfnpi4L9/exec';
         const GOOGLE_MAPS_API_KEY = 'AIzaSyCbVYMijMs8zH6m4iiSiBfn_RiCMuau9ps';
         
         // DOM Elements
@@ -687,6 +688,39 @@
                 alert("שגיאה באישור ההתראה.");
             }
         }
+        
+        // This is the main entry point after the DOM is ready
+        document.addEventListener('DOMContentLoaded', async () => {
+            initializeMap();
+            populateDropdowns();
+            await buildScheduler();
+            await fetchCustomers();
+            
+            updateMap(); 
+            setInterval(updateMap, 30000);
+            
+            fetchAlerts();
+            setInterval(fetchAlerts, 60000);
+
+            // Attach all event listeners
+            showHistoryBtn.addEventListener('click', openHistoryModal);
+            closeHistoryBtn.addEventListener('click', () => historyModal.style.display = 'none');
+            
+            showAnalyticsBtn.addEventListener('click', openAnalyticsModal);
+            closeAnalyticsBtn.addEventListener('click', () => analyticsModal.style.display = 'none');
+
+            alertBell.addEventListener('click', () => {
+                alertsPanel.style.display = alertsPanel.style.display === 'block' ? 'none' : 'block';
+            });
+
+            window.addEventListener('click', (e) => { 
+                if(e.target == historyModal) historyModal.style.display = 'none';
+                if(e.target == analyticsModal) analyticsModal.style.display = 'none';
+            });
+            historySearch.addEventListener('keyup', filterHistoryTable);
+            createOrderForm.addEventListener('submit', handleCreateOrder);
+        });
+
     </script>
 </body>
 </html>
