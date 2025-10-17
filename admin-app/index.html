@@ -16,11 +16,10 @@
     <!-- SortableJS for Drag and Drop -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     
-    <!-- NEW: Chart.js for Analytics -->
+    <!-- Chart.js for Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        /* ... (all previous CSS styles remain the same) ... */
         :root {
             --primary-color: #007bff;
             --secondary-color: #6c757d;
@@ -125,7 +124,6 @@
         .marker-pin::after { content: ''; width: 14px; height: 14px; margin: 8px 0 0 8px; background: #fff; position: absolute; border-radius: 50%; }
         .custom-div-icon i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -150%); color: white; font-size: 1.2em; }
         
-        /* NEW: Analytics Modal Styles */
         .analytics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
         .stat-card { background-color: #f8f9fa; text-align: center; padding: 20px; border-radius: var(--border-radius); }
         .stat-card h3 { margin: 0 0 10px 0; color: var(--secondary-color); }
@@ -140,11 +138,30 @@
         
         <div class="main-layout">
             <div class="left-panel">
-                <!-- ... Scheduler and Map ... -->
+                <div class="card">
+                    <h2><i class="fas fa-calendar-alt"></i> לוח שיבוצים חי</h2>
+                    <div id="scheduler" class="scheduler-container"></div>
+                </div>
+
+                 <div class="card">
+                    <h2><i class="fas fa-map-marked-alt"></i> מפה טקטית חיה</h2>
+                    <div id="liveMap"></div>
+                </div>
             </div>
 
             <div class="right-panel">
-                <!-- ... Create Order Form ... -->
+                <div class="card">
+                    <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
+                    <form id="createOrderForm" autocomplete="off">
+                        <div class="form-group"><label for="customerName">שם לקוח</label><input type="text" id="customerName" required></div>
+                        <div class="form-group"><label for="address">כתובת</label><input type="text" id="address" required></div>
+                        <div class="form-group"><label for="orderTime">שעה</label><input type="time" id="orderTime" required></div>
+                        <div class="form-group"><label for="deliveryType">סוג הובלה</label><select id="deliveryType" required></select></div>
+                        <div class="form-group"><label for="warehouse">מחסן</label><select id="warehouse" required><option value="">בחר מחסן...</option><option value="החרש">החרש</option><option value="התלמיד">התלמיד</option></select></div>
+                        <div class="form-group"><label for="notes">הערות</label><textarea id="notes" rows="3"></textarea></div>
+                        <button type="submit">צור הזמנה</button>
+                    </form>
+                </div>
                  <div class="card">
                     <h2><i class="fas fa-chart-line"></i> דוחות וביצועים</h2>
                     <button id="showAnalyticsBtn" style="width: 100%; background-color: var(--success);"><i class="fas fa-chart-bar"></i> הצג דאשבורד</button>
@@ -157,54 +174,360 @@
         </div>
     </div>
     
-    <!-- History Modal -->
-    <div id="historyModal" class="modal"> <!-- ... (unchanged) ... --> </div>
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeHistory">&times;</span>
+            <h2><i class="fas fa-history"></i> היסטוריית הזמנות</h2>
+            <input type="text" id="historySearch" placeholder="חפש..." class="form-group" style="width: 100%; padding: 10px; margin-bottom: 15px;">
+            <div style="max-height: 60vh; overflow-y: auto;">
+                <table id="historyTable">
+                    <thead><tr><th>תאריך</th><th>לקוח</th><th>כתובת</th><th>נהג</th><th>סטטוס</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
     
-    <!-- NEW: Analytics Modal -->
     <div id="analyticsModal" class="modal">
       <div class="modal-content">
         <span class="close-button" id="closeAnalytics">&times;</span>
         <h2><i class="fas fa-chart-line"></i> דאשבורד ביצועים</h2>
         <div class="analytics-grid">
-            <div class="stat-card">
-                <h3>סה"כ משימות שהושלמו</h3>
-                <p id="totalCompletedStat">0</p>
-            </div>
-            <div class="stat-card">
-                <h3>זמן משימה ממוצע (דקות)</h3>
-                <p id="avgTimeStat">0</p>
-            </div>
-            <div class="stat-card">
-                <h3>נהג מצטיין</h3>
-                <p id="topDriverStat">-</p>
-            </div>
+            <div class="stat-card"><h3>סה"כ משימות שהושלמו</h3><p id="totalCompletedStat">0</p></div>
+            <div class="stat-card"><h3>זמן משימה ממוצע (דקות)</h3><p id="avgTimeStat">0</p></div>
+            <div class="stat-card"><h3>נהג מצטיין</h3><p id="topDriverStat">-</p></div>
         </div>
-        <div class="chart-container">
-            <canvas id="driverPerformanceChart"></canvas>
-        </div>
+        <div class="chart-container"><canvas id="driverPerformanceChart"></canvas></div>
       </div>
     </div>
 
-
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxe44KC0_j7l3i7mD_qjbzhKdjxoj8n1qi_hcy-Vt4ca5_kBaObdaskRIiehfnpi4L9/exec';
-        // ... (all previous script variables) ...
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxelIUS1M4vJ-r_fAuZoyzZDL9iC6Hcop-3_Eg_lLiSdWZVTQXnOpSSlGhxGjhojxot/exec';
+        const GOOGLE_MAPS_API_KEY = 'AIzaSyCbVYMijMs8zH6m4iiSiBfn_RiCMuau9ps';
         
-        const showAnalyticsBtn = document.getElementById('showAnalyticsBtn');
+        // DOM Elements
+        const schedulerContainer = document.getElementById('scheduler');
+        const createOrderForm = document.getElementById('createOrderForm');
+        
+        const historyModal = document.getElementById('historyModal');
+        const showHistoryBtn = document.getElementById('showHistoryBtn');
+        const closeHistoryBtn = document.getElementById('closeHistory');
+        const historyTableBody = document.querySelector('#historyTable tbody');
+        const historySearch = document.getElementById('historySearch');
+
         const analyticsModal = document.getElementById('analyticsModal');
+        const showAnalyticsBtn = document.getElementById('showAnalyticsBtn');
         const closeAnalyticsBtn = document.getElementById('closeAnalytics');
 
-        
+        let allCustomers = [];
+        let liveMap;
+        let driverMarkers = {};
+        let orderMarkersLayer = L.layerGroup();
+        const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
+
         document.addEventListener('DOMContentLoaded', async () => {
-            // ... (all previous DOMContentLoaded logic) ...
+            initializeMap();
+            populateDropdowns();
+            await buildScheduler();
+            await fetchCustomers();
+            
+            updateMap(); 
+            setInterval(updateMap, 30000);
 
             // Event Listeners
+            showHistoryBtn.addEventListener('click', openHistoryModal);
+            closeHistoryBtn.addEventListener('click', () => historyModal.style.display = 'none');
+            
             showAnalyticsBtn.addEventListener('click', openAnalyticsModal);
             closeAnalyticsBtn.addEventListener('click', () => analyticsModal.style.display = 'none');
-            window.addEventListener('click', (e) => { if(e.target == analyticsModal) analyticsModal.style.display = 'none' });
+
+            window.addEventListener('click', (e) => { 
+                if(e.target == historyModal) historyModal.style.display = 'none';
+                if(e.target == analyticsModal) analyticsModal.style.display = 'none';
+            });
+            historySearch.addEventListener('keyup', filterHistoryTable);
+            createOrderForm.addEventListener('submit', handleCreateOrder);
         });
 
-        // --- NEW: Analytics Modal Functions ---
+        // --- Scheduler Functions ---
+        async function buildScheduler() {
+            schedulerContainer.innerHTML = '';
+            try {
+                const [driversResult, ordersResult] = await Promise.all([
+                    fetch(`${API_URL}?action=getDrivers`).then(res => res.json()),
+                    fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`).then(res => res.json())
+                ]);
+
+                if(!driversResult.data) throw new Error("No drivers data received");
+                const drivers = driversResult.data.filter(d => d.status === 'פעיל');
+
+                if(!ordersResult.data) throw new Error("No orders data received");
+                const allTodayOrders = ordersResult.data;
+
+                const unassignedCol = document.createElement('div');
+                unassignedCol.className = 'scheduler-column';
+                unassignedCol.innerHTML = '<h3><i class="fas fa-box-open"></i> הזמנות פנויות</h3>';
+                const unassignedPool = document.createElement('ul');
+                unassignedPool.id = 'unassigned-pool';
+                unassignedPool.className = 'order-pool';
+                unassignedCol.appendChild(unassignedPool);
+                schedulerContainer.appendChild(unassignedCol);
+
+                drivers.forEach(driver => {
+                    const driverCol = document.createElement('div');
+                    driverCol.className = 'scheduler-column';
+                    driverCol.innerHTML = `<h3><i class="fas fa-user-circle"></i> ${driver.name}</h3>`;
+                    const driverLane = document.createElement('ul');
+                    driverLane.id = `driver-lane-${driver.driverId}`;
+                    driverLane.className = 'driver-lane';
+                    driverLane.dataset.driverId = driver.driverId;
+                    driverCol.appendChild(driverLane);
+                    schedulerContainer.appendChild(driverCol);
+                });
+
+                allTodayOrders.forEach(order => {
+                    const card = createScheduleCard(order);
+                    const targetLane = document.getElementById(`driver-lane-${order.driverId}`);
+                    if (order.driverId && targetLane) {
+                        targetLane.appendChild(card);
+                    } else {
+                        unassignedPool.appendChild(card);
+                    }
+                });
+
+                initSortable();
+            } catch (error) {
+                console.error("Failed to build scheduler:", error);
+                schedulerContainer.innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים.</p>`;
+            }
+        }
+
+        function createScheduleCard(order) {
+            const card = document.createElement('li');
+            card.className = 'schedule-card';
+            card.dataset.orderId = order.orderId;
+            card.innerHTML = `<p class="card-customer">${order.customerName}</p><p><i class="fas fa-clock"></i> ${order.orderTime}</p><p><i class="fas fa-map-marker-alt"></i> ${order.address}</p>`;
+            return card;
+        }
+
+        function initSortable() {
+            const pools = document.querySelectorAll('.order-pool, .driver-lane');
+            pools.forEach(pool => {
+                new Sortable(pool, { group: 'orders', animation: 150, ghostClass: 'ghost-card', onEnd: handleDragEnd });
+            });
+        }
+        
+        async function handleDragEnd(event) {
+            const orderId = event.item.dataset.orderId;
+            const newDriverId = event.to.dataset.driverId || ''; 
+            try {
+                event.item.style.opacity = '0.5';
+                await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: newDriverId } } }) });
+                event.item.style.opacity = '1';
+            } catch (error) {
+                console.error("Error updating driver on drag:", error);
+                event.from.appendChild(event.item);
+                alert("שגיאה בעדכון השיבוץ.");
+            }
+        }
+
+        // --- Map Functions ---
+        function initializeMap() {
+            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
+             liveMap = L.map('liveMap', { center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer] });
+            orderMarkersLayer.addTo(liveMap);
+        }
+        
+        async function updateMap() {
+             try {
+                const response = await fetch(`${API_URL}?action=getLiveMapData`);
+                const result = await response.json();
+                if (result.status !== 'success' || !result.data) throw new Error(result.message || 'Invalid data structure');
+                
+                const { drivers, pendingOrders } = result.data;
+                const updatedDriverIds = [];
+
+                drivers.forEach(driver => {
+                    if (!driver.location || typeof driver.location.latitude !== 'number' || typeof driver.location.longitude !== 'number') return;
+                    
+                    updatedDriverIds.push(driver.driverId);
+                    const latLng = [driver.location.latitude, driver.location.longitude];
+                    const isOnRoute = !!driver.activeOrder;
+                    const statusClass = isOnRoute ? 'driver-on-route' : 'driver-available';
+                    let popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
+                    if(isOnRoute) popupContent += `<p>יעד: ${driver.activeOrder.customerName}</p>`;
+                    
+                    const icon = L.divIcon({
+                        className: `custom-div-icon ${statusClass}`,
+                        html: `<div class='marker-pin'></div><i class='fas fa-truck'></i>`,
+                        iconSize: [30, 42], iconAnchor: [15, 42]
+                    });
+
+                    if (driverMarkers[driver.driverId]) {
+                        driverMarkers[driver.driverId].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
+                    } else {
+                        driverMarkers[driver.driverId] = L.marker(latLng, {icon: icon}).addTo(liveMap).bindPopup(popupContent);
+                    }
+                });
+
+                for (const driverId in driverMarkers) {
+                    if (!updatedDriverIds.includes(driverId)) {
+                        liveMap.removeLayer(driverMarkers[driverId]);
+                        delete driverMarkers[driverId];
+                    }
+                }
+                
+                orderMarkersLayer.clearLayers(); 
+                pendingOrders.forEach(order => {
+                    if (typeof order.latitude !== 'number' || typeof order.longitude !== 'number') return;
+                    const latLng = [order.latitude, order.longitude];
+                    const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=200x200&location=${order.latitude},${order.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
+                    const orderPopup = `<h3>הזמנה פנויה</h3><p>${order.customerName}</p><p>${order.address}</p><img src="${streetViewUrl}" class="popup-image" alt="Street View">`;
+                    
+                    const icon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class='marker-pin' style='background-color: var(--danger);'></div><i class='fas fa-box'></i>`,
+                        iconSize: [30, 42], iconAnchor: [15, 42]
+                    });
+
+                    L.marker(latLng, {icon: icon}).bindPopup(orderPopup).addTo(orderMarkersLayer);
+                });
+            } catch (error) { console.error('Error updating map:', error); }
+        }
+
+
+        // --- Form and History Functions ---
+        async function fetchCustomers() {
+             try {
+                const response = await fetch(`${API_URL}?action=getCustomers`);
+                const result = await response.json();
+                if (result.status === 'success' && result.data) {
+                    allCustomers = result.data;
+                    initAutocomplete(document.getElementById("customerName"), allCustomers);
+                }
+            } catch (error) {
+                console.error("Error fetching customers:", error);
+            }
+        }
+
+        function initAutocomplete(inputEl, customers) {
+            inputEl.addEventListener("input", function() {
+                closeAllLists();
+                const val = this.value;
+                if (!val) { return false; }
+                const list = document.createElement("DIV");
+                list.setAttribute("id", this.id + "autocomplete-list");
+                list.setAttribute("class", "autocomplete-items");
+                this.parentNode.appendChild(list);
+
+                customers.forEach(customer => {
+                    if (customer.name.toLowerCase().includes(val.toLowerCase())) {
+                        const item = document.createElement("DIV");
+                        item.innerHTML = customer.name.replace(new RegExp(val, "gi"), "<strong>$&</strong>");
+                        item.addEventListener("click", function() {
+                            inputEl.value = customer.name;
+                            document.getElementById("address").value = customer.defaultAddress || '';
+                            closeAllLists();
+                        });
+                        list.appendChild(item);
+                    }
+                });
+            });
+            function closeAllLists(elmnt) {
+                const x = document.getElementsByClassName("autocomplete-items");
+                for (let i = 0; i < x.length; i++) {
+                    if (elmnt != x[i] && elmnt != inputEl) x[i].parentNode.removeChild(x[i]);
+                }
+            }
+            document.addEventListener("click", (e) => closeAllLists(e.target));
+        }
+        
+        function populateDropdowns() {
+            const deliveryTypeSelect = document.getElementById('deliveryType');
+            deliveryTypeSelect.innerHTML = '<option value="">בחר סוג הובלה...</option>';
+            deliveryTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                deliveryTypeSelect.appendChild(option);
+            });
+        }
+        
+        async function handleCreateOrder(e) {
+            e.preventDefault();
+            const orderData = {
+                customerName: document.getElementById('customerName').value,
+                address: document.getElementById('address').value,
+                orderTime: document.getElementById('orderTime').value,
+                deliveryType: document.getElementById('deliveryType').value,
+                warehouse: document.getElementById('warehouse').value,
+                notes: document.getElementById('notes').value,
+                orderDate: new Date().toISOString().split('T')[0]
+            };
+            try {
+                await fetch(API_URL, {
+                    method: 'POST', 
+                    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+                    body: JSON.stringify({ action: 'createOrder', data: orderData })
+                });
+                createOrderForm.reset();
+                buildScheduler(); 
+            } catch (error) { console.error('Error creating order:', error); }
+        }
+        
+        async function openHistoryModal() {
+            historyModal.style.display = 'block';
+            historyTableBody.innerHTML = '<tr><td colspan="5">טוען היסטוריה...</td></tr>';
+            try {
+                const response = await fetch(`${API_URL}?action=getHistory`);
+                const result = await response.json();
+                if (result.status === 'success' && result.data) {
+                    renderHistory(result.data);
+                } else {
+                    historyTableBody.innerHTML = `<tr><td colspan="5">שגיאה: ${result.message}</td></tr>`;
+                }
+            } catch (error) {
+                console.error("Error fetching history:", error);
+                historyTableBody.innerHTML = `<tr><td colspan="5">שגיאה בטעינת היסטוריה.</td></tr>`;
+            }
+        }
+        
+        function renderHistory(data) {
+             historyTableBody.innerHTML = '';
+            if (data.length === 0) {
+                historyTableBody.innerHTML = '<tr><td colspan="5">אין הזמנות בארכיון.</td></tr>';
+                return;
+            }
+            data.forEach(order => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(order.orderDate).toLocaleDateString('he-IL')}</td>
+                    <td>${order.customerName}</td>
+                    <td>${order.address}</td>
+                    <td>${order.driverId}</td>
+                    <td><span class="status-badge status-${order.status}">${order.status}</span></td>
+                `;
+                historyTableBody.appendChild(row);
+            });
+        }
+
+        function filterHistoryTable() {
+            const filter = historySearch.value.toUpperCase();
+            const rows = historyTableBody.getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+                let found = false;
+                const cells = rows[i].getElementsByTagName('td');
+                for (let j = 0; j < cells.length; j++) {
+                    if (cells[j] && cells[j].textContent.toUpperCase().indexOf(filter) > -1) {
+                        found = true;
+                        break;
+                    }
+                }
+                rows[i].style.display = found ? "" : "none";
+            }
+        }
+        
+        // --- Analytics Modal Functions ---
         async function openAnalyticsModal() {
             analyticsModal.style.display = 'block';
             try {
@@ -248,21 +571,10 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            }
-                        }
-                    }
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
                 }
             });
         }
-
-
-        // ... (All other functions from previous version remain here) ...
-        
     </script>
 </body>
 </html>
