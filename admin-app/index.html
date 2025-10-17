@@ -230,46 +230,53 @@
         async function buildScheduler() {
             schedulerContainer.innerHTML = '';
             
-            const driversResponse = await fetch(`${API_URL}?action=getDrivers`);
-            const driversResult = await driversResponse.json();
-            const drivers = driversResult.data.filter(d => d.status === 'פעיל');
+            try {
+                const driversResponse = await fetch(`${API_URL}?action=getDrivers`);
+                const driversResult = await driversResponse.json();
+                if(!driversResult.data) throw new Error("No drivers data received");
+                const drivers = driversResult.data.filter(d => d.status === 'פעיל');
 
-            const ordersResponse = await fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`);
-            const ordersResult = await ordersResponse.json();
-            const allTodayOrders = ordersResult.data;
+                const ordersResponse = await fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`);
+                const ordersResult = await ordersResponse.json();
+                if(!ordersResult.data) throw new Error("No orders data received");
+                const allTodayOrders = ordersResult.data;
 
-            const unassignedCol = document.createElement('div');
-            unassignedCol.className = 'scheduler-column';
-            unassignedCol.innerHTML = '<h3><i class="fas fa-box-open"></i> הזמנות פנויות</h3>';
-            const unassignedPool = document.createElement('ul');
-            unassignedPool.id = 'unassigned-pool';
-            unassignedPool.className = 'order-pool';
-            unassignedCol.appendChild(unassignedPool);
-            schedulerContainer.appendChild(unassignedCol);
+                const unassignedCol = document.createElement('div');
+                unassignedCol.className = 'scheduler-column';
+                unassignedCol.innerHTML = '<h3><i class="fas fa-box-open"></i> הזמנות פנויות</h3>';
+                const unassignedPool = document.createElement('ul');
+                unassignedPool.id = 'unassigned-pool';
+                unassignedPool.className = 'order-pool';
+                unassignedCol.appendChild(unassignedPool);
+                schedulerContainer.appendChild(unassignedCol);
 
-            drivers.forEach(driver => {
-                const driverCol = document.createElement('div');
-                driverCol.className = 'scheduler-column';
-                driverCol.innerHTML = `<h3><i class="fas fa-user-circle"></i> ${driver.name}</h3>`;
-                const driverLane = document.createElement('ul');
-                driverLane.id = `driver-lane-${driver.driverId}`;
-                driverLane.className = 'driver-lane';
-                driverLane.dataset.driverId = driver.driverId;
-                driverCol.appendChild(driverLane);
-                schedulerContainer.appendChild(driverCol);
-            });
+                drivers.forEach(driver => {
+                    const driverCol = document.createElement('div');
+                    driverCol.className = 'scheduler-column';
+                    driverCol.innerHTML = `<h3><i class="fas fa-user-circle"></i> ${driver.name}</h3>`;
+                    const driverLane = document.createElement('ul');
+                    driverLane.id = `driver-lane-${driver.driverId}`;
+                    driverLane.className = 'driver-lane';
+                    driverLane.dataset.driverId = driver.driverId;
+                    driverCol.appendChild(driverLane);
+                    schedulerContainer.appendChild(driverCol);
+                });
 
-            allTodayOrders.forEach(order => {
-                const card = createScheduleCard(order);
-                const targetLane = document.getElementById(`driver-lane-${order.driverId}`);
-                if (order.driverId && targetLane) {
-                    targetLane.appendChild(card);
-                } else {
-                    unassignedPool.appendChild(card);
-                }
-            });
+                allTodayOrders.forEach(order => {
+                    const card = createScheduleCard(order);
+                    const targetLane = document.getElementById(`driver-lane-${order.driverId}`);
+                    if (order.driverId && targetLane) {
+                        targetLane.appendChild(card);
+                    } else {
+                        unassignedPool.appendChild(card);
+                    }
+                });
 
-            initSortable();
+                initSortable();
+            } catch (error) {
+                console.error("Failed to build scheduler:", error);
+                schedulerContainer.innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים.</p>`;
+            }
         }
 
         function createScheduleCard(order) {
@@ -428,8 +435,9 @@
                 orderDate: new Date().toISOString().split('T')[0]
             };
             try {
-                await fetch(API_URL, {
-                    method: 'POST', mode: 'no-cors',
+                const response = await fetch(API_URL, {
+                    method: 'POST', 
+                    headers: {'Content-Type': 'text/plain;charset=utf-8'}, // Use text/plain for no-cors
                     body: JSON.stringify({ action: 'createOrder', data: orderData })
                 });
                 createOrderForm.reset();
