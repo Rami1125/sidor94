@@ -45,6 +45,7 @@
         .container { max-width: 1600px; margin: 0 auto; }
         .header-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         h1 { text-align: center; color: var(--primary-color); flex-grow: 1; }
+        h2 { text-align: center; margin-bottom: 20px; color: var(--primary-color); }
         .main-layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
         .card { background: var(--white); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 20px; }
         #liveMap { height: 400px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; }
@@ -299,7 +300,7 @@
         let orderMarkersLayer = L.layerGroup();
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
         let performanceChart = null;
-
+        
         // --- All Functions ---
 
         async function buildScheduler() {
@@ -688,39 +689,6 @@
                 alert("שגיאה באישור ההתראה.");
             }
         }
-        
-        // This is the main entry point after the DOM is ready
-        document.addEventListener('DOMContentLoaded', async () => {
-            initializeMap();
-            populateDropdowns();
-            await buildScheduler();
-            await fetchCustomers();
-            
-            updateMap(); 
-            setInterval(updateMap, 30000);
-            
-            fetchAlerts();
-            setInterval(fetchAlerts, 60000);
-
-            // Attach all event listeners
-            showHistoryBtn.addEventListener('click', openHistoryModal);
-            closeHistoryBtn.addEventListener('click', () => historyModal.style.display = 'none');
-            
-            showAnalyticsBtn.addEventListener('click', openAnalyticsModal);
-            closeAnalyticsBtn.addEventListener('click', () => analyticsModal.style.display = 'none');
-
-            alertBell.addEventListener('click', () => {
-                alertsPanel.style.display = alertsPanel.style.display === 'block' ? 'none' : 'block';
-            });
-
-            window.addEventListener('click', (e) => { 
-                if(e.target == historyModal) historyModal.style.display = 'none';
-                if(e.target == analyticsModal) analyticsModal.style.display = 'none';
-            });
-            historySearch.addEventListener('keyup', filterHistoryTable);
-            createOrderForm.addEventListener('submit', handleCreateOrder);
-        });
-
     </script>
 </body>
 </html>
