@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
     <title>DeliveryMaster - מרכז בקרה</title>
     
     <!-- Fonts and Icons -->
@@ -112,6 +112,7 @@
         .autocomplete-items div:hover { background-color: #e9e9e9; }
         .leaflet-popup-content { text-align: right; direction: rtl; }
         .leaflet-popup-content h3 { margin: 0 0 5px 0; font-size: 1.1em; }
+        .popup-image { max-width: 100%; border-radius: 5px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -193,6 +194,7 @@
 
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbxe44KC0_j7l3i7mD_qjbzhKdjxoj8n1qi_hcy-Vt4ca5_kBaObdaskRIiehfnpi4L9/exec';
+        const GOOGLE_MAPS_API_KEY = 'AIzaSyCbVYMijMs8zH6m4iiSiBfn_RiCMuau9ps';
         
         // DOM Elements
         const schedulerContainer = document.getElementById('scheduler');
@@ -334,10 +336,12 @@
                     const isOnRoute = !!driver.activeOrder;
                     const popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
                     
+                    const icon = L.divIcon({ className: 'fa-solid fa-truck', html: '🚚', iconSize: [30, 30] });
+
                     if (driverMarkers[driver.driverId]) {
                         driverMarkers[driver.driverId].setLatLng(latLng).setPopupContent(popupContent);
                     } else {
-                        driverMarkers[driver.driverId] = L.marker(latLng).addTo(liveMap).bindPopup(popupContent);
+                        driverMarkers[driver.driverId] = L.marker(latLng, {icon: icon}).addTo(liveMap).bindPopup(popupContent);
                     }
                 });
 
@@ -352,8 +356,12 @@
                 pendingOrders.forEach(order => {
                     if (typeof order.latitude !== 'number' || typeof order.longitude !== 'number') return;
                     const latLng = [order.latitude, order.longitude];
-                    const orderPopup = `<h3>הזמנה פנויה</h3><p>${order.customerName}</p><p>${order.address}</p>`;
-                    L.marker(latLng).bindPopup(orderPopup).addTo(orderMarkersLayer);
+                    const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=200x200&location=${order.latitude},${order.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
+                    const orderPopup = `<h3>הזמנה פנויה</h3><p>${order.customerName}</p><p>${order.address}</p><img src="${streetViewUrl}" class="popup-image" alt="Street View">`;
+                    
+                    const icon = L.divIcon({ className: 'fa-solid fa-box', html: '📦', iconSize: [30, 30] });
+
+                    L.marker(latLng, {icon: icon}).bindPopup(orderPopup).addTo(orderMarkersLayer);
                 });
             } catch (error) { console.error('Error updating map:', error); }
         }
@@ -442,7 +450,7 @@
             historyModal.style.display = 'block';
             historyTableBody.innerHTML = '<tr><td colspan="5">טוען היסטוריה...</td></tr>';
             try {
-                const response = await fetch(`${API_TBD}?action=getHistory`);
+                const response = await fetch(`${API_URL}?action=getHistory`);
                 const result = await response.json();
                 if (result.status === 'success' && result.data) {
                     renderHistory(result.data);
