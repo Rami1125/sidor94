@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>DeliveryMaster - טרמינל מחסן</title>
+    
+    <!-- PWA Manifest, Fonts, Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- OneSignal SDK -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+
+    <style>
+        /* Basic styling - can be enhanced */
+        body { font-family: 'Rubik', sans-serif; margin: 0; background-color: #f0f2f5; }
+        .view { display: none; }
+        .view.active { display: block; }
+        .container { padding: 15px; }
+        .order-section { margin-bottom: 30px; }
+        .order-section h2 { border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .order-card { background: #fff; border-radius: 8px; margin: 10px 0; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .order-card button { width: 100%; padding: 12px; border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 1em; }
+        .btn-acknowledge { background-color: #28a745; }
+        .btn-load { background-color: #ffc107; }
+    </style>
+</head>
+<body>
+
+    <div id="loginView" class="view active">
+        <!-- Simple login for manager ID -->
+        <div style="padding: 50px; text-align: center;">
+            <h2>כניסת מנהל מחסן</h2>
+            <input type="text" id="managerIdInput" placeholder="הזן קוד מנהל (OREN/TAMIR)" style="width: 100%; padding: 10px; margin-bottom: 10px;">
+            <button id="loginBtn" style="width: 100%; padding: 10px; background-color:#007bff; color:white; border:none;">כניסה</button>
+        </div>
+    </div>
+
+    <div id="mainView" class="view">
+        <header style="background: #007bff; color: white; padding: 15px; display:flex; justify-content:space-between; align-items:center;">
+            <h1 id="welcomeMessage" style="margin:0; font-size: 1.5em;"></h1>
+            <button id="logoutBtn" style="background:none; border:none; color:white; font-size: 1.5em;">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </header>
+        <div class="container">
+            <div id="newOrders" class="order-section">
+                <h2><i class="fas fa-inbox"></i> הזמנות חדשות לאישור</h2>
+                <div id="newOrdersList"></div>
+            </div>
+            <div id="inProgressOrders" class="order-section">
+                <h2><i class="fas fa-tasks"></i> הזמנות בתהליך</h2>
+                <div id="inProgressOrdersList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://script.google.com/macros/s/AKfycbw3KwCxx80PVfedaIu4UOgh0aldXYSGXgJWCRQGiBIZabZhsKjBz6Icn4S2W1M-ruQ8/exec';
+        // DOM Elements
+        const loginView = document.getElementById('loginView');
+        const mainView = document.getElementById('mainView');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const managerIdInput = document.getElementById('managerIdInput');
+        const welcomeMessage = document.getElementById('welcomeMessage');
+        const newOrdersList = document.getElementById('newOrdersList');
+        const inProgressOrdersList = document.getElementById('inProgressOrdersList');
+
+        // App State
+        let currentManager = null;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            currentManager = JSON.parse(sessionStorage.getItem('warehouseManager'));
+            if (currentManager) {
+                initApp(currentManager);
+            }
+        });
+
+        loginBtn.addEventListener('click', () => {
+            const managerId = managerIdInput.value.trim().toUpperCase();
+            // In a real app, you'd fetch manager details. Here we assume.
+            const managerData = {
+                id: managerId,
+                name: managerId === 'OREN' ? 'אורן' : 'תמיר',
+                warehouse: managerId === 'OREN' ? 'החרש' : 'התלמיד'
+            };
+            sessionStorage.setItem('warehouseManager', JSON.stringify(managerData));
+            initApp(managerData);
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            sessionStorage.removeItem('warehouseManager');
+            switchView('loginView');
+        });
+
+        function initApp(manager) {
+            currentManager = manager;
+            welcomeMessage.textContent = `מחסן ${manager.warehouse} | ברוך הבא ${manager.name}`;
+            switchView('mainView');
+            initializeNotifications(manager.id);
+            fetchWarehouseOrders();
+            setInterval(fetchWarehouseOrders, 20000); // Refresh every 20 seconds
+        }
+        
+        async function fetchWarehouseOrders() {
+            if (!currentManager) return;
+            try {
+                const response = await fetch(`${API_URL}?action=getWarehouseOrders&warehouse=${currentManager.warehouse}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    renderOrders(result.data);
+                }
+            } catch (error) {
+                console.error("Error fetching warehouse orders:", error);
+            }
+        }
+        
+        function renderOrders(orders) {
+            newOrdersList.innerHTML = '';
+            inProgressOrdersList.innerHTML = '';
+            
+            const newOrders = orders.filter(o => o.status === 'ממתין לאישור מחסן');
+            const inProgress = orders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
+
+            if (newOrders.length === 0) newOrdersList.innerHTML = '<p>אין הזמנות חדשות.</p>';
+            newOrders.forEach(order => newOrdersList.innerHTML += createOrderCard(order, 'acknowledge'));
+
+            if (inProgress.length === 0) inProgressOrdersList.innerHTML = '<p>אין הזמנות בתהליך.</p>';
+            inProgress.forEach(order => inProgressOrdersList.innerHTML += createOrderCard(order, 'load'));
+        }
+
+        function createOrderCard(order, type) {
+            let buttonHtml = '';
+            if (type === 'acknowledge') {
+                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus('${order.orderId}', 'באיסוף')">אשר קבלת הזמנה</button>`;
+            } else if (order.status === 'באיסוף') {
+                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus('${order.orderId}', 'טעון')">סמן כטעון</button>`;
+            } else {
+                 buttonHtml = `<p style="color:#28a745;"><b>הועמס בהצלחה ✔️</b></p>`;
+            }
+
+            return `
+                <div class="order-card" data-order-id="${order.orderId}">
+                    <h4>${order.customerName} (${order.orderId})</h4>
+                    <p>כתובת: ${order.address}</p>
+                    <p>שעה: ${order.orderTime}</p>
+                    ${buttonHtml}
+                </div>`;
+        }
+        
+        async function updateOrderStatus(orderId, newStatus) {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = 'מעדכן...';
+             try {
+                await fetch(API_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
+                });
+                // Optimistic update
+                fetchWarehouseOrders();
+            } catch (error) {
+                console.error("Error updating status:", error);
+                btn.disabled = false;
+                btn.innerHTML = 'נסה שוב';
+            }
+        }
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+        
+        // --- OneSignal Functions ---
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        OneSignalDeferred.push(function(OneSignal) {
+            OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
+        });
+
+        async function initializeNotifications(managerId) {
+             await OneSignal.Notifications.requestPermission();
+             await OneSignal.login(managerId);
+             const playerId = OneSignal.User.onesignalId;
+             if (playerId) {
+                registerWarehouseDevice(managerId, playerId);
+             }
+        }
+
+        async function registerWarehouseDevice(managerId, deviceId) {
+            try {
+                await fetch(API_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    body: JSON.stringify({ 
+                        action: 'registerWarehouseDevice', 
+                        data: { managerId, deviceId } 
+                    })
+                });
+            } catch (error) { console.error("Error registering device:", error); }
+        }
+
+    </script>
+</body>
+</html>
