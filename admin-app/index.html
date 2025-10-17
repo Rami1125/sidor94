@@ -184,6 +184,81 @@
             setInterval(fetchOrders, 15000); 
             setInterval(updateMap, 30000);
         });
+          // ------------------ הוסף את זה ברמת ה-script (כל מקום לפני renderOrders) ------------------
+function formatTimeOnly(isoValue, useLocal = true) {
+  if (!isoValue && isoValue !== 0) return '';
+  // כבר מחרוזת פשוטה של זמן
+  if (typeof isoValue === 'string' && isoValue.match(/^\d{1,2}:\d{2}$/)) return isoValue.padStart(5, '0');
+
+  let date;
+  try {
+    if (isoValue instanceof Date) {
+      date = isoValue;
+    } else if (!isNaN(Number(isoValue))) {
+      // יתכן שהערך הוא מספר טייםסטמפ
+      date = new Date(Number(isoValue));
+    } else {
+      date = new Date(isoValue);
+    }
+  } catch (e) {
+    date = null;
+  }
+
+  if (date && isFinite(date.getTime())) {
+    // על פי אזור הזמן של המשתמש (או של השרת אם רוצים) - שימוש ברירת מחדל באזור 'he-IL'
+    if (useLocal) {
+      return date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+    } else {
+      // חילוץ פשוט מהמחרוזת במקרה שרוצים ללא התחשבות ב-timezone
+      const isoStr = (typeof isoValue === 'string') ? isoValue : date.toISOString();
+      if (isoStr.includes('T')) {
+        const tPart = isoStr.split('T')[1];
+        const parts = tPart.split(':');
+        if (parts.length >= 2) return parts[0].padStart(2,'0') + ':' + parts[1];
+      }
+      // fallback על UTC
+      return String(date.getUTCHours()).padStart(2,'0') + ':' + String(date.getUTCMinutes()).padStart(2,'0');
+    }
+  }
+
+  // אם נשאר מחרוזת אחרת — נסו לחלץ שעה בקו פשוט
+  if (typeof isoValue === 'string' && isoValue.includes(':')) {
+    const m = isoValue.match(/(\d{1,2}):(\d{2})/);
+    if (m) return m[1].padStart(2,'0') + ':' + m[2];
+  }
+
+  return '';
+}
+// --------------------------------------------------------------------------------------------
+
+// החלף את הפונקציה renderOrders שלך בקוד הבא:
+function renderOrders(orders) {
+    ordersTableBody.innerHTML = '';
+    if (!orders || orders.length === 0) {
+        ordersTableBody.innerHTML = '<tr><td colspan="5">אין הזמנות להיום.</td></tr>';
+        return;
+    }
+    // אם orderTime הוא מחרוזת ISO, נמיין לפי הזמן בפורמט שניתן להשוות
+    orders.sort((a, b) => {
+        const ta = a.orderTime ? (typeof a.orderTime === 'string' ? a.orderTime : new Date(a.orderTime).toISOString()) : '';
+        const tb = b.orderTime ? (typeof b.orderTime === 'string' ? b.orderTime : new Date(b.orderTime).toISOString()) : '';
+        return ta.localeCompare(tb);
+    });
+
+    orders.forEach(order => {
+        const displayTime = formatTimeOnly(order.orderTime);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${order.customerName || ''}</td>
+            <td>${order.address || ''}</td>
+            <td>${displayTime}</td>
+            <td><span class="status-badge status-${order.status || ''}">${order.status || ''}</span></td>
+            <td id="driver-cell-${order.orderId}">${order.driverId || 'לא שויך'}</td>
+        `;
+        ordersTableBody.appendChild(row);
+    });
+    addDriverDropdownsToTable(orders);
+}
 
         function populateDropdowns() {
             const deliveryTypeSelect = document.getElementById('deliveryType');
@@ -232,12 +307,7 @@
                     }
                 });
             });
-             function formatTimeOnly(isoString) {
-               if (!isoString) return '';
-              const date = new Date(isoString);
-               // מציג שעה ודקות בלבד לפי אזור הזמן שלך
-            return date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-            }
+
             function closeAllLists(elmnt) {
                 const x = document.getElementsByClassName("autocomplete-items");
                 for (let i = 0; i < x.length; i++) {
