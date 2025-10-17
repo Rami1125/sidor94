@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DeliveryMaster - מרכז בקרה</title>
-
+    
     <!-- Fonts and Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -49,19 +48,34 @@
         .status-חדש, .status-שויך { background-color: var(--info); }
         .status-בדרך { background-color: var(--warning); color: #333; }
         .status-הושלם { background-color: var(--success); }
-        .form-group { margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; position: relative; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
         .form-group input, .form-group select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; }
         button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; }
         .last-updated { text-align: center; color: var(--secondary-color); font-size: 0.9em; margin-top: 10px; }
         .leaflet-popup-content { text-align: right; direction: rtl; }
         .leaflet-popup-content h3 { margin: 0 0 5px 0; font-size: 1.1em; }
-        .custom-div-icon { position: relative; }
-        .marker-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; }
-        .driver-available .marker-pin { background-color: var(--success); }
-        .driver-on-route .marker-pin { background-color: var(--warning); }
-        .marker-pin::after { content: ''; width: 14px; height: 14px; margin: 8px 0 0 8px; background: #fff; position: absolute; border-radius: 50%; }
-        .custom-div-icon i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -150%); color: white; font-size: 1.2em; }
+        
+        /* Autocomplete styles */
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid #d4d4d4;
+            border-bottom: none;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+        }
+        .autocomplete-items div {
+            padding: 10px;
+            cursor: pointer;
+            background-color: #fff; 
+            border-bottom: 1px solid #d4d4d4; 
+        }
+        .autocomplete-items div:hover { background-color: #e9e9e9; }
+        .autocomplete-active { background-color: DodgerBlue !important; color: #ffffff; }
+
     </style>
 </head>
 <body>
@@ -99,10 +113,19 @@
             <div class="right-panel">
                 <div class="card">
                     <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
-                    <form id="createOrderForm">
-                        <div class="form-group"><label for="customerName">שם לקוח</label><input type="text" id="customerName" required></div>
-                        <div class="form-group"><label for="address">כתובת</label><input type="text" id="address" required></div>
-                         <div class="form-group"><label for="orderTime">שעה</label><input type="time" id="orderTime" required></div>
+                    <form id="createOrderForm" autocomplete="off">
+                        <div class="form-group">
+                            <label for="customerName">שם לקוח</label>
+                            <input type="text" id="customerName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="address">כתובת</label>
+                            <input type="text" id="address" required>
+                        </div>
+                         <div class="form-group">
+                            <label for="orderTime">שעה</label>
+                            <input type="time" id="orderTime" required>
+                        </div>
                         <button type="submit">צור הזמנה</button>
                     </form>
                 </div>
@@ -120,7 +143,8 @@
         
         let liveMap;
         let driverMarkers = {};
-        let orderMarkersLayer = L.layerGroup(); // Layer for pending orders
+        let orderMarkersLayer = L.layerGroup(); 
+        let allCustomers = []; // NEW: To store customer list
 
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
@@ -130,19 +154,74 @@
             
             fetchOrders();
             updateMap(); 
+            fetchCustomers(); // NEW: Fetch customers on load
 
             setInterval(fetchOrders, 15000); 
             setInterval(updateMap, 30000);
         });
 
+        // --- NEW: Customer Autocomplete Logic ---
+        async function fetchCustomers() {
+            try {
+                const response = await fetch(`${API_URL}?action=getCustomers`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    allCustomers = result.data;
+                    initAutocomplete(document.getElementById("customerName"), allCustomers);
+                }
+            } catch (error) {
+                console.error("Error fetching customers:", error);
+            }
+        }
+
+        function initAutocomplete(inputEl, customers) {
+            let currentFocus;
+            inputEl.addEventListener("input", function(e) {
+                let a, b, i, val = this.value;
+                closeAllLists();
+                if (!val) { return false; }
+                currentFocus = -1;
+                a = document.createElement("DIV");
+                a.setAttribute("id", this.id + "autocomplete-list");
+                a.setAttribute("class", "autocomplete-items");
+                this.parentNode.appendChild(a);
+
+                customers.forEach(customer => {
+                    if (customer.name.includes(val)) {
+                        b = document.createElement("DIV");
+                        b.innerHTML = `<strong>${customer.name.substr(0, val.length)}</strong>${customer.name.substr(val.length)}`;
+                        b.innerHTML += `<input type='hidden' value='${JSON.stringify(customer)}'>`;
+                        b.addEventListener("click", function(e) {
+                            const selectedCustomer = JSON.parse(this.getElementsByTagName("input")[0].value);
+                            inputEl.value = selectedCustomer.name;
+                            document.getElementById("address").value = selectedCustomer.defaultAddress || '';
+                            closeAllLists();
+                        });
+                        a.appendChild(b);
+                    }
+                });
+            });
+
+            function closeAllLists(elmnt) {
+                const x = document.getElementsByClassName("autocomplete-items");
+                for (let i = 0; i < x.length; i++) {
+                    if (elmnt != x[i] && elmnt != inputEl) {
+                        x[i].parentNode.removeChild(x[i]);
+                    }
+                }
+            }
+            document.addEventListener("click", function (e) {
+                closeAllLists(e.target);
+            });
+        }
+        
+        // --- Map, Order, and Form Logic (mostly unchanged) ---
         function initializeMap() {
             const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
             const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
 
             liveMap = L.map('liveMap', {
-                center: [32.0853, 34.7818],
-                zoom: 10,
-                layers: [standardLayer]
+                center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer]
             });
             
             const baseMaps = { "מפה": standardLayer, "לוויין": satelliteLayer };
@@ -154,62 +233,53 @@
              try {
                 const response = await fetch(`${API_URL}?action=getLiveMapData`);
                 const result = await response.json();
-                if (result.status !== 'success') throw new Error(result.message);
+                if (result.status !== 'success' || !result.data) throw new Error(result.message || 'Invalid data structure');
                 
                 const { drivers, pendingOrders } = result.data;
+                const updatedDriverIds = [];
 
-                // Update drivers
                 drivers.forEach(driver => {
-                    if (!driver.location) return;
-
+                    if (!driver.location || typeof driver.location.latitude !== 'number' || typeof driver.location.longitude !== 'number') return;
+                    
+                    updatedDriverIds.push(driver.driverId);
                     const latLng = [driver.location.latitude, driver.location.longitude];
                     const isOnRoute = !!driver.activeOrder;
                     const statusClass = isOnRoute ? 'driver-on-route' : 'driver-available';
                     let popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
-                    if(isOnRoute) {
-                        popupContent += `<p>יעד: ${driver.activeOrder.customerName}</p>`;
-                    }
-
+                    if(isOnRoute) popupContent += `<p>יעד: ${driver.activeOrder.customerName}</p>`;
                     const icon = L.divIcon({
                         className: `custom-div-icon ${statusClass}`,
                         html: `<div class='marker-pin'></div><i class='fas fa-truck'></i>`,
-                        iconSize: [30, 42],
-                        iconAnchor: [15, 42]
+                        iconSize: [30, 42], iconAnchor: [15, 42]
                     });
 
                     if (driverMarkers[driver.driverId]) {
                         driverMarkers[driver.driverId].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
                     } else {
-                        driverMarkers[driver.driverId] = L.marker(latLng, { icon: icon })
-                                          .addTo(liveMap)
-                                          .bindPopup(popupContent);
+                        driverMarkers[driver.driverId] = L.marker(latLng, { icon: icon }).addTo(liveMap).bindPopup(popupContent);
                     }
                 });
+
+                for (const driverId in driverMarkers) {
+                    if (!updatedDriverIds.includes(driverId)) {
+                        liveMap.removeLayer(driverMarkers[driverId]);
+                        delete driverMarkers[driverId];
+                    }
+                }
                 
-                // Update pending orders
-                orderMarkersLayer.clearLayers(); // Clear old orders
+                orderMarkersLayer.clearLayers(); 
                 pendingOrders.forEach(order => {
-                    // Placeholder coordinates - geocoding is needed for real addresses
-                    // For now, let's place them randomly around Tel Aviv for visualization
                     const lat = 32.0853 + (Math.random() - 0.5) * 0.1;
                     const lng = 34.7818 + (Math.random() - 0.5) * 0.1;
-
                     const orderIcon = L.divIcon({
                         className: 'custom-div-icon',
                         html: `<div class='marker-pin' style='background-color: var(--danger);'></div><i class='fas fa-box'></i>`,
-                        iconSize: [30, 42],
-                        iconAnchor: [15, 42]
+                        iconSize: [30, 42], iconAnchor: [15, 42]
                     });
-                     
                     const orderPopup = `<h3>הזמנה פנויה</h3><p>${order.customerName}</p><p>${order.address}</p>`;
-
                     L.marker([lat, lng], { icon: orderIcon }).bindPopup(orderPopup).addTo(orderMarkersLayer);
                 });
-
-
-            } catch (error) {
-                console.error('Error updating map:', error);
-            }
+            } catch (error) { console.error('Error updating map:', error); }
         }
 
         async function fetchOrders() {
@@ -230,21 +300,11 @@
                  ordersTableBody.innerHTML = '<tr><td colspan="5">אין הזמנות להיום.</td></tr>';
                  return;
             }
-            
-            orders
-                .sort((a,b) => a.orderTime.localeCompare(b.orderTime))
-                .forEach(order => {
+            orders.sort((a,b) => a.orderTime.localeCompare(b.orderTime)).forEach(order => {
                 const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${order.customerName}</td>
-                    <td>${order.address}</td>
-                    <td>${order.orderTime}</td>
-                    <td><span class="status-badge status-${order.status}">${order.status}</span></td>
-                    <td id="driver-cell-${order.orderId}">${order.driverId || 'לא שויך'}</td>
-                `;
+                row.innerHTML = `<td>${order.customerName}</td><td>${order.address}</td><td>${order.orderTime}</td><td><span class="status-badge status-${order.status}">${order.status}</span></td><td id="driver-cell-${order.orderId}">${order.driverId || 'לא שויך'}</td>`;
                 ordersTableBody.appendChild(row);
             });
-            
             addDriverDropdownsToTable(orders);
         }
         
@@ -254,11 +314,9 @@
                 const driversResult = await driversResponse.json();
                 if (driversResult.status !== 'success') return;
                 const drivers = driversResult.data;
-
                 orders.forEach(order => {
                     const cell = document.getElementById(`driver-cell-${order.orderId}`);
                     if (!cell) return;
-
                     const select = document.createElement('select');
                     select.innerHTML = '<option value="">בחר נהג...</option>';
                     drivers.forEach(driver => {
@@ -268,7 +326,6 @@
                         if (driver.driverId === order.driverId) option.selected = true;
                         select.appendChild(option);
                     });
-                    
                     select.addEventListener('change', (e) => updateOrderDriver(order.orderId, e.target.value));
                     cell.innerHTML = '';
                     cell.appendChild(select);
@@ -279,8 +336,7 @@
         async function updateOrderDriver(orderId, driverId) {
              try {
                 await fetch(API_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
+                    method: 'POST', mode: 'no-cors',
                     body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: driverId } } })
                 });
                 fetchOrders();
@@ -295,11 +351,9 @@
                 orderTime: document.getElementById('orderTime').value,
                 orderDate: new Date().toISOString().split('T')[0]
             };
-            
             try {
                 await fetch(API_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
+                    method: 'POST', mode: 'no-cors',
                     body: JSON.stringify({ action: 'createOrder', data: orderData })
                 });
                 createOrderForm.reset();
