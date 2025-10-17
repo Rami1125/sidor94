@@ -1,84 +1,43 @@
 {
-  "name": "Sidor94 - Driver App",
-  "short_name": "Sidor94 Driver",
-  "description": "אפליקציית נהגים למערכת משלוחים Sidor94",
-  "start_url": "https://rami1125.github.io/sidor94/driver-app/",
-  "display": "standalone",
-  "background_color": "#1b4332",
-  "theme_color": "#2d6a4f",
-  "orientation": "portrait",
-  "scope": "/sidor94/driver-app/",
-  "lang": "he",
-  "dir": "rtl",
-  "categories": ["business", "navigation", "productivity"],
-  "icons": [
-    {
-      "src": "icons/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "https://i.postimg.cc/ryPT3r29/image.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "https://i.postimg.cc/ryPT3r29/image.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "https://i.postimg.cc/ryPT3r29/image.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "https://i.postimg.cc/ryPT3r29/image.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "https://i.postimg.cc/ryPT3r29/image.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "https://i.postimg.cc/ryPT3r29/image.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
-    },
-    {
-      "src": "screenshots/driver-2.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
-  ],
-  "related_applications": [
-    {
-      "platform": "web",
-      "url": "https://rami1125.github.io/sidor94/driver-app/"
-    }
-  ]
+"short_name": "נהגים",
+"name": "DeliveryMaster - אפליקציית נהגים",
+"lang": "he-IL",
+"description": "אפליקציית נהגים לניהול משימות, ניווט ועדכונים בזמן אמת.",
+"icons": [
+{
+"src": "https://i.postimg.cc/ryPT3r29/image.png",
+"type": "image/png",
+"sizes": "192x192",
+"purpose": "any maskable"
+},
+{
+"src": "https://i.postimg.cc/ryPT3r29/image.png",
+"type": "image/png",
+"sizes": "512x512",
+"purpose": "any maskable"
+}
+],
+"start_url": "./index.html",
+"scope": "./",
+"display": "standalone",
+"orientation": "portrait-primary",
+"background_color": "#f0f2f5",
+"theme_color": "#3a86ff",
+"categories": ["business", "productivity", "navigation"],
+"screenshots": [
+{
+"src": "https://www.google.com/search?q=https://placehold.co/1080x1920/3a86ff/ffffff%3Ftext%3D%D7%9E%D7%A1%D7%9A%2B%D7%9E%D7%A9%D7%99%D7%9E%D7%95%D7%AA",
+"sizes": "1080x1920",
+"type": "image/png",
+"form_factor": "narrow",
+"label": "רשימת משימות יומית"
+},
+{
+"src": "https://www.google.com/search?q=https://placehold.co/1080x1920/f0f2f5/333333%3Ftext%3D%D7%A4%D7%A8%D7%98%D7%99%2B%D7%94%D7%96%D7%9E%D7%A0%D7%94",
+"sizes": "1080x1920",
+"type": "image/png",
+"form_factor": "narrow",
+"label": "פרטי משימה וניווט"
+}
+]
 }
