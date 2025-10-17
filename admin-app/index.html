@@ -50,8 +50,8 @@
         .status-הושלם { background-color: var(--success); }
         .form-group { margin-bottom: 15px; position: relative; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-        .form-group input, .form-group select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; }
-        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; }
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; }
         .last-updated { text-align: center; color: var(--secondary-color); font-size: 0.9em; margin-top: 10px; }
         .leaflet-popup-content { text-align: right; direction: rtl; }
         .leaflet-popup-content h3 { margin: 0 0 5px 0; font-size: 1.1em; }
@@ -126,6 +126,22 @@
                             <label for="orderTime">שעה</label>
                             <input type="time" id="orderTime" required>
                         </div>
+                        <div class="form-group">
+                            <label for="deliveryType">סוג הובלה</label>
+                            <select id="deliveryType" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="warehouse">מחסן</label>
+                            <select id="warehouse" required>
+                                <option value="">בחר מחסן...</option>
+                                <option value="החרש">החרש</option>
+                                <option value="התלמיד">התלמיד</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="notes">הערות</label>
+                            <textarea id="notes" rows="3"></textarea>
+                        </div>
                         <button type="submit">צור הזמנה</button>
                     </form>
                 </div>
@@ -144,28 +160,41 @@
         let liveMap;
         let driverMarkers = {};
         let orderMarkersLayer = L.layerGroup(); 
-        let allCustomers = []; // NEW: To store customer list
+        let allCustomers = [];
+
+        const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
 
         document.addEventListener('DOMContentLoaded', () => {
             const today = new Date();
             todayDateSpan.textContent = today.toLocaleDateString('he-IL');
             
+            populateDropdowns();
             initializeMap();
             
             fetchOrders();
             updateMap(); 
-            fetchCustomers(); // NEW: Fetch customers on load
+            fetchCustomers();
 
             setInterval(fetchOrders, 15000); 
             setInterval(updateMap, 30000);
         });
 
-        // --- NEW: Customer Autocomplete Logic ---
+        function populateDropdowns() {
+            const deliveryTypeSelect = document.getElementById('deliveryType');
+            deliveryTypeSelect.innerHTML = '<option value="">בחר סוג הובלה...</option>';
+            deliveryTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                deliveryTypeSelect.appendChild(option);
+            });
+        }
+
         async function fetchCustomers() {
             try {
                 const response = await fetch(`${API_URL}?action=getCustomers`);
                 const result = await response.json();
-                if (result.status === 'success') {
+                if (result.status === 'success' && result.data) {
                     allCustomers = result.data;
                     initAutocomplete(document.getElementById("customerName"), allCustomers);
                 }
@@ -175,29 +204,25 @@
         }
 
         function initAutocomplete(inputEl, customers) {
-            let currentFocus;
             inputEl.addEventListener("input", function(e) {
-                let a, b, i, val = this.value;
                 closeAllLists();
+                const val = this.value;
                 if (!val) { return false; }
-                currentFocus = -1;
-                a = document.createElement("DIV");
-                a.setAttribute("id", this.id + "autocomplete-list");
-                a.setAttribute("class", "autocomplete-items");
-                this.parentNode.appendChild(a);
+                const list = document.createElement("DIV");
+                list.setAttribute("id", this.id + "autocomplete-list");
+                list.setAttribute("class", "autocomplete-items");
+                this.parentNode.appendChild(list);
 
                 customers.forEach(customer => {
-                    if (customer.name.includes(val)) {
-                        b = document.createElement("DIV");
-                        b.innerHTML = `<strong>${customer.name.substr(0, val.length)}</strong>${customer.name.substr(val.length)}`;
-                        b.innerHTML += `<input type='hidden' value='${JSON.stringify(customer)}'>`;
-                        b.addEventListener("click", function(e) {
-                            const selectedCustomer = JSON.parse(this.getElementsByTagName("input")[0].value);
-                            inputEl.value = selectedCustomer.name;
-                            document.getElementById("address").value = selectedCustomer.defaultAddress || '';
+                    if (customer.name.toLowerCase().includes(val.toLowerCase())) {
+                        const item = document.createElement("DIV");
+                        item.innerHTML = customer.name.replace(new RegExp(val, "gi"), "<strong>$&</strong>");
+                        item.addEventListener("click", function(e) {
+                            inputEl.value = customer.name;
+                            document.getElementById("address").value = customer.defaultAddress || '';
                             closeAllLists();
                         });
-                        a.appendChild(b);
+                        list.appendChild(item);
                     }
                 });
             });
@@ -215,7 +240,6 @@
             });
         }
         
-        // --- Map, Order, and Form Logic (mostly unchanged) ---
         function initializeMap() {
             const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
             const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
@@ -233,6 +257,9 @@
              try {
                 const response = await fetch(`${API_URL}?action=getLiveMapData`);
                 const result = await response.json();
+
+                console.log("Map data received from server:", result); // DEBUGGING
+
                 if (result.status !== 'success' || !result.data) throw new Error(result.message || 'Invalid data structure');
                 
                 const { drivers, pendingOrders } = result.data;
@@ -243,6 +270,8 @@
                     
                     updatedDriverIds.push(driver.driverId);
                     const latLng = [driver.location.latitude, driver.location.longitude];
+                    console.log(`Placing driver ${driver.driverId} at`, latLng); // DEBUGGING
+
                     const isOnRoute = !!driver.activeOrder;
                     const statusClass = isOnRoute ? 'driver-on-route' : 'driver-available';
                     let popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
@@ -349,6 +378,9 @@
                 customerName: document.getElementById('customerName').value,
                 address: document.getElementById('address').value,
                 orderTime: document.getElementById('orderTime').value,
+                deliveryType: document.getElementById('deliveryType').value,
+                warehouse: document.getElementById('warehouse').value,
+                notes: document.getElementById('notes').value,
                 orderDate: new Date().toISOString().split('T')[0]
             };
             try {
