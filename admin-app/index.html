@@ -90,7 +90,7 @@
         }
         .form-group { margin-bottom: 15px; position: relative; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; box-sizing: border-box; }
         button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; }
 
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
@@ -273,7 +273,7 @@
 
     <script>
         // FIXED: All constants and variables moved to the top for global access
-        const API_URL = 'https://script.google.com/macros/s/AKfycbw3KwCxx80PVfedaIu4UOgh0aldXYSGXgJWCRQGiBIZabZhsKjBz6Icn4S2W1M-ruQ8/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxe44KC0_j7l3i7mD_qjbzhKdjxoj8n1qi_hcy-Vt4ca5_kBaObdaskRIiehfnpi4L9/exec';
         const GOOGLE_MAPS_API_KEY = 'AIzaSyCbVYMijMs8zH6m4iiSiBfn_RiCMuau9ps';
         
         // DOM Elements
@@ -300,7 +300,7 @@
         let orderMarkersLayer = L.layerGroup();
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
         let performanceChart = null;
-        
+
         // --- All Functions ---
 
         async function buildScheduler() {
@@ -311,10 +311,10 @@
                     fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`).then(res => res.json())
                 ]);
 
-                if(!driversResult.data) throw new Error("No drivers data received");
+                if (!driversResult.data) throw new Error("No drivers data received");
                 const drivers = driversResult.data.filter(d => d.status === 'פעיל');
 
-                if(!ordersResult.data) throw new Error("No orders data received");
+                if (!ordersResult.data) throw new Error("No orders data received");
                 const allTodayOrders = ordersResult.data;
 
                 const unassignedCol = document.createElement('div');
@@ -369,10 +369,10 @@
                 new Sortable(pool, { group: 'orders', animation: 150, ghostClass: 'ghost-card', onEnd: handleDragEnd });
             });
         }
-        
+
         async function handleDragEnd(event) {
             const orderId = event.item.dataset.orderId;
-            const newDriverId = event.to.dataset.driverId || ''; 
+            const newDriverId = event.to.dataset.driverId || '';
             try {
                 event.item.style.opacity = '0.5';
                 await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: newDriverId } } }) });
@@ -386,29 +386,29 @@
 
         function initializeMap() {
             const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
-             liveMap = L.map('liveMap', { center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer] });
+            liveMap = L.map('liveMap', { center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer] });
             orderMarkersLayer.addTo(liveMap);
         }
-        
+
         async function updateMap() {
-             try {
+            try {
                 const response = await fetch(`${API_URL}?action=getLiveMapData`);
                 const result = await response.json();
                 if (result.status !== 'success' || !result.data) throw new Error(result.message || 'Invalid data structure');
-                
+
                 const { drivers, pendingOrders } = result.data;
                 const updatedDriverIds = [];
 
                 drivers.forEach(driver => {
                     if (!driver.location || typeof driver.location.latitude !== 'number' || typeof driver.location.longitude !== 'number') return;
-                    
+
                     updatedDriverIds.push(driver.driverId);
                     const latLng = [driver.location.latitude, driver.location.longitude];
                     const isOnRoute = !!driver.activeOrder;
                     const statusClass = isOnRoute ? 'driver-on-route' : 'driver-available';
                     let popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
-                    if(isOnRoute) popupContent += `<p>יעד: ${driver.activeOrder.customerName}</p>`;
-                    
+                    if (isOnRoute) popupContent += `<p>יעד: ${driver.activeOrder.customerName}</p>`;
+
                     const icon = L.divIcon({
                         className: `custom-div-icon ${statusClass}`,
                         html: `<div class='marker-pin'></div><i class='fas fa-truck'></i>`,
@@ -418,7 +418,7 @@
                     if (driverMarkers[driver.driverId]) {
                         driverMarkers[driver.driverId].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
                     } else {
-                        driverMarkers[driver.driverId] = L.marker(latLng, {icon: icon}).addTo(liveMap).bindPopup(popupContent);
+                        driverMarkers[driver.driverId] = L.marker(latLng, { icon: icon }).addTo(liveMap).bindPopup(popupContent);
                     }
                 });
 
@@ -428,27 +428,27 @@
                         delete driverMarkers[driverId];
                     }
                 }
-                
-                orderMarkersLayer.clearLayers(); 
+
+                orderMarkersLayer.clearLayers();
                 pendingOrders.forEach(order => {
                     if (typeof order.latitude !== 'number' || typeof order.longitude !== 'number') return;
                     const latLng = [order.latitude, order.longitude];
                     const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=200x200&location=${order.latitude},${order.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
                     const orderPopup = `<h3>הזמנה פנויה</h3><p>${order.customerName}</p><p>${order.address}</p><img src="${streetViewUrl}" class="popup-image" alt="Street View">`;
-                    
+
                     const icon = L.divIcon({
                         className: 'custom-div-icon',
                         html: `<div class='marker-pin' style='background-color: var(--danger);'></div><i class='fas fa-box'></i>`,
                         iconSize: [30, 42], iconAnchor: [15, 42]
                     });
 
-                    L.marker(latLng, {icon: icon}).bindPopup(orderPopup).addTo(orderMarkersLayer);
+                    L.marker(latLng, { icon: icon }).bindPopup(orderPopup).addTo(orderMarkersLayer);
                 });
             } catch (error) { console.error('Error updating map:', error); }
         }
 
         async function fetchCustomers() {
-             try {
+            try {
                 const response = await fetch(`${API_URL}?action=getCustomers`);
                 const result = await response.json();
                 if (result.status === 'success' && result.data) {
@@ -461,7 +461,7 @@
         }
 
         function initAutocomplete(inputEl, customers) {
-            inputEl.addEventListener("input", function() {
+            inputEl.addEventListener("input", function () {
                 closeAllLists();
                 const val = this.value;
                 if (!val) { return false; }
@@ -474,7 +474,7 @@
                     if (customer.name.toLowerCase().includes(val.toLowerCase())) {
                         const item = document.createElement("DIV");
                         item.innerHTML = customer.name.replace(new RegExp(val, "gi"), "<strong>$&</strong>");
-                        item.addEventListener("click", function() {
+                        item.addEventListener("click", function () {
                             inputEl.value = customer.name;
                             document.getElementById("address").value = customer.defaultAddress || '';
                             document.getElementById("customerPhone").value = customer.phone || '';
@@ -492,7 +492,7 @@
             }
             document.addEventListener("click", (e) => closeAllLists(e.target));
         }
-        
+
         function populateDropdowns() {
             const deliveryTypeSelect = document.getElementById('deliveryType');
             deliveryTypeSelect.innerHTML = '<option value="">בחר סוג הובלה...</option>';
@@ -503,7 +503,7 @@
                 deliveryTypeSelect.appendChild(option);
             });
         }
-        
+
         async function handleCreateOrder(e) {
             e.preventDefault();
             const orderData = {
@@ -518,15 +518,15 @@
             };
             try {
                 await fetch(API_URL, {
-                    method: 'POST', 
-                    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ action: 'createOrder', data: orderData })
                 });
                 createOrderForm.reset();
-                buildScheduler(); 
+                buildScheduler();
             } catch (error) { console.error('Error creating order:', error); }
         }
-        
+
         async function openHistoryModal() {
             historyModal.style.display = 'block';
             historyTableBody.innerHTML = '<tr><td colspan="5">טוען היסטוריה...</td></tr>';
@@ -543,9 +543,9 @@
                 historyTableBody.innerHTML = `<tr><td colspan="5">שגיאה בטעינת היסטוריה.</td></tr>`;
             }
         }
-        
+
         function renderHistory(data) {
-             historyTableBody.innerHTML = '';
+            historyTableBody.innerHTML = '';
             if (data.length === 0) {
                 historyTableBody.innerHTML = '<tr><td colspan="5">אין הזמנות בארכיון.</td></tr>';
                 return;
@@ -578,7 +578,7 @@
                 rows[i].style.display = found ? "" : "none";
             }
         }
-        
+
         async function openAnalyticsModal() {
             analyticsModal.style.display = 'block';
             try {
@@ -593,7 +593,7 @@
                 console.error("Error fetching analytics:", error);
             }
         }
-        
+
         function displayAnalytics(data) {
             document.getElementById('totalCompletedStat').textContent = data.totalCompleted;
             document.getElementById('avgTimeStat').textContent = data.avgMissionTime;
