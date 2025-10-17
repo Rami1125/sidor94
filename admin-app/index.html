@@ -304,17 +304,20 @@
         // --- All Functions ---
 
         async function buildScheduler() {
+            console.log("LOG: Building scheduler...");
             schedulerContainer.innerHTML = '';
             try {
                 const [driversResult, ordersResult] = await Promise.all([
                     fetch(`${API_URL}?action=getDrivers`).then(res => res.json()),
                     fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`).then(res => res.json())
                 ]);
+                console.log("LOG: Fetched drivers and orders for scheduler.", {driversResult, ordersResult});
 
-                if (!driversResult.data) throw new Error("No drivers data received");
+
+                if(!driversResult.data) throw new Error("No drivers data received");
                 const drivers = driversResult.data.filter(d => d.status === 'פעיל');
 
-                if (!ordersResult.data) throw new Error("No orders data received");
+                if(!ordersResult.data) throw new Error("No orders data received");
                 const allTodayOrders = ordersResult.data;
 
                 const unassignedCol = document.createElement('div');
@@ -349,8 +352,9 @@
                 });
 
                 initSortable();
+                 console.log("LOG: Scheduler built successfully.");
             } catch (error) {
-                console.error("Failed to build scheduler:", error);
+                console.error("ERROR: Failed to build scheduler:", error);
                 schedulerContainer.innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים.</p>`;
             }
         }
@@ -373,42 +377,51 @@
         async function handleDragEnd(event) {
             const orderId = event.item.dataset.orderId;
             const newDriverId = event.to.dataset.driverId || '';
+            console.log(`LOG: DragEnd - Moving order ${orderId} to driver ${newDriverId}`);
             try {
                 event.item.style.opacity = '0.5';
                 await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: newDriverId } } }) });
                 event.item.style.opacity = '1';
             } catch (error) {
-                console.error("Error updating driver on drag:", error);
+                console.error("ERROR: Error updating driver on drag:", error);
                 event.from.appendChild(event.item);
                 alert("שגיאה בעדכון השיבוץ.");
             }
         }
 
         function initializeMap() {
-            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
-            liveMap = L.map('liveMap', { center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer] });
-            orderMarkersLayer.addTo(liveMap);
+            console.log("LOG: Initializing map...");
+            try {
+                const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
+                liveMap = L.map('liveMap', { center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer] });
+                orderMarkersLayer.addTo(liveMap);
+                console.log("LOG: Map initialized successfully.");
+            } catch (error) {
+                console.error("ERROR: Failed to initialize map:", error);
+            }
         }
 
         async function updateMap() {
-            try {
+             console.log("LOG: Updating map data...");
+             try {
                 const response = await fetch(`${API_URL}?action=getLiveMapData`);
                 const result = await response.json();
+                console.log("LOG: Map data received from server:", result);
                 if (result.status !== 'success' || !result.data) throw new Error(result.message || 'Invalid data structure');
-
+                
                 const { drivers, pendingOrders } = result.data;
                 const updatedDriverIds = [];
 
                 drivers.forEach(driver => {
                     if (!driver.location || typeof driver.location.latitude !== 'number' || typeof driver.location.longitude !== 'number') return;
-
+                    
                     updatedDriverIds.push(driver.driverId);
                     const latLng = [driver.location.latitude, driver.location.longitude];
                     const isOnRoute = !!driver.activeOrder;
                     const statusClass = isOnRoute ? 'driver-on-route' : 'driver-available';
                     let popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
                     if (isOnRoute) popupContent += `<p>יעד: ${driver.activeOrder.customerName}</p>`;
-
+                    
                     const icon = L.divIcon({
                         className: `custom-div-icon ${statusClass}`,
                         html: `<div class='marker-pin'></div><i class='fas fa-truck'></i>`,
@@ -418,7 +431,7 @@
                     if (driverMarkers[driver.driverId]) {
                         driverMarkers[driver.driverId].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
                     } else {
-                        driverMarkers[driver.driverId] = L.marker(latLng, { icon: icon }).addTo(liveMap).bindPopup(popupContent);
+                        driverMarkers[driver.driverId] = L.marker(latLng, {icon: icon}).addTo(liveMap).bindPopup(popupContent);
                     }
                 });
 
@@ -428,35 +441,38 @@
                         delete driverMarkers[driverId];
                     }
                 }
-
-                orderMarkersLayer.clearLayers();
+                
+                orderMarkersLayer.clearLayers(); 
                 pendingOrders.forEach(order => {
                     if (typeof order.latitude !== 'number' || typeof order.longitude !== 'number') return;
                     const latLng = [order.latitude, order.longitude];
                     const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=200x200&location=${order.latitude},${order.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
                     const orderPopup = `<h3>הזמנה פנויה</h3><p>${order.customerName}</p><p>${order.address}</p><img src="${streetViewUrl}" class="popup-image" alt="Street View">`;
-
+                    
                     const icon = L.divIcon({
                         className: 'custom-div-icon',
                         html: `<div class='marker-pin' style='background-color: var(--danger);'></div><i class='fas fa-box'></i>`,
                         iconSize: [30, 42], iconAnchor: [15, 42]
                     });
 
-                    L.marker(latLng, { icon: icon }).bindPopup(orderPopup).addTo(orderMarkersLayer);
+                    L.marker(latLng, {icon: icon}).bindPopup(orderPopup).addTo(orderMarkersLayer);
                 });
-            } catch (error) { console.error('Error updating map:', error); }
+                console.log("LOG: Map updated successfully.");
+            } catch (error) { console.error('ERROR: Error updating map:', error); }
         }
 
         async function fetchCustomers() {
-            try {
+             try {
+                console.log("LOG: Fetching customers...");
                 const response = await fetch(`${API_URL}?action=getCustomers`);
                 const result = await response.json();
                 if (result.status === 'success' && result.data) {
                     allCustomers = result.data;
                     initAutocomplete(document.getElementById("customerName"), allCustomers);
+                    console.log("LOG: Customers fetched and autocomplete initialized.");
                 }
             } catch (error) {
-                console.error("Error fetching customers:", error);
+                console.error("ERROR: Error fetching customers:", error);
             }
         }
 
@@ -506,6 +522,7 @@
 
         async function handleCreateOrder(e) {
             e.preventDefault();
+            console.log("LOG: Creating new order...");
             const orderData = {
                 customerName: document.getElementById('customerName').value,
                 customerPhone: document.getElementById('customerPhone').value,
@@ -524,10 +541,12 @@
                 });
                 createOrderForm.reset();
                 buildScheduler();
-            } catch (error) { console.error('Error creating order:', error); }
+                console.log("LOG: Order created successfully.");
+            } catch (error) { console.error('ERROR: Error creating order:', error); }
         }
 
         async function openHistoryModal() {
+            console.log("LOG: Opening history modal...");
             historyModal.style.display = 'block';
             historyTableBody.innerHTML = '<tr><td colspan="5">טוען היסטוריה...</td></tr>';
             try {
@@ -535,11 +554,12 @@
                 const result = await response.json();
                 if (result.status === 'success' && result.data) {
                     renderHistory(result.data);
+                    console.log("LOG: History loaded successfully.");
                 } else {
-                    historyTableBody.innerHTML = `<tr><td colspan="5">שגיאה: ${result.message}</td></tr>`;
+                    throw new Error(result.message);
                 }
             } catch (error) {
-                console.error("Error fetching history:", error);
+                console.error("ERROR: Error fetching history:", error);
                 historyTableBody.innerHTML = `<tr><td colspan="5">שגיאה בטעינת היסטוריה.</td></tr>`;
             }
         }
@@ -689,6 +709,41 @@
                 alert("שגיאה באישור ההתראה.");
             }
         }
+        
+        // This is the main entry point after the DOM is ready
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log("LOG: DOM fully loaded and parsed. Starting app initialization.");
+            initializeMap();
+            populateDropdowns();
+            await buildScheduler();
+            await fetchCustomers();
+            
+            updateMap(); 
+            setInterval(updateMap, 30000);
+            
+            fetchAlerts();
+            setInterval(fetchAlerts, 60000);
+
+            // Attach all event listeners
+            showHistoryBtn.addEventListener('click', openHistoryModal);
+            closeHistoryBtn.addEventListener('click', () => historyModal.style.display = 'none');
+            
+            showAnalyticsBtn.addEventListener('click', openAnalyticsModal);
+            closeAnalyticsBtn.addEventListener('click', () => analyticsModal.style.display = 'none');
+
+            alertBell.addEventListener('click', () => {
+                alertsPanel.style.display = alertsPanel.style.display === 'block' ? 'none' : 'block';
+            });
+
+            window.addEventListener('click', (e) => { 
+                if(e.target == historyModal) historyModal.style.display = 'none';
+                if(e.target == analyticsModal) analyticsModal.style.display = 'none';
+            });
+            historySearch.addEventListener('keyup', filterHistoryTable);
+            createOrderForm.addEventListener('submit', handleCreateOrder);
+            console.log("LOG: All initializations and event listeners are set up.");
+        });
+
     </script>
 </body>
 </html>
