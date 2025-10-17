@@ -5,40 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>DeliveryMaster - טרמינל מחסן</title>
     
-    <!-- PWA Manifest, Fonts, Icons -->
+    <link rel="manifest" href="manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- OneSignal SDK -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 
     <style>
-        /* Basic styling - can be enhanced */
-        body { font-family: 'Rubik', sans-serif; margin: 0; background-color: #f0f2f5; }
-        .view { display: none; }
-        .view.active { display: block; }
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --background-color: #f0f2f5;
+            --white: #ffffff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+        }
+        body { font-family: 'Rubik', sans-serif; margin: 0; background-color: var(--background-color); }
+        .view { display: none !important; }
+        .view.active { display: block !important; }
         .container { padding: 15px; }
         .order-section { margin-bottom: 30px; }
-        .order-section h2 { border-bottom: 2px solid #007bff; padding-bottom: 10px; }
-        .order-card { background: #fff; border-radius: 8px; margin: 10px 0; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .order-section h2 { border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; display: flex; align-items: center; gap: 10px;}
+        .order-card { background: var(--white); border-radius: 8px; margin: 10px 0; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .order-card button { width: 100%; padding: 12px; border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 1em; }
-        .btn-acknowledge { background-color: #28a745; }
-        .btn-load { background-color: #ffc107; }
+        .btn-acknowledge { background-color: var(--success); }
+        .btn-load { background-color: var(--warning); }
+        #loginView { display: flex; justify-content: center; align-items: center; height: 100vh; }
     </style>
 </head>
 <body>
 
     <div id="loginView" class="view active">
-        <!-- Simple login for manager ID -->
-        <div style="padding: 50px; text-align: center;">
+        <div style="padding: 50px; text-align: center; background: white; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 90%; max-width: 400px;">
             <h2>כניסת מנהל מחסן</h2>
-            <input type="text" id="managerIdInput" placeholder="הזן קוד מנהל (OREN/TAMIR)" style="width: 100%; padding: 10px; margin-bottom: 10px;">
-            <button id="loginBtn" style="width: 100%; padding: 10px; background-color:#007bff; color:white; border:none;">כניסה</button>
+            <input type="text" id="managerIdInput" placeholder="הזן קוד מנהל (OREN/TAMIR)" style="width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box;">
+            <button id="loginBtn" style="width: 100%; padding: 10px; background-color:var(--primary-color); color:white; border:none;">כניסה</button>
         </div>
     </div>
 
     <div id="mainView" class="view">
-        <header style="background: #007bff; color: white; padding: 15px; display:flex; justify-content:space-between; align-items:center;">
+        <header style="background: var(--primary-color); color: white; padding: 15px; display:flex; justify-content:space-between; align-items:center;">
             <h1 id="welcomeMessage" style="margin:0; font-size: 1.5em;"></h1>
             <button id="logoutBtn" style="background:none; border:none; color:white; font-size: 1.5em;">
                 <i class="fas fa-sign-out-alt"></i>
@@ -68,8 +75,8 @@
         const newOrdersList = document.getElementById('newOrdersList');
         const inProgressOrdersList = document.getElementById('inProgressOrdersList');
 
-        // App State
         let currentManager = null;
+        let refreshInterval;
 
         // Init
         document.addEventListener('DOMContentLoaded', () => {
@@ -81,6 +88,7 @@
 
         loginBtn.addEventListener('click', () => {
             const managerId = managerIdInput.value.trim().toUpperCase();
+            if(!managerId) return;
             // In a real app, you'd fetch manager details. Here we assume.
             const managerData = {
                 id: managerId,
@@ -93,6 +101,7 @@
 
         logoutBtn.addEventListener('click', () => {
             sessionStorage.removeItem('warehouseManager');
+            if(refreshInterval) clearInterval(refreshInterval);
             switchView('loginView');
         });
 
@@ -101,20 +110,36 @@
             welcomeMessage.textContent = `מחסן ${manager.warehouse} | ברוך הבא ${manager.name}`;
             switchView('mainView');
             initializeNotifications(manager.id);
-            fetchWarehouseOrders();
-            setInterval(fetchWarehouseOrders, 20000); // Refresh every 20 seconds
+            startPolling();
         }
         
+        // REVISED: Safe polling mechanism
+        function startPolling() {
+            if (refreshInterval) clearInterval(refreshInterval); // Clear any old interval
+            
+            const poll = async () => {
+                await fetchWarehouseOrders();
+            };
+            
+            poll(); // Run immediately
+            refreshInterval = setInterval(poll, 20000); // And then every 20 seconds
+        }
+
         async function fetchWarehouseOrders() {
             if (!currentManager) return;
+            console.log(`Fetching orders for warehouse: ${currentManager.warehouse}`);
             try {
                 const response = await fetch(`${API_URL}?action=getWarehouseOrders&warehouse=${currentManager.warehouse}`);
                 const result = await response.json();
+                console.log("Received data:", result);
                 if (result.status === 'success') {
                     renderOrders(result.data);
+                } else {
+                    throw new Error(result.message);
                 }
             } catch (error) {
                 console.error("Error fetching warehouse orders:", error);
+                newOrdersList.innerHTML = `<p style="color:red">שגיאת תקשורת עם השרת.</p>`;
             }
         }
         
@@ -135,11 +160,11 @@
         function createOrderCard(order, type) {
             let buttonHtml = '';
             if (type === 'acknowledge') {
-                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus('${order.orderId}', 'באיסוף')">אשר קבלת הזמנה</button>`;
+                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.orderId}', 'באיסוף')">אשר קבלת הזמנה</button>`;
             } else if (order.status === 'באיסוף') {
-                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus('${order.orderId}', 'טעון')">סמן כטעון</button>`;
+                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.orderId}', 'טעון')">סמן כטעון</button>`;
             } else {
-                 buttonHtml = `<p style="color:#28a745;"><b>הועמס בהצלחה ✔️</b></p>`;
+                 buttonHtml = `<p style="color:var(--success);"><b>הועמס בהצלחה ✔️</b></p>`;
             }
 
             return `
@@ -151,7 +176,7 @@
                 </div>`;
         }
         
-        async function updateOrderStatus(orderId, newStatus) {
+        async function updateOrderStatus(event, orderId, newStatus) {
             const btn = event.target;
             btn.disabled = true;
             btn.innerHTML = 'מעדכן...';
@@ -161,7 +186,7 @@
                     body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
                 });
                 // Optimistic update
-                fetchWarehouseOrders();
+                setTimeout(fetchWarehouseOrders, 1000); // Refresh after a short delay
             } catch (error) {
                 console.error("Error updating status:", error);
                 btn.disabled = false;
@@ -204,3 +229,4 @@
     </script>
 </body>
 </html>
+
