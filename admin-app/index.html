@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DeliveryMaster - מרכז בקרה</title>
     
     <!-- Fonts and Icons -->
@@ -113,6 +113,15 @@
         .leaflet-popup-content { text-align: right; direction: rtl; }
         .leaflet-popup-content h3 { margin: 0 0 5px 0; font-size: 1.1em; }
         .popup-image { max-width: 100%; border-radius: 5px; margin-top: 10px; }
+        
+        /* FIXED: Icon Styles */
+        .custom-div-icon { position: relative; }
+        .marker-pin { width: 30px; height: 30px; border-radius: 50% 50% 50% 0; position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -15px 0 0 -15px; }
+        .driver-available .marker-pin { background-color: var(--success); }
+        .driver-on-route .marker-pin { background-color: var(--warning); }
+        .marker-pin::after { content: ''; width: 14px; height: 14px; margin: 8px 0 0 8px; background: #fff; position: absolute; border-radius: 50%; }
+        .custom-div-icon i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -150%); color: white; font-size: 1.2em; }
+
     </style>
 </head>
 <body>
@@ -334,12 +343,18 @@
                     updatedDriverIds.push(driver.driverId);
                     const latLng = [driver.location.latitude, driver.location.longitude];
                     const isOnRoute = !!driver.activeOrder;
-                    const popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
+                    const statusClass = isOnRoute ? 'driver-on-route' : 'driver-available';
+                    let popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
+                    if(isOnRoute) popupContent += `<p>יעד: ${driver.activeOrder.customerName}</p>`;
                     
-                    const icon = L.divIcon({ className: 'fa-solid fa-truck', html: '🚚', iconSize: [30, 30] });
+                    const icon = L.divIcon({
+                        className: `custom-div-icon ${statusClass}`,
+                        html: `<div class='marker-pin'></div><i class='fas fa-truck'></i>`,
+                        iconSize: [30, 42], iconAnchor: [15, 42]
+                    });
 
                     if (driverMarkers[driver.driverId]) {
-                        driverMarkers[driver.driverId].setLatLng(latLng).setPopupContent(popupContent);
+                        driverMarkers[driver.driverId].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
                     } else {
                         driverMarkers[driver.driverId] = L.marker(latLng, {icon: icon}).addTo(liveMap).bindPopup(popupContent);
                     }
@@ -359,7 +374,11 @@
                     const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=200x200&location=${order.latitude},${order.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
                     const orderPopup = `<h3>הזמנה פנויה</h3><p>${order.customerName}</p><p>${order.address}</p><img src="${streetViewUrl}" class="popup-image" alt="Street View">`;
                     
-                    const icon = L.divIcon({ className: 'fa-solid fa-box', html: '📦', iconSize: [30, 30] });
+                    const icon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class='marker-pin' style='background-color: var(--danger);'></div><i class='fas fa-box'></i>`,
+                        iconSize: [30, 42], iconAnchor: [15, 42]
+                    });
 
                     L.marker(latLng, {icon: icon}).bindPopup(orderPopup).addTo(orderMarkersLayer);
                 });
