@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>DeliveryMaster - נהג</title>
 
     <!-- PWA Manifest -->
@@ -26,6 +26,7 @@
         html, body {
             height: 100%;
             overflow: hidden;
+            -webkit-tap-highlight-color: transparent; /* Disable tap highlight on mobile */
         }
         body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 0; color: var(--text-color); }
         .view { display: none !important; height: 100%; } 
@@ -34,17 +35,17 @@
         #loginView { justify-content: center; align-items: center; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
         .login-card { background: var(--white); padding: 40px; border-radius: var(--border-radius); box-shadow: var(--shadow); text-align: center; width: 90%; max-width: 400px; }
         .login-card img { width: 100px; height: 100px; border-radius: 20px; margin-bottom: 20px; }
-        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 8px; font-size: 1.2rem; text-align: center; }
+        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; }
         .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color: var(--white); border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer; }
         
-        #permissionOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 2000; display: none; justify-content: center; align-items: center; text-align: center; padding: 20px; }
+        #permissionOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 2000; display: none; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box; }
         .permission-card { background-color: #fff; color: #333; padding: 30px; border-radius: 12px; max-width: 350px; }
         .permission-card h2 { color: var(--primary-color); }
         .permission-card p { margin: 15px 0; }
         .permission-card button { width: 100%; padding: 15px; font-size: 1.1em; background-color: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; }
         
         .app-header { background: var(--primary-color); color: var(--white); padding: 15px 20px; z-index: 10; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        main { flex-grow: 1; overflow-y: auto; }
+        main { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
         .header-buttons { display: flex; align-items: center; gap: 15px; }
         .header-buttons button { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
         
@@ -65,25 +66,6 @@
         .order-card[data-status="בדרך"] { border-color: var(--warning); }
         .order-card[data-status="הושלם"] { border-color: var(--success); opacity: 0.7; }
 
-        #podModal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.6); z-index: 2000; display: none;
-            justify-content: center; align-items: center;
-        }
-        .pod-content {
-            background: var(--white); padding: 20px; border-radius: var(--border-radius);
-            width: 95%; max-width: 500px; text-align: center;
-        }
-        #signature-pad {
-            border: 2px solid #eee; border-radius: var(--border-radius);
-            width: 100%; height: 200px; cursor: crosshair;
-        }
-        .pod-buttons { display: flex; gap: 10px; margin-top: 15px; }
-        .pod-buttons button { width: 100%; }
-        #photo-preview {
-            max-width: 100px; max-height: 100px; margin-top: 10px;
-            border-radius: 5px; border: 1px solid #ddd;
-        }
     </style>
 </head>
 <body>
@@ -117,25 +99,6 @@
             <button id="enableFeaturesBtn">הפעל והמשך</button>
         </div>
     </div>
-
-    <div id="podModal">
-        <div class="pod-content">
-            <h2>הוכחת מסירה</h2>
-            <p>חתימת לקוח:</p>
-            <canvas id="signature-pad"></canvas>
-            <div class="pod-buttons">
-                <button id="clear-signature" style="background-color: var(--secondary-color);">נקה חתימה</button>
-            </div>
-            <hr style="margin: 20px 0;">
-            <p>צילום מסירה:</p>
-            <input type="file" id="photo-input" accept="image/*" capture="environment">
-            <img id="photo-preview" style="display:none;" alt="תצוגה מקדימה">
-            <div class="pod-buttons">
-                <button id="submit-pod" style="background-color: var(--success);">שלח וסיים משימה</button>
-                <button id="cancel-pod" style="background-color: var(--danger);">בטל</button>
-            </div>
-        </div>
-    </div>
     
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbxelIUS1M4vJ-r_fAuZoyzZDL9iC6Hcop-3_Eg_lLiSdWZVTQXnOpSSlGhxGjhojxot/exec';
@@ -151,39 +114,33 @@
         const welcomeMessage = document.getElementById('welcomeMessage');
         const orderList = document.getElementById('orderList');
         const installBtn = document.getElementById('installBtn');
-        const podModal = document.getElementById('podModal');
-        const signaturePadCanvas = document.getElementById('signature-pad');
-        const clearSignatureBtn = document.getElementById('clear-signature');
-        const photoInput = document.getElementById('photo-input');
-        const photoPreview = document.getElementById('photo-preview');
-        const submitPodBtn = document.getElementById('submit-pod');
-        const cancelPodBtn = document.getElementById('cancel-pod');
         
         let deferredPrompt; 
-        let currentOrderIdForPod = null;
-        let sigPadCtx = signaturePadCanvas.getContext('2d');
-        let drawing = false;
+        let locationIntervalId;
 
         // --- App Initialization ---
+        
+        // This function is the single entry point to the app logic,
+        // ensuring OneSignal is ready before anything else runs.
         window.OneSignalDeferred = window.OneSignalDeferred || [];
         OneSignalDeferred.push(async function(OneSignal) {
             try {
-                await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
-                initializeApp(false);
+                // The init is now inside the script tag, so we just run our app logic
+                initializeApp(false); // OneSignal is ready
             } catch (e) {
-                console.error("OneSignal init failed:", e);
-                initializeApp(true);
+                console.error("OneSignal setup failed:", e);
+                initializeApp(true); // OneSignal failed, skip notification features
             }
         });
 
         function initializeApp(oneSignalFailed = false) {
+            // Attach all event listeners now that the DOM and scripts are ready
             loginBtn.addEventListener('click', () => onLogin(oneSignalFailed));
             logoutBtn.addEventListener('click', onLogout);
             enableFeaturesBtn.addEventListener('click', () => onEnableFeatures(oneSignalFailed));
             installBtn.addEventListener('click', onInstall);
             
             registerServiceWorker();
-            setupSignaturePad();
 
             const loggedInDriver = sessionStorage.getItem('driverId');
             if (loggedInDriver) {
@@ -277,15 +234,76 @@
                 });
             }
         }
+
+        // --- Feature-specific Functions (Notifications, Location, Orders) ---
+        async function initializeNotifications(driverId) {
+            try {
+                await OneSignal.login(driverId);
+                const playerId = OneSignal.User.onesignalId;
+                if (playerId) registerDevice(driverId, playerId);
+            } catch (error) { console.error("OneSignal login failed:", error); }
+        }
         
-        // --- Feature-specific Functions ---
-        async function initializeNotifications(driverId) { /* ... same as before ... */ }
-        let locationIntervalId;
-        function startLocationTracking(driverId) { /* ... same as before ... */ }
-        function stopLocationTracking(driverId) { /* ... same as before ... */ }
-        async function registerDevice(driverId, deviceId) { /* ... same as before ... */ }
-        async function fetchDriverOrders(driverId) { /* ... same as before ... */ }
+        function startLocationTracking(driverId) {
+            if (locationIntervalId) clearInterval(locationIntervalId);
+            
+            const updateLocation = () => {
+                navigator.permissions.query({name: 'geolocation'}).then(status => {
+                    if (status.state === 'granted') {
+                        navigator.geolocation.getCurrentPosition(async (position) => {
+                            const { latitude, longitude } = position.coords;
+                            try {
+                                await fetch(API_URL, {
+                                    method: 'POST', mode: 'no-cors',
+                                    body: JSON.stringify({ action: 'updateDriverLocation', data: { driverId, latitude, longitude } })
+                                });
+                            } catch (error) { console.error('Failed to send location:', error); }
+                        }, (error) => {
+                            console.error('Geolocation error:', error);
+                        }, { enableHighAccuracy: true });
+                    } else {
+                        stopLocationTracking(driverId);
+                    }
+                });
+            };
+            updateLocation();
+            locationIntervalId = setInterval(updateLocation, 60000);
+        }
+
+        function stopLocationTracking(driverId) {
+            if (locationIntervalId) {
+                clearInterval(locationIntervalId);
+                locationIntervalId = null;
+                console.log(`Stopped location tracking for ${driverId}.`);
+            }
+        }
+
+        async function registerDevice(driverId, deviceId) {
+            try {
+                await fetch(API_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    body: JSON.stringify({ action: 'registerDevice', data: { driverId, deviceId } })
+                });
+            } catch (error) { console.error('Error registering device:', error); }
+        }
+        
+        async function fetchDriverOrders(driverId) {
+            if (!orderList) return;
+            orderList.innerHTML = '<p>טוען משימות...</p>';
+            const today = new Date().toISOString().split('T')[0];
+            try {
+                const response = await fetch(`${API_URL}?action=getOrders&date=${today}&driverId=${driverId}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    renderOrders(result.data);
+                } else { throw new Error(result.message); }
+            } catch (error) {
+                orderList.innerHTML = `<p style="color: red;">שגיאה: ${error.message}</p>`;
+            }
+        }
+
         function renderOrders(orders) {
+            if (!orderList) return;
             if (!orders || orders.length === 0) {
                 orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
                 return;
@@ -312,87 +330,20 @@
             }).join('');
         }
 
-        // REVISED updateOrderStatus to open POD modal
         function updateOrderStatus(event, orderId, newStatus) {
-            if (newStatus === 'הושלם') {
-                openPodModal(orderId);
-            } else { // Handle "start trip"
-                const btn = event.currentTarget;
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                fetch(API_URL, {
-                    method: 'POST', mode: 'no-cors',
-                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
-                }).then(() => {
-                     fetchDriverOrders(sessionStorage.getItem('driverId'));
-                }).catch(err => {
-                    console.error("Error updating status:", err);
-                    btn.disabled = false;
-                });
-            }
-        }
-        
-        // --- POD Functions ---
-        function setupSignaturePad() {
-            function resizeCanvas() {
-                const ratio = Math.max(window.devicePixelRatio || 1, 1);
-                signaturePadCanvas.width = signaturePadCanvas.offsetWidth * ratio;
-                signaturePadCanvas.height = signaturePadCanvas.offsetHeight * ratio;
-                signaturePadCanvas.getContext('2d').scale(ratio, ratio);
-            }
-            window.addEventListener('resize', resizeCanvas);
-            
-            const draw = (event) => {
-                if (!drawing) return;
-                const rect = signaturePadCanvas.getBoundingClientRect();
-                sigPadCtx.lineWidth = 3;
-                sigPadCtx.lineCap = 'round';
-                sigPadCtx.strokeStyle = '#000';
-                const x = (event.clientX || event.touches[0].clientX) - rect.left;
-                const y = (event.clientY || event.touches[0].clientY) - rect.top;
-                sigPadCtx.lineTo(x, y);
-                sigPadCtx.stroke();
-                sigPadCtx.beginPath();
-                sigPadCtx.moveTo(x, y);
-            };
-
-            signaturePadCanvas.addEventListener('mousedown', () => drawing = true);
-            signaturePadCanvas.addEventListener('mouseup', () => { drawing = false; sigPadCtx.beginPath(); });
-            signaturePadCanvas.addEventListener('mousemove', draw);
-            signaturePadCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); drawing = true; }, { passive: false });
-            signaturePadCanvas.addEventListener('touchend', (e) => { e.preventDefault(); drawing = false; sigPadCtx.beginPath(); }, { passive: false });
-            signaturePadCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, { passive: false });
-            
-            clearSignatureBtn.addEventListener('click', () => sigPadCtx.clearRect(0, 0, signaturePadCanvas.width, signaturePadCanvas.height));
-            photoInput.addEventListener('change', () => {
-                const file = photoInput.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => { photoPreview.src = e.target.result; photoPreview.style.display = 'block'; }
-                    reader.readAsDataURL(file);
-                }
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            fetch(API_URL, {
+                method: 'POST', mode: 'no-cors',
+                body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
+            }).then(() => {
+                 fetchDriverOrders(sessionStorage.getItem('driverId'));
+            }).catch(err => {
+                console.error("Error updating status:", err);
+                btn.disabled = false;
             });
-            cancelPodBtn.addEventListener('click', () => podModal.style.display = 'none');
-            submitPodBtn.addEventListener('click', submitProofOfDelivery);
         }
-
-        function openPodModal(orderId) {
-            currentOrderIdForPod = orderId;
-            sigPadCtx.clearRect(0, 0, signaturePadCanvas.width, signaturePadCanvas.height);
-            photoInput.value = '';
-            photoPreview.style.display = 'none';
-            podModal.style.display = 'flex';
-            // Resize canvas after modal is visible
-            setTimeout(() => {
-                const ratio = Math.max(window.devicePixelRatio || 1, 1);
-                signaturePadCanvas.width = signaturePadCanvas.offsetWidth * ratio;
-                signaturePadCanvas.height = signaturePadCanvas.offsetHeight * ratio;
-                signaturePadCanvas.getContext('2d').scale(ratio, ratio);
-            }, 10);
-        }
-
-        async function submitProofOfDelivery() { /* ... same as before ... */ }
-        function isCanvasBlank(canvas) { /* ... same as before ... */ }
         
         // --- View Management ---
         function switchView(viewId) {
