@@ -98,7 +98,7 @@
 
             initializeMap();
             fetchInitialData();
-            setInterval(fetchInitialData, 30000);
+            setInterval(fetchInitialData, 30000); // Refresh all data every 30 seconds
 
             orderSearch.addEventListener('keyup', () => renderOrderList(currentOrders));
             dateFilter.addEventListener('change', fetchInitialData);
@@ -125,23 +125,79 @@
             }
         }
 
-        function updateKPIs(orders) { /* ... same as before ... */ }
+        function updateKPIs(orders) {
+            const total = orders.length;
+            const completed = orders.filter(o => o.status === 'הושלם').length;
+            const inProgress = orders.filter(o => o.status === 'בדרך').length;
+            const pending = total - completed - inProgress;
 
-        function renderOrderList(orders) { /* ... same as before ... */ }
+            kpiTotal.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">סה"כ הזמנות</h3><p class="text-4xl font-bold text-blue-600">${total}</p>`;
+            kpiCompleted.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">הושלמו</h3><p class="text-4xl font-bold text-green-500">${completed}</p>`;
+            kpiInProgress.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">בדרך</h3><p class="text-4xl font-bold text-yellow-500">${inProgress}</p>`;
+            kpiPending.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">ממתינות</h3><p class="text-4xl font-bold text-gray-600">${pending}</p>`;
+        }
+
+        function renderOrderList(orders) {
+            orderListContainer.innerHTML = '';
+            const searchTerm = orderSearch.value.toLowerCase();
+            const filteredOrders = orders.filter(o => 
+                (o.customerName && o.customerName.toLowerCase().includes(searchTerm)) ||
+                (o.driverId && o.driverId.toLowerCase().includes(searchTerm)) ||
+                (o.status && o.status.toLowerCase().includes(searchTerm))
+            );
+
+            if (filteredOrders.length === 0) {
+                orderListContainer.innerHTML = '<p class="text-gray-500 text-center">לא נמצאו הזמנות.</p>';
+                return;
+            }
+            filteredOrders.forEach(order => {
+                const item = document.createElement('div');
+                item.className = 'order-item-clickable p-3 border-b';
+                item.dataset.orderId = order.orderId;
+                item.innerHTML = `
+                    <p class="font-bold">${order.customerName}</p>
+                    <div class="flex justify-between text-sm text-gray-600">
+                        <span>נהג: ${order.driverId || 'טרם שובץ'}</span>
+                        <span>סטטוס: ${order.status}</span>
+                    </div>`;
+                item.addEventListener('click', () => openOrderModal(order.orderId));
+                orderListContainer.appendChild(item);
+            });
+        }
         
-        function initializeMap() { /* ... same as before ... */ }
+        function initializeMap() {
+            liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
+        }
 
-        function updateMap(mapData) { /* ... same as before ... */ }
+        function updateMap(mapData) {
+            Object.values(driverMarkers).forEach(marker => marker.remove());
+            driverMarkers = {};
+
+            mapData.drivers.forEach(driver => {
+                if (!driver.location) return;
+                const { latitude, longitude } = driver.location;
+                const iconHtml = `<div class="text-2xl">🚚</div>`;
+                const icon = L.divIcon({ className: 'bg-transparent', html: iconHtml, iconSize: [30, 30] });
+                const marker = L.marker([latitude, longitude], { icon: icon })
+                    .addTo(liveMap)
+                    .bindPopup(`<b>${driver.name}</b>`);
+                driverMarkers[driver.driverId] = marker;
+            });
+        }
         
         async function openOrderModal(orderId) {
             modal.classList.remove('hidden');
-            modal.classList.add('opacity-100');
+            modal.classList.remove('opacity-0'); // Smooth transition
             modalContent.innerHTML = '<p class="p-8 text-center">טוען פרטי הזמנה מלאים...</p>';
 
             const response = await fetch(`${API_URL}?action=getOrderDetails&orderId=${orderId}`);
             const result = await response.json();
             if (result.status !== 'success' || !result.data) {
                 modalContent.innerHTML = '<p class="p-8 text-center text-red-500">שגיאה בטעינת פרטי הזמנה.</p>';
+                // Add a close button even on error
+                modalContent.insertAdjacentHTML('beforeend', '<button id="closeModalBtn" class="absolute top-4 left-4 text-2xl">&times;</button>');
+                document.getElementById('closeModalBtn').addEventListener('click', closeModal);
                 return;
             }
             
@@ -188,10 +244,7 @@
                 </div>
             `;
 
-            document.getElementById('closeModalBtn').addEventListener('click', () => {
-                modal.classList.add('hidden');
-                modal.classList.remove('opacity-100');
-            });
+            document.getElementById('closeModalBtn').addEventListener('click', closeModal);
             
             document.getElementById('commentForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -214,6 +267,11 @@
                     input.value = message;
                 }
             });
+        }
+
+        function closeModal() {
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300); // Wait for transition
         }
     </script>
 </body>
