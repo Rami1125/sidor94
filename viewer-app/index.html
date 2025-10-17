@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DeliveryMaster - חדר מצב</title>
     
-    <!-- ... (Fonts, Icons, Leaflet CSS/JS remain the same) ... -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -19,6 +18,8 @@
         .modal { transition: opacity 0.3s ease; }
         .comment { background-color: #f1f5f9; }
         .comment.own { background-color: #dbeafe; }
+        .order-item-clickable { cursor: pointer; transition: background-color 0.2s; }
+        .order-item-clickable:hover { background-color: #f9fafb; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -44,7 +45,7 @@
             <!-- Map Column -->
             <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-lg">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4">מפה חיה</h2>
-                <div id="liveMap" class="h-96 rounded-md"></div>
+                <div id="liveMap" class="h-96 rounded-md z-0"></div>
             </div>
 
             <!-- Order List Column -->
@@ -58,13 +59,190 @@
 
     <!-- Order Details Modal -->
     <div id="orderDetailsModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0">
-        <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-full overflow-y-auto" id="modalContent">
+        <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col" id="modalContent">
            <!-- Content will be injected here -->
         </div>
     </div>
 
     <script>
-        // ... (all the necessary JavaScript will go here) ...
+        const API_URL = 'https://script.google.com/macros/s/AKfycbw3KwCxx80PVfedaIu4UOgh0aldXYSGXgJWCRQGiBIZabZhsKjBz6Icn4S2W1M-ruQ8/exec';
+        
+        // DOM Elements
+        const kpiTotal = document.getElementById('kpi-total');
+        const kpiCompleted = document.getElementById('kpi-completed');
+        const kpiInProgress = document.getElementById('kpi-in-progress');
+        const kpiPending = document.getElementById('kpi-pending');
+        const orderListContainer = document.getElementById('orderList');
+        const orderSearch = document.getElementById('orderSearch');
+        const modal = document.getElementById('orderDetailsModal');
+        const modalContent = document.getElementById('modalContent');
+
+        let liveMap;
+        let driverMarkers = {};
+        let allTodayOrders = [];
+        let userName = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            userName = localStorage.getItem('deliveryMasterViewerName');
+            if (!userName) {
+                userName = prompt("נא להזין את שמך לצורך זיהוי בהערות:") || 'אורח';
+                localStorage.setItem('deliveryMasterViewerName', userName);
+            }
+
+            initializeMap();
+            fetchInitialData();
+            setInterval(fetchInitialData, 30000); // Refresh all data every 30 seconds
+
+            orderSearch.addEventListener('keyup', () => renderOrderList(allTodayOrders));
+        });
+        
+        async function fetchInitialData() {
+            try {
+                const [ordersResult, mapResult] = await Promise.all([
+                    fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`).then(res => res.json()),
+                    fetch(`${API_URL}?action=getLiveMapData`).then(res => res.json())
+                ]);
+
+                if (ordersResult.status === 'success' && ordersResult.data) {
+                    allTodayOrders = ordersResult.data;
+                    updateKPIs(allTodayOrders);
+                    renderOrderList(allTodayOrders);
+                }
+                if (mapResult.status === 'success' && mapResult.data) {
+                    updateMap(mapResult.data);
+                }
+            } catch (error) {
+                console.error("Error fetching initial data:", error);
+            }
+        }
+
+        function updateKPIs(orders) {
+            const total = orders.length;
+            const completed = orders.filter(o => o.status === 'הושלם').length;
+            const inProgress = orders.filter(o => o.status === 'בדרך').length;
+            const pending = total - completed - inProgress;
+
+            kpiTotal.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">סה"כ הזמנות</h3><p class="text-4xl font-bold text-blue-600">${total}</p>`;
+            kpiCompleted.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">הושלמו</h3><p class="text-4xl font-bold text-green-500">${completed}</p>`;
+            kpiInProgress.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">בדרך</h3><p class="text-4xl font-bold text-yellow-500">${inProgress}</p>`;
+            kpiPending.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">ממתינות</h3><p class="text-4xl font-bold text-gray-600">${pending}</p>`;
+        }
+
+        function renderOrderList(orders) {
+            orderListContainer.innerHTML = '';
+            const searchTerm = orderSearch.value.toLowerCase();
+            const filteredOrders = orders.filter(o => 
+                o.customerName.toLowerCase().includes(searchTerm) ||
+                (o.driverId && o.driverId.toLowerCase().includes(searchTerm)) ||
+                o.status.toLowerCase().includes(searchTerm)
+            );
+
+            if (filteredOrders.length === 0) {
+                orderListContainer.innerHTML = '<p class="text-gray-500 text-center">לא נמצאו הזמנות.</p>';
+                return;
+            }
+            filteredOrders.forEach(order => {
+                const item = document.createElement('div');
+                item.className = 'order-item-clickable p-3 border-b';
+                item.dataset.orderId = order.orderId;
+                item.innerHTML = `
+                    <p class="font-bold">${order.customerName}</p>
+                    <div class="flex justify-between text-sm text-gray-600">
+                        <span>נהג: ${order.driverId || 'טרם שובץ'}</span>
+                        <span>סטטוס: ${order.status}</span>
+                    </div>`;
+                item.addEventListener('click', () => openOrderModal(order.orderId));
+                orderListContainer.appendChild(item);
+            });
+        }
+        
+        function initializeMap() {
+            liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
+        }
+
+        function updateMap(mapData) {
+            // Clear existing driver markers before adding new ones
+            Object.values(driverMarkers).forEach(marker => marker.remove());
+            driverMarkers = {};
+
+            mapData.drivers.forEach(driver => {
+                const { latitude, longitude } = driver.location;
+                const iconHtml = `<div class="text-2xl">🚚</div>`;
+                const icon = L.divIcon({ className: 'bg-transparent', html: iconHtml, iconSize: [30, 30] });
+                const marker = L.marker([latitude, longitude], { icon: icon })
+                    .addTo(liveMap)
+                    .bindPopup(`<b>${driver.name}</b>`);
+                driverMarkers[driver.driverId] = marker;
+            });
+        }
+        
+        async function openOrderModal(orderId) {
+            modal.classList.remove('hidden');
+            modal.classList.add('opacity-100');
+            modalContent.innerHTML = '<p class="p-8 text-center">טוען פרטי הזמנה...</p>';
+
+            const order = allTodayOrders.find(o => o.orderId === orderId);
+            const commentsResponse = await fetch(`${API_URL}?action=getComments&orderId=${orderId}`);
+            const commentsResult = await commentsResponse.json();
+            const comments = commentsResult.data || [];
+
+            modalContent.innerHTML = `
+                <div class="p-6">
+                    <div class="flex justify-between items-start">
+                        <h2 class="text-2xl font-bold mb-4">${order.customerName}</h2>
+                        <button id="closeModalBtn" class="text-2xl">&times;</button>
+                    </div>
+                    <p><b>סטטוס:</b> ${order.status}</p>
+                    <p><b>נהג:</b> ${order.driverId || 'טרם שובץ'}</p>
+                    <p><b>כתובת:</b> ${order.address}</p>
+                </div>
+                <div class="p-6 bg-gray-50 border-t">
+                    <h3 class="font-bold mb-2">הערות פנימיות</h3>
+                    <div id="commentsContainer" class="space-y-3 max-h-48 overflow-y-auto mb-4 pr-2">
+                        ${comments.map(c => `
+                            <div class="comment p-3 rounded-lg ${c.author === userName ? 'own ml-4' : 'mr-4'}">
+                                <p class="font-bold text-sm">${c.author}</p>
+                                <p>${c.message}</p>
+                                <p class="text-xs text-gray-500 text-left">${new Date(c.timestamp).toLocaleTimeString('he-IL')}</p>
+                            </div>
+                        `).join('') || '<p class="text-gray-500">אין עדיין הערות.</p>'}
+                    </div>
+                    <form id="commentForm" class="flex gap-2">
+                        <input type="text" id="commentInput" placeholder="הוסף הערה..." class="flex-grow p-2 border rounded-md">
+                        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md"><i class="fas fa-paper-plane"></i></button>
+                    </form>
+                </div>
+            `;
+
+            document.getElementById('closeModalBtn').addEventListener('click', () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('opacity-100');
+            });
+            
+            document.getElementById('commentForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const input = document.getElementById('commentInput');
+                const message = input.value.trim();
+                if (!message) return;
+
+                const commentData = { orderId, author: userName, message };
+                input.value = ''; // Optimistic update
+
+                try {
+                     await fetch(API_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({ action: 'postComment', data: commentData })
+                    });
+                    // After a short delay to allow backend to process, refresh comments
+                    setTimeout(() => openOrderModal(orderId), 1500);
+                } catch (error) {
+                    console.error("Error posting comment:", error);
+                    input.value = message; // Revert on error
+                }
+            });
+        }
     </script>
 </body>
 </html>
