@@ -271,7 +271,6 @@
     </div>
 
     <script>
-        // FIXED: All constants and variables moved to the top for global access
         const API_URL = 'https://script.google.com/macros/s/AKfycbxelIUS1M4vJ-r_fAuZoyzZDL9iC6Hcop-3_Eg_lLiSdWZVTQXnOpSSlGhxGjhojxot/exec';
         const GOOGLE_MAPS_API_KEY = 'AIzaSyCbVYMijMs8zH6m4iiSiBfn_RiCMuau9ps';
         
@@ -300,58 +299,330 @@
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
         let performanceChart = null;
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            initializeMap();
-            populateDropdowns();
-            await buildScheduler();
-            await fetchCustomers();
-            
-            updateMap(); 
-            setInterval(updateMap, 30000);
-            
-            fetchAlerts();
-            setInterval(fetchAlerts, 60000);
-
-            // Event Listeners
-            showHistoryBtn.addEventListener('click', openHistoryModal);
-            closeHistoryBtn.addEventListener('click', () => historyModal.style.display = 'none');
-            
-            showAnalyticsBtn.addEventListener('click', openAnalyticsModal);
-            closeAnalyticsBtn.addEventListener('click', () => analyticsModal.style.display = 'none');
-
-            alertBell.addEventListener('click', () => {
-                alertsPanel.style.display = alertsPanel.style.display === 'block' ? 'none' : 'block';
-            });
-
-            window.addEventListener('click', (e) => { 
-                if(e.target == historyModal) historyModal.style.display = 'none';
-                if(e.target == analyticsModal) analyticsModal.style.display = 'none';
-            });
-            historySearch.addEventListener('keyup', filterHistoryTable);
-            createOrderForm.addEventListener('submit', handleCreateOrder);
-        });
-
         // --- All Functions ---
+
+        async function buildScheduler() {
+            schedulerContainer.innerHTML = '';
+            try {
+                const [driversResult, ordersResult] = await Promise.all([
+                    fetch(`${API_URL}?action=getDrivers`).then(res => res.json()),
+                    fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`).then(res => res.json())
+                ]);
+
+                if(!driversResult.data) throw new Error("No drivers data received");
+                const drivers = driversResult.data.filter(d => d.status === 'פעיל');
+
+                if(!ordersResult.data) throw new Error("No orders data received");
+                const allTodayOrders = ordersResult.data;
+
+                const unassignedCol = document.createElement('div');
+                unassignedCol.className = 'scheduler-column';
+                unassignedCol.innerHTML = '<h3><i class="fas fa-box-open"></i> הזמנות פנויות</h3>';
+                const unassignedPool = document.createElement('ul');
+                unassignedPool.id = 'unassigned-pool';
+                unassignedPool.className = 'order-pool';
+                unassignedCol.appendChild(unassignedPool);
+                schedulerContainer.appendChild(unassignedCol);
+
+                drivers.forEach(driver => {
+                    const driverCol = document.createElement('div');
+                    driverCol.className = 'scheduler-column';
+                    driverCol.innerHTML = `<h3><i class="fas fa-user-circle"></i> ${driver.name}</h3>`;
+                    const driverLane = document.createElement('ul');
+                    driverLane.id = `driver-lane-${driver.driverId}`;
+                    driverLane.className = 'driver-lane';
+                    driverLane.dataset.driverId = driver.driverId;
+                    driverCol.appendChild(driverLane);
+                    schedulerContainer.appendChild(driverCol);
+                });
+
+                allTodayOrders.forEach(order => {
+                    const card = createScheduleCard(order);
+                    const targetLane = document.getElementById(`driver-lane-${order.driverId}`);
+                    if (order.driverId && targetLane) {
+                        targetLane.appendChild(card);
+                    } else {
+                        unassignedPool.appendChild(card);
+                    }
+                });
+
+                initSortable();
+            } catch (error) {
+                console.error("Failed to build scheduler:", error);
+                schedulerContainer.innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים.</p>`;
+            }
+        }
+
+        function createScheduleCard(order) {
+            const card = document.createElement('li');
+            card.className = 'schedule-card';
+            card.dataset.orderId = order.orderId;
+            card.innerHTML = `<p class="card-customer">${order.customerName}</p><p><i class="fas fa-clock"></i> ${order.orderTime}</p><p><i class="fas fa-map-marker-alt"></i> ${order.address}</p>`;
+            return card;
+        }
+
+        function initSortable() {
+            const pools = document.querySelectorAll('.order-pool, .driver-lane');
+            pools.forEach(pool => {
+                new Sortable(pool, { group: 'orders', animation: 150, ghostClass: 'ghost-card', onEnd: handleDragEnd });
+            });
+        }
         
-        async function buildScheduler() { /* ... function from previous response ... */ }
-        function createScheduleCard(order) { /* ... function from previous response ... */ }
-        function initSortable() { /* ... function from previous response ... */ }
-        async function handleDragEnd(event) { /* ... function from previous response ... */ }
+        async function handleDragEnd(event) {
+            const orderId = event.item.dataset.orderId;
+            const newDriverId = event.to.dataset.driverId || ''; 
+            try {
+                event.item.style.opacity = '0.5';
+                await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: newDriverId } } }) });
+                event.item.style.opacity = '1';
+            } catch (error) {
+                console.error("Error updating driver on drag:", error);
+                event.from.appendChild(event.item);
+                alert("שגיאה בעדכון השיבוץ.");
+            }
+        }
 
-        function initializeMap() { /* ... function from previous response ... */ }
-        async function updateMap() { /* ... function from previous response ... */ }
+        function initializeMap() {
+            const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
+             liveMap = L.map('liveMap', { center: [32.0853, 34.7818], zoom: 10, layers: [standardLayer] });
+            orderMarkersLayer.addTo(liveMap);
+        }
+        
+        async function updateMap() {
+             try {
+                const response = await fetch(`${API_URL}?action=getLiveMapData`);
+                const result = await response.json();
+                if (result.status !== 'success' || !result.data) throw new Error(result.message || 'Invalid data structure');
+                
+                const { drivers, pendingOrders } = result.data;
+                const updatedDriverIds = [];
 
-        async function fetchCustomers() { /* ... function from previous response ... */ }
-        function initAutocomplete(inputEl, customers) { /* ... function from previous response ... */ }
-        function populateDropdowns() { /* ... function from previous response ... */ }
-        async function handleCreateOrder(e) { /* ... function from previous response ... */ }
+                drivers.forEach(driver => {
+                    if (!driver.location || typeof driver.location.latitude !== 'number' || typeof driver.location.longitude !== 'number') return;
+                    
+                    updatedDriverIds.push(driver.driverId);
+                    const latLng = [driver.location.latitude, driver.location.longitude];
+                    const isOnRoute = !!driver.activeOrder;
+                    const statusClass = isOnRoute ? 'driver-on-route' : 'driver-available';
+                    let popupContent = `<h3>${driver.name} (${isOnRoute ? 'בדרך' : 'פנוי'})</h3><p>עודכן: ${new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL')}</p>`;
+                    if(isOnRoute) popupContent += `<p>יעד: ${driver.activeOrder.customerName}</p>`;
+                    
+                    const icon = L.divIcon({
+                        className: `custom-div-icon ${statusClass}`,
+                        html: `<div class='marker-pin'></div><i class='fas fa-truck'></i>`,
+                        iconSize: [30, 42], iconAnchor: [15, 42]
+                    });
 
-        async function openHistoryModal() { /* ... function from previous response ... */ }
-        function renderHistory(data) { /* ... function from previous response ... */ }
-        function filterHistoryTable() { /* ... function from previous response ... */ }
+                    if (driverMarkers[driver.driverId]) {
+                        driverMarkers[driver.driverId].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
+                    } else {
+                        driverMarkers[driver.driverId] = L.marker(latLng, {icon: icon}).addTo(liveMap).bindPopup(popupContent);
+                    }
+                });
 
-        async function openAnalyticsModal() { /* ... function from previous response ... */ }
-        function displayAnalytics(data) { /* ... function from previous response ... */ }
+                for (const driverId in driverMarkers) {
+                    if (!updatedDriverIds.includes(driverId)) {
+                        liveMap.removeLayer(driverMarkers[driverId]);
+                        delete driverMarkers[driverId];
+                    }
+                }
+                
+                orderMarkersLayer.clearLayers(); 
+                pendingOrders.forEach(order => {
+                    if (typeof order.latitude !== 'number' || typeof order.longitude !== 'number') return;
+                    const latLng = [order.latitude, order.longitude];
+                    const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=200x200&location=${order.latitude},${order.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
+                    const orderPopup = `<h3>הזמנה פנויה</h3><p>${order.customerName}</p><p>${order.address}</p><img src="${streetViewUrl}" class="popup-image" alt="Street View">`;
+                    
+                    const icon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class='marker-pin' style='background-color: var(--danger);'></div><i class='fas fa-box'></i>`,
+                        iconSize: [30, 42], iconAnchor: [15, 42]
+                    });
+
+                    L.marker(latLng, {icon: icon}).bindPopup(orderPopup).addTo(orderMarkersLayer);
+                });
+            } catch (error) { console.error('Error updating map:', error); }
+        }
+
+        async function fetchCustomers() {
+             try {
+                const response = await fetch(`${API_URL}?action=getCustomers`);
+                const result = await response.json();
+                if (result.status === 'success' && result.data) {
+                    allCustomers = result.data;
+                    initAutocomplete(document.getElementById("customerName"), allCustomers);
+                }
+            } catch (error) {
+                console.error("Error fetching customers:", error);
+            }
+        }
+
+        function initAutocomplete(inputEl, customers) {
+            inputEl.addEventListener("input", function() {
+                closeAllLists();
+                const val = this.value;
+                if (!val) { return false; }
+                const list = document.createElement("DIV");
+                list.setAttribute("id", this.id + "autocomplete-list");
+                list.setAttribute("class", "autocomplete-items");
+                this.parentNode.appendChild(list);
+
+                customers.forEach(customer => {
+                    if (customer.name.toLowerCase().includes(val.toLowerCase())) {
+                        const item = document.createElement("DIV");
+                        item.innerHTML = customer.name.replace(new RegExp(val, "gi"), "<strong>$&</strong>");
+                        item.addEventListener("click", function() {
+                            inputEl.value = customer.name;
+                            document.getElementById("address").value = customer.defaultAddress || '';
+                            document.getElementById("customerPhone").value = customer.phone || '';
+                            closeAllLists();
+                        });
+                        list.appendChild(item);
+                    }
+                });
+            });
+            function closeAllLists(elmnt) {
+                const x = document.getElementsByClassName("autocomplete-items");
+                for (let i = 0; i < x.length; i++) {
+                    if (elmnt != x[i] && elmnt != inputEl) x[i].parentNode.removeChild(x[i]);
+                }
+            }
+            document.addEventListener("click", (e) => closeAllLists(e.target));
+        }
+        
+        function populateDropdowns() {
+            const deliveryTypeSelect = document.getElementById('deliveryType');
+            deliveryTypeSelect.innerHTML = '<option value="">בחר סוג הובלה...</option>';
+            deliveryTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                deliveryTypeSelect.appendChild(option);
+            });
+        }
+        
+        async function handleCreateOrder(e) {
+            e.preventDefault();
+            const orderData = {
+                customerName: document.getElementById('customerName').value,
+                customerPhone: document.getElementById('customerPhone').value,
+                address: document.getElementById('address').value,
+                orderTime: document.getElementById('orderTime').value,
+                deliveryType: document.getElementById('deliveryType').value,
+                warehouse: document.getElementById('warehouse').value,
+                notes: document.getElementById('notes').value,
+                orderDate: new Date().toISOString().split('T')[0]
+            };
+            try {
+                await fetch(API_URL, {
+                    method: 'POST', 
+                    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+                    body: JSON.stringify({ action: 'createOrder', data: orderData })
+                });
+                createOrderForm.reset();
+                buildScheduler(); 
+            } catch (error) { console.error('Error creating order:', error); }
+        }
+        
+        async function openHistoryModal() {
+            historyModal.style.display = 'block';
+            historyTableBody.innerHTML = '<tr><td colspan="5">טוען היסטוריה...</td></tr>';
+            try {
+                const response = await fetch(`${API_URL}?action=getHistory`);
+                const result = await response.json();
+                if (result.status === 'success' && result.data) {
+                    renderHistory(result.data);
+                } else {
+                    historyTableBody.innerHTML = `<tr><td colspan="5">שגיאה: ${result.message}</td></tr>`;
+                }
+            } catch (error) {
+                console.error("Error fetching history:", error);
+                historyTableBody.innerHTML = `<tr><td colspan="5">שגיאה בטעינת היסטוריה.</td></tr>`;
+            }
+        }
+        
+        function renderHistory(data) {
+             historyTableBody.innerHTML = '';
+            if (data.length === 0) {
+                historyTableBody.innerHTML = '<tr><td colspan="5">אין הזמנות בארכיון.</td></tr>';
+                return;
+            }
+            data.forEach(order => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(order.orderDate).toLocaleDateString('he-IL')}</td>
+                    <td>${order.customerName}</td>
+                    <td>${order.address}</td>
+                    <td>${order.driverId}</td>
+                    <td><span class="status-badge status-${order.status}">${order.status}</span></td>
+                `;
+                historyTableBody.appendChild(row);
+            });
+        }
+
+        function filterHistoryTable() {
+            const filter = historySearch.value.toUpperCase();
+            const rows = historyTableBody.getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+                let found = false;
+                const cells = rows[i].getElementsByTagName('td');
+                for (let j = 0; j < cells.length; j++) {
+                    if (cells[j] && cells[j].textContent.toUpperCase().indexOf(filter) > -1) {
+                        found = true;
+                        break;
+                    }
+                }
+                rows[i].style.display = found ? "" : "none";
+            }
+        }
+        
+        async function openAnalyticsModal() {
+            analyticsModal.style.display = 'block';
+            try {
+                const response = await fetch(`${API_URL}?action=getAnalyticsData`);
+                const result = await response.json();
+                if (result.status === 'success' && result.data) {
+                    displayAnalytics(result.data);
+                } else {
+                    console.error("Failed to load analytics:", result.message);
+                }
+            } catch (error) {
+                console.error("Error fetching analytics:", error);
+            }
+        }
+        
+        function displayAnalytics(data) {
+            document.getElementById('totalCompletedStat').textContent = data.totalCompleted;
+            document.getElementById('avgTimeStat').textContent = data.avgMissionTime;
+
+            const driverData = data.ordersByDriver;
+            const topDriver = Object.keys(driverData).reduce((a, b) => driverData[a] > driverData[b] ? a : b, '-');
+            document.getElementById('topDriverStat').textContent = topDriver;
+
+            const ctx = document.getElementById('driverPerformanceChart').getContext('2d');
+            if (performanceChart) {
+                performanceChart.destroy();
+            }
+            performanceChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(driverData),
+                    datasets: [{
+                        label: 'מספר משימות שהושלמו',
+                        data: Object.values(driverData),
+                        backgroundColor: 'rgba(0, 123, 255, 0.5)',
+                        borderColor: 'rgba(0, 123, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
         
         async function fetchAlerts() {
             try {
