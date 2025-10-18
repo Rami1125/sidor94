@@ -138,10 +138,10 @@
                     fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`).then(res => res.json())
                 ]);
 
-                if (driversResult.status !== 'success' || !driversResult.data) throw new Error(`Failed to fetch drivers: ${driversResult.message}`);
+                if (driversResult.status !== 'success' || !driversResult.data) throw new Error(`Failed to fetch drivers: ${driversResult.message || 'No data'}`);
                 const drivers = driversResult.data.filter(d => d.status === 'פעיל');
                 
-                if (ordersResult.status !== 'success' || !ordersResult.data) throw new Error(`Failed to fetch orders: ${ordersResult.message}`);
+                if (ordersResult.status !== 'success' || !ordersResult.data) throw new Error(`Failed to fetch orders: ${ordersResult.message || 'No data'}`);
                 const allTodayOrders = ordersResult.data;
                 
                 schedulerContainer.innerHTML = ''; 
@@ -186,7 +186,7 @@
             setInterval(fetchAlerts, 60000);
 
             // Attach all event listeners
-            showHistoryBtn.addEventListener('click', openHistoryModal);
+            // showHistoryBtn.addEventListener('click', openHistoryModal);
             // ... (other event listeners) ...
             console.log("LOG: Initializations and event listeners are set up.");
         });
