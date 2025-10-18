@@ -96,7 +96,7 @@
             <div class="right-panel">
                 <div class="card">
                     <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
-                    <form id="createOrderForm" autocomplete="off"><!-- Form content --></form>
+                    <form id="createOrderForm" autocomplete="off"></form>
                 </div>
                 <div class="card">
                     <h2><i class="fas fa-chart-line"></i> דוחות וביצועים</h2>
@@ -110,8 +110,8 @@
         </div>
     </div>
     
-    <div id="historyModal" class="modal"><!-- History Modal --></div>
-    <div id="analyticsModal" class="modal"><!-- Analytics Modal --></div>
+    <div id="historyModal" class="modal"></div>
+    <div id="analyticsModal" class="modal"></div>
 
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbypee4F3xxqfgoMEM3ZRCwvkZHUNuYQxcxOrZzhsrwD7og1E3NHC7NO5ncJ2nwl5PQY/exec';
@@ -119,7 +119,11 @@
         
         // DOM Elements
         const schedulerContainer = document.getElementById('scheduler');
-        // ... (all other DOM elements) ...
+        // --- FIX: Added missing DOM element definitions ---
+        const showAnalyticsBtn = document.getElementById('showAnalyticsBtn');
+        const showHistoryBtn = document.getElementById('showHistoryBtn');
+        const createOrderForm = document.getElementById('createOrderForm');
+        // --- END OF FIX ---
         const alertBell = document.getElementById('alertBell');
         const alertCount = document.getElementById('alertCount');
         const alertsPanel = document.getElementById('alertsPanel');
@@ -185,13 +189,17 @@
             fetchAlerts();
             setInterval(fetchAlerts, 60000);
 
-            // Attach all event listeners
-            // showHistoryBtn.addEventListener('click', openHistoryModal);
-            // ... (other event listeners) ...
+            // --- FIX: Attach all event listeners ---
+            showHistoryBtn.addEventListener('click', openHistoryModal);
+            showAnalyticsBtn.addEventListener('click', openAnalyticsModal);
+            createOrderForm.addEventListener('submit', handleCreateOrder);
+            alertBell.addEventListener('click', () => {
+                alertsPanel.style.display = alertsPanel.style.display === 'block' ? 'none' : 'block';
+            });
+            // --- END OF FIX ---
             console.log("LOG: Initializations and event listeners are set up.");
         });
     </script>
 </body>
 </html>
 // --- END OF MODULE ---
-
