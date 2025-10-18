@@ -118,12 +118,12 @@
                 const ordersResult = await ordersResponse.json();
                 console.log("LOG: Received orders data:", ordersResult);
 
-                if (ordersResult.status === 'success' && ordersResult.data) {
+                if (ordersResult.status === 'success' && Array.isArray(ordersResult.data)) {
                     currentOrders = ordersResult.data;
                     updateKPIs(currentOrders);
                     renderOrderList(currentOrders);
                 } else {
-                    throw new Error(`API returned error for orders: ${ordersResult.message}`);
+                    throw new Error(`API returned error for orders: ${ordersResult.message || 'Data is not an array'}`);
                 }
 
                 console.log("LOG: Fetching map data...");
