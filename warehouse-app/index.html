@@ -207,7 +207,11 @@
             newOrdersList.innerHTML = '';
             inProgressOrdersList.innerHTML = '';
             
-            const newOrders = orders.filter(o => o.status === 'ממתין לאישור מחסן');
+            // --- FIX: Flexible status filtering ---
+            const NEW_ORDER_STATUSES = ['ממתין לאישור מחסן', 'חדש', 'חדשה'];
+            const newOrders = orders.filter(o => NEW_ORDER_STATUSES.includes(o.status));
+            // --- END FIX ---
+            
             const inProgress = orders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
 
             if (knownOrderIds.size > 0) {
