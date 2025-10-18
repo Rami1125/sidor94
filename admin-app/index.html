@@ -33,30 +33,31 @@
         h2 { text-align: center; margin-bottom: 20px; color: var(--primary-color); }
         .main-layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
         .card { background: var(--white); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 20px; }
-        #liveMap { height: 400px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; }
+        #liveMap { height: 400px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; z-index: 5; }
         .scheduler-container { display: grid; grid-template-columns: 250px repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; min-height: 400px; }
-        .scheduler-column { background-color: #f0f3f5; border-radius: var(--border-radius); padding: 15px; }
-        .scheduler-column h3 { text-align: center; padding-bottom: 10px; border-bottom: 2px solid var(--primary-color); margin-bottom: 15px; }
-        .order-pool, .driver-lane { min-height: 300px; list-style-type: none; padding: 0; }
+        .scheduler-column { background-color: #f0f3f5; border-radius: var(--border-radius); padding: 15px; display: flex; flex-direction: column; }
+        .scheduler-column h3 { text-align: center; padding-bottom: 10px; border-bottom: 2px solid var(--primary-color); margin-bottom: 15px; position: sticky; top: 0; background-color: #f0f3f5; z-index: 10;}
+        .order-pool, .driver-lane { min-height: 300px; list-style-type: none; padding: 0; flex-grow: 1; overflow-y: auto; max-height: 60vh; }
         .schedule-card { background: var(--white); padding: 10px 15px; border-radius: 5px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: grab; border-right: 4px solid var(--secondary-color); }
         .schedule-card p { margin: 2px 0; font-size: 0.9em; }
         .schedule-card .card-customer { font-weight: 500; font-size: 1em; }
-        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; }
-        
-        /* --- "מלשינון" דיבאג קונסול (מוסתר) --- */
-        #debugConsole { display: none; }
-
+        .ghost-card { background: #cce5ff; opacity: 0.7; border: 2px dashed var(--primary-color); }
+        .form-group { margin-bottom: 15px; position: relative; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; box-sizing: border-box; }
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); }
+        .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="container">
          <div class="header-title">
-            <div class="header-alerts">
-                <button id="alertBell" class="alert-bell"><i class="fas fa-bell"></i><span id="alertCount" class="alert-count"></span></button>
-                <div id="alertsPanel" class="alerts-panel"></div>
-            </div>
-            <h1><i class="fas fa-tachometer-alt"></i> DeliveryMaster - מרכז בקרה</h1>
-            <div></div> 
+             <h1><i class="fas fa-tachometer-alt"></i> DeliveryMaster - מרכז בקרה</h1>
         </div>
         <div class="main-layout">
             <div class="left-panel">
@@ -72,7 +73,12 @@
             <div class="right-panel">
                 <div class="card">
                     <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
-                    <form id="createOrderForm" autocomplete="off"></form>
+                    <form id="createOrderForm" autocomplete="off">
+                        <div class="form-group"><label for="customerName">שם לקוח</label><input type="text" id="customerName" required></div>
+                        <div class="form-group"><label for="address">כתובת</label><input type="text" id="address" required></div>
+                        <div class="form-group"><label for="deliveryType">סוג הובלה</label><select id="deliveryType"></select></div>
+                        <button type="submit">צור הזמנה</button>
+                    </form>
                 </div>
                 <div class="card">
                     <h2><i class="fas fa-chart-line"></i> דוחות וביצועים</h2>
@@ -86,7 +92,8 @@
         </div>
     </div>
     
-    <div id="debugConsole"></div>
+    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>היסטוריית הזמנות</h2><div id="historyContent"></div></div></div>
+    <div id="analyticsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוחות וביצועים</h2><div id="analyticsContent"></div></div></div>
 
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbypee4F3xxqfgoMEM3ZRCwvkZHUNuYQxcxOrZzhsrwD7og1E3NHC7NO5ncJ2nwl5PQY/exec';
@@ -97,78 +104,76 @@
         const showAnalyticsBtn = document.getElementById('showAnalyticsBtn');
         const showHistoryBtn = document.getElementById('showHistoryBtn');
         const createOrderForm = document.getElementById('createOrderForm');
-        const alertBell = document.getElementById('alertBell');
         
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup();
+        const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
 
-        // --- "מלשינון" - פונקציית רישום אירועים (רק ל-F12) ---
         function logEvent(message, type = 'info') {
-            const styles = {
-                info: 'color: #63d4f7;',
-                success: 'color: #73f763; font-weight: bold;',
-                warn: 'color: #f7d663;',
-                error: 'color: #f76363; font-weight: bold;'
-            };
+            const styles = { info: 'color: #63d4f7;', success: 'color: #73f763; font-weight: bold;', warn: 'color: #f7d663;', error: 'color: #f76363; font-weight: bold;' };
             console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, styles[type], message);
         }
 
-        // --- פונקציית בניית כרטיס הזמנה ---
         function createScheduleCard(order) {
-            if (!order) return '';
-            return `
-                <li class="schedule-card" data-order-id="${order.orderId}">
-                    <p class="card-customer">${order.customerName || 'N/A'}</p>
-                    <p><i class="fas fa-map-marker-alt" style="margin-left: 5px;"></i> ${order.address || 'N/A'}</p>
-                    <p><i class="fas fa-clock" style="margin-left: 5px;"></i> ${order.orderTime || 'N/A'}</p>
-                </li>
-            `;
+            return `<li class="schedule-card" data-order-id="${order.orderId}"><p class="card-customer">${order.customerName || 'N/A'}</p><p><i class="fas fa-map-marker-alt" style="margin-left: 5px;"></i> ${order.address || 'N/A'}</p><p><i class="fas fa-clock" style="margin-left: 5px;"></i> ${order.orderTime || 'N/A'}</p></li>`;
         }
-
-        // --- All Functions ---
+        
         async function buildScheduler() {
             logEvent("Building scheduler...");
             schedulerContainer.innerHTML = '<p>טוען נתונים...</p>';
             try {
-                logEvent("Fetching drivers and orders from server...");
                 const [driversResult, ordersResult] = await Promise.all([
                     fetch(`${API_URL}?action=getDrivers`).then(res => res.json()),
                     fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`).then(res => res.json())
                 ]);
-                logEvent("Driver and order data fetched successfully.", "success");
+                logEvent("Driver and order data fetched.", "success");
 
-                if (driversResult.status !== 'success' || !driversResult.data) throw new Error(`Failed to fetch drivers: ${driversResult.message || 'No data'}`);
+                if (driversResult.status !== 'success' || !driversResult.data) throw new Error(`Failed to fetch drivers: ${driversResult.message}`);
                 const drivers = driversResult.data.filter(d => d.status === 'פעיל');
-                
-                if (ordersResult.status !== 'success' || !ordersResult.data) throw new Error(`Failed to fetch orders: ${ordersResult.message || 'No data'}`);
+                if (ordersResult.status !== 'success' || !ordersResult.data) throw new Error(`Failed to fetch orders: ${ordersResult.message}`);
                 const allTodayOrders = ordersResult.data;
                 
                 schedulerContainer.innerHTML = ''; 
 
-                // 1. Create Unassigned Orders Column
                 const unassignedOrders = allTodayOrders.filter(o => !o.driverId || o.driverId === '');
-                let unassignedHtml = `<div class="scheduler-column"><h3 class="sticky-top">ממתינות (${unassignedOrders.length})</h3><ul class="order-pool" data-driver-id="unassigned">`;
-                unassignedOrders.forEach(order => {
-                    unassignedHtml += createScheduleCard(order);
-                });
-                unassignedHtml += `</ul></div>`;
+                let unassignedHtml = `<div class="scheduler-column"><h3>ממתינות (${unassignedOrders.length})</h3><ul class="order-pool" data-driver-id="unassigned">${unassignedOrders.map(createScheduleCard).join('')}</ul></div>`;
                 schedulerContainer.innerHTML += unassignedHtml;
 
-                // 2. Create Columns for each active driver
                 drivers.forEach(driver => {
                     const driverOrders = allTodayOrders.filter(o => o.driverId === driver.driverId);
-                    let driverHtml = `<div class="scheduler-column"><h3>${driver.name} (${driverOrders.length})</h3><ul class="driver-lane" data-driver-id="${driver.driverId}">`;
-                    driverOrders.forEach(order => {
-                        driverHtml += createScheduleCard(order);
-                    });
-                    driverHtml += `</ul></div>`;
+                    let driverHtml = `<div class="scheduler-column"><h3>${driver.name} (${driverOrders.length})</h3><ul class="driver-lane" data-driver-id="${driver.driverId}">${driverOrders.map(createScheduleCard).join('')}</ul></div>`;
                     schedulerContainer.innerHTML += driverHtml;
                 });
                 
-                logEvent("Scheduler layout and order cards built.", "success");
-
+                initSortable();
+                logEvent("Scheduler layout and cards built.", "success");
             } catch (error) {
                 logEvent(`Failed to build scheduler: ${error.message}`, "error");
                 schedulerContainer.innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים.</p>`;
+            }
+        }
+
+        function initSortable() {
+            document.querySelectorAll('.order-pool, .driver-lane').forEach(lane => {
+                new Sortable(lane, { group: 'shared', animation: 150, ghostClass: 'ghost-card', onEnd: handleDragEnd });
+            });
+            logEvent("Drag & Drop initialized for all lanes.");
+        }
+
+        async function handleDragEnd(event) {
+            const orderId = event.item.dataset.orderId;
+            const newDriverId = event.to.dataset.driverId;
+            logEvent(`Order ${orderId} moved to driver ${newDriverId}. Updating server...`);
+            
+            try {
+                await fetch(API_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: newDriverId === 'unassigned' ? '' : newDriverId } } })
+                });
+                logEvent(`Update for order ${orderId} sent. Refreshing UI...`, 'success');
+                setTimeout(() => { buildScheduler(); updateMap(); }, 800);
+            } catch (error) {
+                logEvent(`Failed to update order ${orderId}: ${error.message}`, "error");
+                buildScheduler();
             }
         }
 
@@ -176,77 +181,112 @@
             logEvent("Initializing map...");
             try {
                 liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }).addTo(liveMap);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
                 orderMarkersLayer.addTo(liveMap);
                 logEvent("Map initialized successfully.", "success");
-            } catch (error) {
-                logEvent(`Failed to initialize map: ${error.message}`, "error");
-                liveMapElement.innerHTML = `<p style="color:red; text-align:center; padding-top: 50px;">שגיאה קריטית בטעינת המפה.</p>`;
+            } catch (e) {
+                logEvent(`Map initialization failed: ${e.message}`, 'error');
             }
         }
-
+        
         async function updateMap() {
             logEvent("Updating map data...");
-            if (!liveMap) {
-                logEvent("Map not initialized, skipping update.", "warn");
-                return;
-            }
+            if (!liveMap) return logEvent("Map not ready, skipping update.", "warn");
             try {
-                logEvent("Fetching live map data from server...");
-                const response = await fetch(`${API_URL}?action=getLiveMapData`);
-                const result = await response.json();
-
-                if (result.status !== 'success' || !result.data) {
-                    throw new Error(result.message || 'Invalid data from server');
-                }
-                logEvent("Successfully fetched map data.", "success");
-
-                Object.values(driverMarkers).forEach(marker => marker.remove());
-                driverMarkers = {};
-                orderMarkersLayer.clearLayers();
+                const res = await fetch(`${API_URL}?action=getLiveMapData`);
+                const result = await res.json();
+                if (result.status !== 'success') throw new Error(result.message);
                 
-                const { drivers, pendingOrders } = result.data;
+                Object.values(driverMarkers).forEach(m => m.remove());
+                orderMarkersLayer.clearLayers();
 
-                if (drivers && drivers.length > 0) {
-                     drivers.forEach(driver => {
-                        if (driver.location && driver.location.latitude) {
-                            const icon = L.divIcon({ className: 'custom-div-icon', html: `<div style='background-color:var(--primary-color);' class='marker-pin'></div><i class='fas fa-truck'></i>`, iconSize: [30, 42], iconAnchor: [15, 42] });
-                            const marker = L.marker([driver.location.latitude, driver.location.longitude], {icon}).addTo(liveMap)
-                                .bindPopup(`<b>${driver.name}</b>`);
-                            driverMarkers[driver.driverId] = marker;
-                        }
-                    });
-                    logEvent(`Updated ${drivers.length} driver locations.`);
-                } else {
-                    logEvent("No active drivers with location data found.", "info");
-                }
-               
-                if (pendingOrders && pendingOrders.length > 0) {
-                    pendingOrders.forEach(order => {
-                         if (order.latitude) {
-                             const orderIcon = L.divIcon({className: 'custom-div-icon', html: "<div style='background-color:#6c757d;' class='marker-pin'></div><i class='fas fa-box-open'></i>", iconSize: [30, 42], iconAnchor: [15, 42]});
-                            const marker = L.marker([order.latitude, order.longitude], { icon: orderIcon });
-                            marker.bindPopup(`<b>הזמנה ממתינה:</b><br>${order.customerName}`);
-                            orderMarkersLayer.addLayer(marker);
-                         }
-                    });
-                    logEvent(`Displayed ${pendingOrders.length} pending orders on map.`);
-                }
+                result.data.drivers.forEach(d => {
+                    if (d.location && d.location.latitude) {
+                        driverMarkers[d.driverId] = L.marker([d.location.latitude, d.location.longitude]).addTo(liveMap).bindPopup(`<b>${d.name}</b>`);
+                    }
+                });
 
+                result.data.pendingOrders.forEach(o => {
+                    if (o.latitude) {
+                       L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png', iconSize: [25, 41] }) })
+                           .addTo(orderMarkersLayer).bindPopup(`<b>ממתין:</b> ${o.customerName}`);
+                    }
+                });
+                logEvent("Map updated.", "success");
             } catch (error) {
                 logEvent(`Failed to update map: ${error.message}`, "error");
             }
+        }
+        
+        async function handleCreateOrder(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.textContent = 'יוצר...';
+            const orderData = {
+                customerName: document.getElementById('customerName').value,
+                address: document.getElementById('address').value,
+                deliveryType: document.getElementById('deliveryType').value
+            };
+            logEvent(`Creating new order for ${orderData.customerName}`);
+            try {
+                 await fetch(API_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    body: JSON.stringify({ action: 'createOrder', data: orderData })
+                });
+                logEvent('New order created successfully.', 'success');
+                createOrderForm.reset();
+                setTimeout(() => { buildScheduler(); updateMap(); }, 800);
+            } catch(error) {
+                logEvent(`Error creating order: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'צור הזמנה';
+            }
+        }
+
+        function populateDropdowns() {
+            const deliveryTypeSelect = document.getElementById('deliveryType');
+            deliveryTypes.forEach(type => {
+                deliveryTypeSelect.innerHTML += `<option value="${type}">${type}</option>`;
+            });
+        }
+        
+        function openModal(modalId, contentId, loadingMessage) {
+            logEvent(`Opening ${modalId}...`);
+            const modal = document.getElementById(modalId);
+            const content = document.getElementById(contentId);
+            modal.style.display = 'block';
+            content.innerHTML = loadingMessage;
+            return {modal, content};
+        }
+
+        async function openHistoryModal() {
+            const {content} = openModal('historyModal', 'historyContent', 'טוען היסטוריה...');
+            // Fetch and render logic will go here
+        }
+        
+        async function openAnalyticsModal() {
+            const {content} = openModal('analyticsModal', 'analyticsContent', 'טוען דוחות...');
+            // Fetch and render logic will go here
         }
         
         document.addEventListener('DOMContentLoaded', async () => {
             logEvent("DOM Loaded. Initializing app.", "success");
             
             initializeMap();
+            populateDropdowns();
             await buildScheduler();
             await updateMap(); 
             setInterval(updateMap, 30000);
+
+            // Attach Event Listeners
+            showHistoryBtn.addEventListener('click', openHistoryModal);
+            showAnalyticsBtn.addEventListener('click', openAnalyticsModal);
+            createOrderForm.addEventListener('submit', handleCreateOrder);
+            document.querySelectorAll('.close-button').forEach(btn => {
+                btn.onclick = () => btn.closest('.modal').style.display = 'none';
+            });
             
             logEvent("Initializations and event listeners are set up.", "success");
         });
