@@ -49,9 +49,13 @@
         button:hover { background-color: #0056b3; }
         button:disabled { background-color: #6c757d; cursor: not-allowed; }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); max-height: 80vh; display: flex; flex-direction: column;}
         .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; }
         .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+        .history-table-container { overflow-y: auto; flex-grow: 1; }
+        #historyContent table { width: 100%; border-collapse: collapse; }
+        #historyContent th, #historyContent td { padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; }
+        #historyContent th { background-color: #f2f2f2; }
     </style>
 </head>
 <body>
@@ -105,7 +109,7 @@
         const showHistoryBtn = document.getElementById('showHistoryBtn');
         const createOrderForm = document.getElementById('createOrderForm');
         
-        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup();
+        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
 
         function logEvent(message, type = 'info') {
@@ -130,7 +134,7 @@
                 if (driversResult.status !== 'success' || !driversResult.data) throw new Error(`Failed to fetch drivers: ${driversResult.message}`);
                 const drivers = driversResult.data.filter(d => d.status === 'פעיל');
                 if (ordersResult.status !== 'success' || !ordersResult.data) throw new Error(`Failed to fetch orders: ${ordersResult.message}`);
-                const allTodayOrders = ordersResult.data;
+                allTodayOrders = ordersResult.data; // Store globally
                 
                 schedulerContainer.innerHTML = ''; 
 
@@ -158,19 +162,35 @@
             });
             logEvent("Drag & Drop initialized for all lanes.");
         }
+        
+        function updateSchedulerCounts() {
+            logEvent("Updating scheduler header counts only...");
+            document.querySelectorAll('.scheduler-column').forEach(column => {
+                const h3 = column.querySelector('h3');
+                const list = column.querySelector('ul');
+                const count = list.children.length;
+                const text = h3.textContent.split('(')[0].trim();
+                h3.textContent = `${text} (${count})`;
+            });
+        }
 
         async function handleDragEnd(event) {
             const orderId = event.item.dataset.orderId;
             const newDriverId = event.to.dataset.driverId;
             logEvent(`Order ${orderId} moved to driver ${newDriverId}. Updating server...`);
             
+            updateSchedulerCounts();
+
             try {
                 await fetch(API_URL, {
                     method: 'POST', mode: 'no-cors',
                     body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { driverId: newDriverId === 'unassigned' ? '' : newDriverId } } })
                 });
-                logEvent(`Update for order ${orderId} sent. Refreshing UI...`, 'success');
-                setTimeout(() => { buildScheduler(); updateMap(); }, 800);
+                logEvent(`Update for order ${orderId} sent.`, 'success');
+                const ordersResponse = await fetch(`${API_URL}?action=getOrders&date=${new Date().toISOString().split('T')[0]}`);
+                const ordersResult = await ordersResponse.json();
+                allTodayOrders = ordersResult.data;
+                updateMap();
             } catch (error) {
                 logEvent(`Failed to update order ${orderId}: ${error.message}`, "error");
                 buildScheduler();
@@ -206,13 +226,21 @@
                     }
                 });
 
-                result.data.pendingOrders.forEach(o => {
-                    if (o.latitude) {
-                       L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png', iconSize: [25, 41] }) })
-                           .addTo(orderMarkersLayer).bindPopup(`<b>ממתין:</b> ${o.customerName}`);
+                allTodayOrders.forEach(o => {
+                    if (o.latitude && o.status !== 'הושלם') {
+                       const isPending = !o.driverId || o.driverId === '';
+                       const iconUrl = isPending 
+                           ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png'
+                           : 'https://cdn-icons-png.flaticon.com/512/3405/3405255.png';
+                       const popupText = isPending 
+                           ? `<b>ממתין:</b> ${o.customerName}`
+                           : `<b>${o.customerName}</b><br>שויך ל: ${o.driverId}`;
+
+                       L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl, iconSize: [32, 32] }) })
+                           .addTo(orderMarkersLayer).bindPopup(popupText);
                     }
                 });
-                logEvent("Map updated.", "success");
+                logEvent("Map updated with drivers and all active orders.", "success");
             } catch (error) {
                 logEvent(`Failed to update map: ${error.message}`, "error");
             }
@@ -252,23 +280,61 @@
             });
         }
         
+        // --- FIX: Correct implementation for openModal ---
         function openModal(modalId, contentId, loadingMessage) {
             logEvent(`Opening ${modalId}...`);
             const modal = document.getElementById(modalId);
             const content = document.getElementById(contentId);
+            if (!modal || !content) {
+                logEvent(`Modal or content element not found for ${modalId}`, 'error');
+                return null; // Return null if elements don't exist
+            }
             modal.style.display = 'block';
             content.innerHTML = loadingMessage;
-            return {modal, content};
+            return {modal, content}; // Return the elements
         }
 
         async function openHistoryModal() {
-            const {content} = openModal('historyModal', 'historyContent', 'טוען היסטוריה...');
-            // Fetch and render logic will go here
+            const modalElements = openModal('historyModal', 'historyContent', 'טוען היסטוריה...');
+            if (!modalElements) return; // Guard clause to prevent error
+            const { content } = modalElements;
+
+            try {
+                const response = await fetch(`${API_URL}?action=getHistory`);
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error(result.message);
+
+                const historyData = result.data;
+                if (!historyData || historyData.length === 0) {
+                    content.innerHTML = '<p>לא נמצאו נתוני היסטוריה.</p>';
+                    return;
+                }
+
+                let tableHTML = `<div class="history-table-container"><table><thead><tr><th>זמן</th><th>מזהה</th><th>לקוח</th><th>נהג</th><th>סטטוס</th></tr></thead><tbody>`;
+                historyData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                           .forEach(record => {
+                    tableHTML += `<tr>
+                        <td>${new Date(record.timestamp).toLocaleString('he-IL')}</td>
+                        <td>${record.orderId || 'N/A'}</td>
+                        <td>${record.customerName || 'N/A'}</td>
+                        <td>${record.driverId || '-'}</td>
+                        <td>${record.status || 'N/A'}</td>
+                    </tr>`;
+                });
+                tableHTML += `</tbody></table></div>`;
+                content.innerHTML = tableHTML;
+                logEvent("History data loaded successfully.", "success");
+            } catch (error) {
+                logEvent(`Failed to load history: ${error.message}`, "error");
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת ההיסטוריה.</p>`;
+            }
         }
         
         async function openAnalyticsModal() {
-            const {content} = openModal('analyticsModal', 'analyticsContent', 'טוען דוחות...');
-            // Fetch and render logic will go here
+            const modalElements = openModal('analyticsModal', 'analyticsContent', 'טוען דוחות...');
+            if (!modalElements) return;
+            const { content } = modalElements;
+            content.innerHTML = '<p>מודול דוחות בבנייה.</p>';
         }
         
         document.addEventListener('DOMContentLoaded', async () => {
@@ -278,7 +344,10 @@
             populateDropdowns();
             await buildScheduler();
             await updateMap(); 
-            setInterval(updateMap, 30000);
+            setInterval(async () => {
+                await buildScheduler();
+                await updateMap();
+            }, 30000);
 
             // Attach Event Listeners
             showHistoryBtn.addEventListener('click', openHistoryModal);
@@ -287,6 +356,11 @@
             document.querySelectorAll('.close-button').forEach(btn => {
                 btn.onclick = () => btn.closest('.modal').style.display = 'none';
             });
+            window.onclick = (event) => {
+                if (event.target.classList.contains('modal')) {
+                    event.target.style.display = 'none';
+                }
+            };
             
             logEvent("Initializations and event listeners are set up.", "success");
         });
