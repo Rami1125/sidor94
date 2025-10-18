@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DeliveryMaster - נהג</title>
 
     <!-- PWA Manifest -->
@@ -26,7 +26,6 @@
         html, body {
             height: 100%;
             overflow: hidden;
-            -webkit-tap-highlight-color: transparent; /* Disable tap highlight on mobile */
         }
         body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 0; color: var(--text-color); }
         .view { display: none !important; height: 100%; } 
@@ -35,17 +34,17 @@
         #loginView { justify-content: center; align-items: center; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); }
         .login-card { background: var(--white); padding: 40px; border-radius: var(--border-radius); box-shadow: var(--shadow); text-align: center; width: 90%; max-width: 400px; }
         .login-card img { width: 100px; height: 100px; border-radius: 20px; margin-bottom: 20px; }
-        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 8px; font-size: 1.2rem; text-align: center; box-sizing: border-box; }
+        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 8px; font-size: 1.2rem; text-align: center; }
         .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color: var(--white); border: none; border-radius: 8px; font-size: 1.2rem; cursor: pointer; }
         
-        #permissionOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 2000; display: none; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box; }
+        #permissionOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 2000; display: none; justify-content: center; align-items: center; text-align: center; padding: 20px; }
         .permission-card { background-color: #fff; color: #333; padding: 30px; border-radius: 12px; max-width: 350px; }
         .permission-card h2 { color: var(--primary-color); }
         .permission-card p { margin: 15px 0; }
         .permission-card button { width: 100%; padding: 15px; font-size: 1.1em; background-color: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; }
         
         .app-header { background: var(--primary-color); color: var(--white); padding: 15px 20px; z-index: 10; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        main { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        main { flex-grow: 1; overflow-y: auto; }
         .header-buttons { display: flex; align-items: center; gap: 15px; }
         .header-buttons button { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
         
@@ -65,7 +64,6 @@
         .order-card[data-status="שויך"] { border-color: var(--info); }
         .order-card[data-status="בדרך"] { border-color: var(--warning); }
         .order-card[data-status="הושלם"] { border-color: var(--success); opacity: 0.7; }
-
     </style>
 </head>
 <body>
@@ -101,7 +99,7 @@
     </div>
     
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxelIUS1M4vJ-r_fAuZoyzZDL9iC6Hcop-3_Eg_lLiSdWZVTQXnOpSSlGhxGjhojxot/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbx38YRbtI1y2vItZoIHWR3EOhI8vUzBLKuRuTuFvr9taJt-Wffw4RhVa3SpLSNnnpCW/exec';
 
         // DOM Elements
         const loginView = document.getElementById('loginView');
@@ -116,19 +114,15 @@
         const installBtn = document.getElementById('installBtn');
         
         let deferredPrompt; 
-        let locationIntervalId;
 
         // --- App Initialization ---
-        
-        // This function is the single entry point to the app logic,
-        // ensuring OneSignal is ready before anything else runs.
         window.OneSignalDeferred = window.OneSignalDeferred || [];
         OneSignalDeferred.push(async function(OneSignal) {
             try {
-                // The init is now inside the script tag, so we just run our app logic
+                await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
                 initializeApp(false); // OneSignal is ready
             } catch (e) {
-                console.error("OneSignal setup failed:", e);
+                console.error("OneSignal init failed:", e);
                 initializeApp(true); // OneSignal failed, skip notification features
             }
         });
@@ -180,7 +174,9 @@
             if (!oneSignalFailed) {
                 try {
                     await OneSignal.Notifications.requestPermission();
-                } catch(e) { console.error("Notification permission request failed", e); }
+                } catch(e) {
+                    console.error("Notification permission request failed", e);
+                }
             }
             initializeFeatures(driverId, oneSignalFailed);
         }
@@ -244,6 +240,7 @@
             } catch (error) { console.error("OneSignal login failed:", error); }
         }
         
+        let locationIntervalId;
         function startLocationTracking(driverId) {
             if (locationIntervalId) clearInterval(locationIntervalId);
             
@@ -288,7 +285,6 @@
         }
         
         async function fetchDriverOrders(driverId) {
-            if (!orderList) return;
             orderList.innerHTML = '<p>טוען משימות...</p>';
             const today = new Date().toISOString().split('T')[0];
             try {
@@ -303,7 +299,6 @@
         }
 
         function renderOrders(orders) {
-            if (!orderList) return;
             if (!orders || orders.length === 0) {
                 orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
                 return;
@@ -330,19 +325,20 @@
             }).join('');
         }
 
-        function updateOrderStatus(event, orderId, newStatus) {
+        async function updateOrderStatus(event, orderId, newStatus) {
             const btn = event.currentTarget;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            fetch(API_URL, {
-                method: 'POST', mode: 'no-cors',
-                body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
-            }).then(() => {
-                 fetchDriverOrders(sessionStorage.getItem('driverId'));
-            }).catch(err => {
-                console.error("Error updating status:", err);
+            try {
+                await fetch(API_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
+                });
+                fetchDriverOrders(sessionStorage.getItem('driverId'));
+            } catch (error) {
+                console.error("Error updating status:", error);
                 btn.disabled = false;
-            });
+            }
         }
         
         // --- View Management ---
