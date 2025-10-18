@@ -97,7 +97,6 @@
     </div>
 
     <script>
-        // --- FIX: Updated API URL ---
         const API_URL = 'https://script.google.com/macros/s/AKfycbyzexCL02v9onBXItCCv-uQE7lDfPO2hg7P6edq-EnnH_8bK3k2aDp1iwoBvM_EM0re/exec';
         
         const loginView = document.getElementById('loginView');
@@ -113,7 +112,9 @@
         let refreshInterval;
         let knownOrderIds = new Set();
 
-        function logEvent(message, type = 'info', data = '') { /* ... (implementation is correct) ... */ }
+        function logEvent(message, type = 'info', data = '') {
+            console.log(`[${type.toUpperCase()}] ${new Date().toLocaleTimeString()}: ${message}`, data);
+        }
 
         window.OneSignalDeferred = window.OneSignalDeferred || [];
         OneSignalDeferred.push(async function(OneSignal) {
@@ -126,26 +127,123 @@
             }
         });
 
-        function initializeApp(oneSignalFailed = false) { /* ... (implementation is correct) ... */ }
-        function onLogin(oneSignalFailed) { /* ... (implementation is correct) ... */ }
-        function onLogout() { /* ... (implementation is correct) ... */ }
-        function initApp(manager, oneSignalFailed = false) { /* ... (implementation is correct) ... */ }
-        function startPolling() { /* ... (implementation is correct) ... */ }
-        async function fetchWarehouseOrders() { /* ... (implementation is correct) ... */ }
-        function renderOrders(orders) { /* ... (implementation is correct) ... */ }
-        function createOrderCard(order, type) { /* ... (implementation is correct) ... */ }
+        // --- FIX: Restored full function implementations ---
+        function initializeApp(oneSignalFailed = false) {
+            logEvent("Initializing app...");
+            loginBtn.addEventListener('click', () => onLogin(oneSignalFailed));
+            logoutBtn.addEventListener('click', onLogout);
+            const loggedInManager = JSON.parse(sessionStorage.getItem('warehouseManager'));
+            if (loggedInManager) {
+                initApp(loggedInManager, oneSignalFailed);
+            } else {
+                switchView('loginView');
+            }
+        }
         
-        async function updateOrderStatus(event, orderId, newStatus) {
+        function onLogin(oneSignalFailed) {
+            const managerId = managerIdInput.value.trim().toUpperCase();
+            if(!managerId) return;
+            const managerData = { id: managerId, name: managerId === 'OREN' ? 'אורן' : 'תמיר', warehouse: managerId === 'OREN' ? 'החרש' : 'התלמיד' };
+            sessionStorage.setItem('warehouseManager', JSON.stringify(managerData));
+            initApp(managerData, oneSignalFailed);
+        }
+
+        function onLogout() {
+            logEvent("User logged out");
+            sessionStorage.removeItem('warehouseManager');
+            if(refreshInterval) clearInterval(refreshInterval);
+            if(window.OneSignal) OneSignal.logout();
+            switchView('loginView');
+        }
+
+        function initApp(manager, oneSignalFailed = false) {
+            logEvent(`Initializing session for manager: ${manager.id}`, 'success');
+            currentManager = manager;
+            welcomeMessage.textContent = `מחסן ${manager.warehouse} | ברוך הבא ${manager.name}`;
+            switchView('mainView');
+            if (!oneSignalFailed) initializeNotifications(manager.id);
+            startPolling();
+        }
+        
+        function startPolling() {
+            logEvent("Starting to poll for orders...");
+            if (refreshInterval) clearInterval(refreshInterval);
+            const poll = async () => { await fetchWarehouseOrders(); };
+            poll();
+            refreshInterval = setInterval(poll, 20000);
+        }
+
+        async function fetchWarehouseOrders() {
+            if (!currentManager) return;
+            logEvent(`Fetching orders for warehouse: ${currentManager.warehouse}...`);
+            try {
+                const response = await fetch(`${API_URL}?action=getWarehouseOrders&warehouse=${currentManager.warehouse}`);
+                if (!response.ok) throw new Error(`Server returned error: ${response.status}`);
+                const result = await response.json();
+                if (result.status === 'success' && Array.isArray(result.data)) {
+                    logEvent(`Successfully fetched ${result.data.length} orders.`, 'success');
+                    renderOrders(result.data);
+                } else {
+                    throw new Error(result.message || 'Invalid data format from server');
+                }
+            } catch (error) {
+                logEvent('Error fetching orders', 'error', error);
+                newOrdersList.innerHTML = `<p style="color:red;">שגיאת תקשורת עם השרת.</p>`;
+            }
+        }
+
+        function renderOrders(orders) {
+            newOrdersList.innerHTML = '';
+            inProgressOrdersList.innerHTML = '';
+            
+            const NEW_ORDER_STATUSES = ['ממתין לאישור מחסן', 'חדש', 'חדשה'];
+            const newOrders = orders.filter(o => NEW_ORDER_STATUSES.includes(o.status));
+            const inProgress = orders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
+
+            if (knownOrderIds.size > 0) {
+                const newIncomingIds = new Set(newOrders.map(o => o.orderId));
+                if ([...newIncomingIds].some(id => !knownOrderIds.has(id))) {
+                    playNotificationSound();
+                }
+            }
+            knownOrderIds = new Set(orders.map(o => o.orderId));
+
+            if (newOrders.length === 0) newOrdersList.innerHTML = '<p>אין הזמנות חדשות.</p>';
+            newOrders.forEach(order => newOrdersList.innerHTML += createOrderCard(order, 'acknowledge'));
+
+            if (inProgress.length === 0) inProgressOrdersList.innerHTML = '<p>אין הזמנות בתהליך.</p>';
+            inProgress.forEach(order => inProgressOrdersList.innerHTML += createOrderCard(order, 'load'));
+        }
+
+        function createOrderCard(order, type) {
+            let buttonHtml = '';
+            if (type === 'acknowledge') {
+                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.orderId}', 'באיסוף', 'acknowledge')">אשר קבלת הזמנה</button>`;
+            } else if (order.status === 'באיסוף') {
+                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.orderId}', 'טעון', 'load')">סמן כטעון</button>`;
+            } else {
+                 buttonHtml = `<p style="color:var(--success); font-weight:bold; text-align:center; margin-top: 15px;">הועמס בהצלחה ✔️</p>`;
+            }
+
+            return `
+                <div class="order-card glass-card" data-order-id="${order.orderId}">
+                    <h4>${order.customerName} (${order.orderId.substring(0,6)})</h4>
+                    <p><strong>כתובת:</strong> ${order.address}</p>
+                    <p><strong>שעה:</strong> ${order.orderTime}</p>
+                    ${buttonHtml}
+                </div>`;
+        }
+        
+        async function updateOrderStatus(event, orderId, newStatus, type) {
             logEvent(`Updating order ${orderId} to status: ${newStatus}`);
             const btn = event.target;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעדכן...';
              try {
-                // Using 'cors' mode to potentially get error details back from server
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    mode: 'cors', // Changed from no-cors for better error handling
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Necessary for CORS with Apps Script
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } }),
                     redirect: 'follow'
                 });
@@ -171,9 +269,40 @@
             }
         }
         
-        async function playNotificationSound() { /* ... (implementation is correct) ... */ }
-        function switchView(viewId) { /* ... (implementation is correct) ... */ }
-        async function initializeNotifications(managerId) { /* ... (implementation is correct) ... */ }
+        async function playNotificationSound() {
+            try {
+                await Tone.start();
+                const synth = new Tone.Synth().toDestination();
+                synth.triggerAttackRelease("C5", "8n");
+            } catch(e) {
+                console.error('Could not play sound', e);
+            }
+        }
+        
+        function switchView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        async function initializeNotifications(managerId) {
+            try {
+                await OneSignal.Notifications.requestPermission();
+                await OneSignal.login(managerId);
+                const playerId = OneSignal.User.onesignalId;
+                if (playerId) {
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({ 
+                            action: 'registerWarehouseDevice', 
+                            data: { managerId, deviceId: playerId } 
+                        })
+                    });
+                }
+             } catch (e) {
+                 logEvent("Error initializing notifications", 'error', e);
+             }
+        }
     </script>
 </body>
 </html>
