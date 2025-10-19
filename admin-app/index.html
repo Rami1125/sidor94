@@ -14,9 +14,16 @@
 
     <style>
         :root {
-            --primary-color: #007bff; --secondary-color: #6c757d; --background-color: #f8f9fa;
-            --text-color: #343a40; --white: #ffffff; --success: #28a745; --warning: #ffc107;
-            --danger: #dc3545; --info: #17a2b8; --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --background-color: #f8f9fa;
+            --text-color: #343a40;
+            --white: #ffffff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             --border-radius: 8px;
         }
         body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 20px; color: var(--text-color); }
@@ -35,20 +42,21 @@
         .schedule-card p { margin: 2px 0; font-size: 0.9em; }
         .schedule-card .card-customer { font-weight: 500; font-size: 1em; }
         .ghost-card { background: #cce5ff; opacity: 0.7; border: 2px dashed var(--primary-color); }
-        .form-group { margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; position: relative; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; box-sizing: border-box; }
+        .address-group { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
         button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; transition: background-color 0.2s; }
         button:hover { background-color: #0056b3; }
         button:disabled { background-color: #6c757d; cursor: not-allowed; }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
         .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); max-height: 80vh; display: flex; flex-direction: column;}
-        .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
         .history-table-container { overflow-y: auto; flex-grow: 1; }
         #historyContent table { width: 100%; border-collapse: collapse; }
         #historyContent th, #historyContent td { padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; }
         #historyContent th { background-color: #f2f2f2; }
-        #analyticsContent { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; height: 100%; }
     </style>
 </head>
 <body>
@@ -72,7 +80,12 @@
                     <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
                     <form id="createOrderForm" autocomplete="off">
                         <div class="form-group"><label for="customerName">שם לקוח</label><input type="text" id="customerName" required></div>
-                        <div class="form-group"><label for="address">כתובת</label><input type="text" id="address" required></div>
+                        <div class="form-group"><label for="customerPhone">טלפון לקוח</label><input type="tel" id="customerPhone" required></div>
+                        <div class="form-group"><label for="city">עיר</label><select id="city" required></select></div>
+                        <div class="form-group address-group">
+                            <div><label for="street">רחוב</label><input type="text" id="street" required></div>
+                            <div><label for="houseNumber">מספר</label><input type="text" id="houseNumber" required></div>
+                        </div>
                         <div class="form-group"><label for="deliveryType">סוג הובלה</label><select id="deliveryType"></select></div>
                         <button type="submit">צור הזמנה</button>
                     </form>
@@ -90,22 +103,17 @@
     </div>
     
     <div id="historyModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>היסטוריית הזמנות</h2><div id="historyContent"></div></div></div>
-    <div id="analyticsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוחות וביצועים</h2><div id="analyticsContent"><canvas id="ordersByDriverChart"></canvas><canvas id="ordersByStatusChart"></canvas></div></div></div>
+    <div id="analyticsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוחות וביצועים</h2><div id="analyticsContent"></div></div></div>
 
     <script>
-        // *** UNIFIED API URL ***
         const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
-        
-        // DOM Elements
-        const schedulerContainer = document.getElementById('scheduler');
-        const createOrderForm = document.getElementById('createOrderForm');
         
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
+        const cities = ["תל אביב-יפו", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה", "בני ברק", "באר שבע", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה", "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "רעננה", "רמלה", "גבעתיים", "הוד השרון"];
 
         function logEvent(message, type = 'info') {
-            const styles = { info: 'color: #63d4f7;', success: 'color: #73f763;', warn: 'color: #f7d663;', error: 'color: #f76363; font-weight: bold;' };
-            console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, styles[type], message);
+            console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, `color:${type === 'success' ? '#28a745' : '#007bff'}`, message);
         }
 
         async function apiFetch(action, params = {}, method = 'GET', body = null) {
@@ -114,27 +122,22 @@
                 url.searchParams.append('action', action);
                 Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
             }
-            
             const options = { method };
             if (method === 'POST') {
                 options.body = JSON.stringify({ action, data: body });
-                options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' }; // Required for Apps Script
+                options.mode = 'cors';
+                options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
             }
-            
             const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`Network response was not ok for action: ${action}`);
+            if (!response.ok) throw new Error(`Network error for action: ${action}`);
             const result = await response.json();
             if (result.status !== 'success') throw new Error(result.message);
             return result.data;
         }
-
-        function createScheduleCard(order) {
-            return `<li class="schedule-card" data-order-id="${order.orderId}"><p class="card-customer">${order.customerName || 'N/A'}</p><p><i class="fas fa-map-marker-alt"></i> ${order.address || 'N/A'}</p><p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p></li>`;
-        }
         
         async function buildScheduler() {
             logEvent("Building scheduler...");
-            schedulerContainer.innerHTML = '<p>טוען נתונים...</p>';
+            document.getElementById('scheduler').innerHTML = '<p>טוען נתונים...</p>';
             try {
                 const [drivers, orders] = await Promise.all([
                     apiFetch('getDrivers'),
@@ -143,23 +146,21 @@
                 logEvent("Driver and order data fetched.", "success");
                 
                 allTodayOrders = orders;
-                schedulerContainer.innerHTML = ''; 
-
-                const unassignedOrders = allTodayOrders.filter(o => !o.driverId || o.driverId === '');
-                let unassignedHtml = `<div class="scheduler-column"><h3>ממתינות (${unassignedOrders.length})</h3><ul class="order-pool" data-driver-id="unassigned">${unassignedOrders.map(createScheduleCard).join('')}</ul></div>`;
-                schedulerContainer.innerHTML += unassignedHtml;
+                
+                const unassignedOrders = allTodayOrders.filter(o => !o.driverId);
+                let schedulerHTML = `<div class="scheduler-column"><h3>ממתינות (${unassignedOrders.length})</h3><ul class="order-pool" data-driver-id="unassigned">${unassignedOrders.map(createScheduleCard).join('')}</ul></div>`;
                 
                 drivers.filter(d => d.status === 'פעיל').forEach(driver => {
                     const driverOrders = allTodayOrders.filter(o => o.driverId === driver.driverId);
-                    let driverHtml = `<div class="scheduler-column"><h3>${driver.name} (${driverOrders.length})</h3><ul class="driver-lane" data-driver-id="${driver.driverId}">${driverOrders.map(createScheduleCard).join('')}</ul></div>`;
-                    schedulerContainer.innerHTML += driverHtml;
+                    schedulerHTML += `<div class="scheduler-column"><h3>${driver.name} (${driverOrders.length})</h3><ul class="driver-lane" data-driver-id="${driver.driverId}">${driverOrders.map(createScheduleCard).join('')}</ul></div>`;
                 });
                 
+                document.getElementById('scheduler').innerHTML = schedulerHTML;
                 initSortable();
-                logEvent("Scheduler layout and cards built.", "success");
+                logEvent("Scheduler layout built.", "success");
             } catch (error) {
                 logEvent(`Failed to build scheduler: ${error.message}`, "error");
-                schedulerContainer.innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים: ${error.message}</p>`;
+                document.getElementById('scheduler').innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים.</p>`;
             }
         }
 
@@ -169,31 +170,24 @@
             });
         }
         
-        function updateSchedulerCounts() {
-            document.querySelectorAll('.scheduler-column').forEach(column => {
-                const h3 = column.querySelector('h3');
-                const list = column.querySelector('ul');
-                const count = list.children.length;
-                const text = h3.textContent.split('(')[0].trim();
-                h3.textContent = `${text} (${count})`;
-            });
-        }
-
         async function handleDragEnd(event) {
             const orderId = event.item.dataset.orderId;
-            const newDriverId = event.to.dataset.driverId;
+            const newDriverId = event.to.dataset.driverId === 'unassigned' ? '' : event.to.dataset.driverId;
             logEvent(`Order ${orderId} moved to driver ${newDriverId}.`);
             
-            updateSchedulerCounts();
+            document.querySelectorAll('.scheduler-column h3').forEach(h3 => {
+                const count = h3.nextElementSibling.children.length;
+                h3.textContent = `${h3.textContent.split('(')[0].trim()} (${count})`;
+            });
 
             try {
-                await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { driverId: newDriverId === 'unassigned' ? '' : newDriverId } });
-                logEvent(`Update for order ${orderId} sent.`, 'success');
+                await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { driverId: newDriverId } });
+                logEvent(`Update for order ${orderId} successful.`, 'success');
                 allTodayOrders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] });
                 updateMap();
             } catch (error) {
                 logEvent(`Failed to update order ${orderId}: ${error.message}`, "error");
-                buildScheduler(); // Rebuild to revert optimistic update
+                buildScheduler(); // Rebuild on failure to revert visually
             }
         }
 
@@ -202,130 +196,122 @@
                 liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
                 orderMarkersLayer.addTo(liveMap);
-            } catch (e) { logEvent(`Map initialization failed: ${e.message}`, 'error'); }
+                logEvent("Map initialized.", "success");
+            } catch (e) {
+                logEvent(`Map initialization failed: ${e.message}`, 'error');
+            }
         }
         
         async function updateMap() {
-            if (!liveMap) return logEvent("Map not ready.", "warn");
+            logEvent("Updating map...");
+            if (!liveMap) return;
             try {
-                const mapData = await apiFetch('getLiveMapData');
+                const { drivers } = await apiFetch('getLiveMapData');
+                
                 Object.values(driverMarkers).forEach(m => m.remove());
                 orderMarkersLayer.clearLayers();
 
-                mapData.drivers.forEach(d => {
-                    if (d.location && d.location.latitude) {
+                drivers.forEach(d => {
+                    if (d.location?.latitude) {
                         driverMarkers[d.driverId] = L.marker([d.location.latitude, d.location.longitude]).addTo(liveMap).bindPopup(`<b>${d.name}</b>`);
                     }
                 });
 
-                mapData.orders.forEach(o => {
+                allTodayOrders.forEach(o => {
                     if (o.latitude && o.status !== 'הושלם') {
-                       const iconUrl = (!o.driverId) ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png' : 'https://cdn-icons-png.flaticon.com/512/3405/3405255.png';
+                       const iconUrl = (!o.driverId) 
+                           ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png' // Pending
+                           : 'https://cdn-icons-png.flaticon.com/512/3405/3405255.png'; // Assigned
                        L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl, iconSize: [32, 32] }) })
-                           .addTo(orderMarkersLayer).bindPopup(`<b>${o.customerName}</b><br>${o.driverId || 'ממתין לשיבוץ'}`);
+                           .addTo(orderMarkersLayer).bindPopup(`<b>${o.customerName}</b><br>שויך ל: ${o.driverId || 'טרם'}`);
                     }
                 });
                 logEvent("Map updated.", "success");
-            } catch (error) { logEvent(`Failed to update map: ${error.message}`, "error"); }
+            } catch (error) {
+                logEvent(`Failed to update map: ${error.message}`, "error");
+            }
         }
         
         async function handleCreateOrder(e) {
             e.preventDefault();
             const btn = e.target.querySelector('button');
-            btn.disabled = true;
-            btn.textContent = 'יוצר...';
+            btn.disabled = true; btn.textContent = 'יוצר...';
+            
             const orderData = {
                 customerName: document.getElementById('customerName').value,
-                address: document.getElementById('address').value,
+                customerPhone: document.getElementById('customerPhone').value,
+                city: document.getElementById('city').value,
+                street: document.getElementById('street').value,
+                houseNumber: document.getElementById('houseNumber').value,
                 deliveryType: document.getElementById('deliveryType').value
             };
+            logEvent(`Creating order for ${orderData.customerName}`);
+
             try {
                  await apiFetch('createOrder', {}, 'POST', orderData);
                 logEvent('New order created successfully.', 'success');
-                createOrderForm.reset();
+                document.getElementById('createOrderForm').reset();
                 setTimeout(() => { buildScheduler(); updateMap(); }, 800);
             } catch(error) {
                 logEvent(`Error creating order: ${error.message}`, 'error');
                 alert(`שגיאה ביצירת הזמנה: ${error.message}`);
             } finally {
-                btn.disabled = false;
-                btn.textContent = 'צור הזמנה';
+                btn.disabled = false; btn.textContent = 'צור הזמנה';
             }
         }
 
         function populateDropdowns() {
             const deliveryTypeSelect = document.getElementById('deliveryType');
-            deliveryTypes.forEach(type => {
-                deliveryTypeSelect.innerHTML += `<option value="${type}">${type}</option>`;
-            });
+            deliveryTypes.forEach(type => { deliveryTypeSelect.innerHTML += `<option value="${type}">${type}</option>`; });
+            
+            const citySelect = document.getElementById('city');
+            cities.sort().forEach(city => { citySelect.innerHTML += `<option value="${city}">${city}</option>`; });
         }
         
-        function openModal(modalId) {
+        function openModal(modalId, contentId, loadingMessage) {
             const modal = document.getElementById(modalId);
-            if (modal) modal.style.display = 'block';
-            return modal;
+            const content = document.getElementById(contentId);
+            modal.style.display = 'block';
+            content.innerHTML = `<p>${loadingMessage}</p>`;
+            return {modal, content};
         }
 
         async function openHistoryModal() {
-            const modal = openModal('historyModal');
-            if (!modal) return;
-            const content = modal.querySelector('#historyContent');
-            content.innerHTML = 'טוען היסטוריה...';
+            const { content } = openModal('historyModal', 'historyContent', 'טוען היסטוריה...');
             try {
                 const historyData = await apiFetch('getHistory');
-                if (!historyData || historyData.length === 0) {
-                    content.innerHTML = '<p>לא נמצאו נתוני היסטוריה.</p>'; return;
-                }
+                if (!historyData.length) { content.innerHTML = '<p>לא נמצאו נתוני היסטוריה.</p>'; return; }
                 let tableHTML = `<div class="history-table-container"><table><thead><tr><th>זמן</th><th>מזהה</th><th>לקוח</th><th>נהג</th><th>סטטוס</th></tr></thead><tbody>`;
                 historyData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-                   .forEach(record => {
-                    tableHTML += `<tr><td>${new Date(record.timestamp).toLocaleString('he-IL')}</td><td>${record.orderId || 'N/A'}</td><td>-</td><td>${record.driverId || '-'}</td><td>${record.status || 'N/A'}</td></tr>`;
+                           .forEach(record => {
+                    tableHTML += `<tr><td>${new Date(record.timestamp).toLocaleString('he-IL')}</td><td>${record.orderId || 'N/A'}</td><td>${record.customerName || 'N/A'}</td><td>${record.driverId || '-'}</td><td>${record.status || 'N/A'}</td></tr>`;
                 });
-                tableHTML += `</tbody></table></div>`;
-                content.innerHTML = tableHTML;
+                content.innerHTML = tableHTML + `</tbody></table></div>`;
             } catch (error) {
                 content.innerHTML = `<p style="color:red;">שגיאה בטעינת ההיסטוריה: ${error.message}</p>`;
             }
         }
         
         async function openAnalyticsModal() {
-            const modal = openModal('analyticsModal');
-            if (!modal) return;
+            const { content } = openModal('analyticsModal', 'analyticsContent', 'טוען דוחות...');
             try {
-                const data = await apiFetch('getAnalyticsData');
-                
-                // Chart 1: Orders by Driver
+                const analyticsData = await apiFetch('getAnalyticsData');
+                content.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 100%;">
+                        <div><h3>הזמנות לפי נהג</h3><canvas id="ordersByDriverChart"></canvas></div>
+                        <div><h3>סטטוס הזמנות כללי</h3><canvas id="ordersByStatusChart"></canvas></div>
+                    </div>`;
+
                 new Chart(document.getElementById('ordersByDriverChart'), {
                     type: 'bar',
-                    data: {
-                        labels: data.ordersByDriver.map(d => d.driverName),
-                        datasets: [{
-                            label: 'הזמנות לנהג',
-                            data: data.ordersByDriver.map(d => d.count),
-                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'התפלגות הזמנות לפי נהג' } } }
+                    data: { labels: Object.keys(analyticsData.byDriver), datasets: [{ label: 'הזמנות', data: Object.values(analyticsData.byDriver), backgroundColor: '#007bff' }] }
                 });
-
-                // Chart 2: Orders by Status
                 new Chart(document.getElementById('ordersByStatusChart'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(data.statusCounts),
-                        datasets: [{
-                            label: 'סטטוס הזמנות',
-                            data: Object.values(data.statusCounts),
-                            backgroundColor: ['#ffc107', '#28a745', '#17a2b8', '#dc3545', '#6c757d']
-                        }]
-                    },
-                     options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'סטטוס הזמנות כללי' } } }
+                    type: 'pie',
+                    data: { labels: Object.keys(analyticsData.byStatus), datasets: [{ data: Object.values(analyticsData.byStatus), backgroundColor: ['#28a745', '#ffc107', '#6c757d', '#17a2b8', '#dc3545'] }] }
                 });
-
             } catch(error) {
-                modal.querySelector('#analyticsContent').innerHTML = `<p style="color:red;">שגיאה בטעינת דוחות: ${error.message}</p>`;
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת דוחות: ${error.message}</p>`;
             }
         }
         
@@ -336,25 +322,22 @@
             populateDropdowns();
             await buildScheduler();
             await updateMap(); 
-            setInterval(async () => {
-                await buildScheduler();
-                await updateMap();
-            }, 30000);
+            setInterval(() => { buildScheduler(); updateMap(); }, 30000);
 
-            // Attach Event Listeners
             document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
             document.getElementById('showAnalyticsBtn').addEventListener('click', openAnalyticsModal);
-            createOrderForm.addEventListener('submit', handleCreateOrder);
-            
+            document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
             document.querySelectorAll('.close-button').forEach(btn => {
                 btn.onclick = () => btn.closest('.modal').style.display = 'none';
             });
             window.onclick = (event) => {
                 if (event.target.classList.contains('modal')) event.target.style.display = 'none';
             };
-            
-            logEvent("Initializations and event listeners are set up.", "success");
         });
+
+        function createScheduleCard(order) {
+            return `<li class="schedule-card" data-order-id="${order.orderId}"><p class="card-customer">${order.customerName || 'N/A'}</p><p><i class="fas fa-map-marker-alt"></i> ${order.address || 'N/A'}</p><p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p></li>`;
+        }
     </script>
 </body>
 </html>
