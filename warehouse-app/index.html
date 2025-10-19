@@ -18,45 +18,53 @@
         body { 
             font-family: 'Rubik', sans-serif; 
             -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: contain; /* Prevents pull-to-refresh */
         }
-        /* Custom scrollbar for better aesthetics */
+        .view {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+        .view.hidden {
+            opacity: 0;
+            transform: scale(0.98);
+            pointer-events: none;
+        }
         main::-webkit-scrollbar { width: 6px; }
         main::-webkit-scrollbar-track { background: transparent; }
         main::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800">
+<body class="bg-gradient-to-br from-slate-50 to-slate-200 text-slate-800">
 
-    <div id="loginView" class="view active flex h-screen items-center justify-center p-4">
-        <div class="w-full max-w-sm mx-auto bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-lg text-center">
+    <div id="loginView" class="view flex absolute inset-0 items-center justify-center p-4">
+        <div class="w-full max-w-sm mx-auto bg-white/70 backdrop-blur-xl p-8 rounded-2xl shadow-lg border border-white/50 text-center">
             <i class="fas fa-warehouse text-5xl text-blue-600 mb-4"></i>
-            <h2 class="text-2xl font-bold mb-2">כניסת מנהל מחסן</h2>
+            <h2 class="text-2xl font-bold mb-2">טרמינל מחסן</h2>
             <p class="text-slate-500 mb-6">נא הזן קוד מנהל כדי להמשיך</p>
             <input type="text" id="managerIdInput" placeholder="הזן קוד מנהל" class="w-full text-center text-lg p-3 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-            <p id="loginError" class="text-red-500 min-h-[20px] my-2 text-sm"></p>
-            <button id="loginBtn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-transform transform active:scale-95 disabled:bg-slate-400">
+            <p id="loginError" class="text-red-500 min-h-[20px] my-2 text-sm font-semibold"></p>
+            <button id="loginBtn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-transform transform active:scale-95 disabled:bg-slate-400 disabled:cursor-not-allowed">
                 כניסה
             </button>
         </div>
     </div>
 
-    <div id="mainView" class="view h-screen">
-        <header class="bg-white/80 backdrop-blur-sm sticky top-0 z-10 p-4 shadow-md flex justify-between items-center">
-            <h1 id="welcomeMessage" class="text-xl font-bold"></h1>
+    <div id="mainView" class="view hidden absolute inset-0 flex flex-col h-screen">
+        <header class="bg-white/80 backdrop-blur-sm flex-shrink-0 z-10 p-4 shadow-sm flex justify-between items-center">
+            <h1 id="welcomeMessage" class="text-xl font-bold text-slate-700"></h1>
             <button id="logoutBtn" class="text-slate-500 hover:text-red-600 text-2xl transition">
                 <i class="fas fa-sign-out-alt"></i>
             </button>
         </header>
         <main class="flex-grow overflow-y-auto p-4">
-            <div id="ordersGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div id="ordersGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 <div id="newOrders" class="order-section">
-                    <h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center gap-3 sticky top-0 bg-gradient-to-b from-slate-100 via-slate-100 to-transparent py-2 -mx-2 px-2">
                         <i class="fas fa-inbox text-blue-500"></i> הזמנות חדשות
                     </h2>
                     <div id="newOrdersList" class="space-y-4"></div>
                 </div>
-                <div id="inProgressOrders" class="order-section">
-                     <h2 class="text-2xl font-bold mb-4 flex items-center gap-3">
+                <div id="inProgressOrders" class="order-section md:col-span-1 lg:col-span-2 xl:col-span-3">
+                     <h2 class="text-2xl font-bold mb-4 flex items-center gap-3 sticky top-0 bg-gradient-to-b from-slate-100 via-slate-100 to-transparent py-2 -mx-2 px-2">
                         <i class="fas fa-tasks text-amber-500"></i> הזמנות בתהליך
                     </h2>
                     <div id="inProgressOrdersList" class="space-y-4"></div>
@@ -106,6 +114,9 @@
         function initializeApp() {
             loginBtn.addEventListener('click', onLogin);
             logoutBtn.addEventListener('click', onLogout);
+            document.getElementById('managerIdInput').addEventListener('keyup', (e) => {
+                if(e.key === 'Enter') onLogin();
+            });
             const loggedInManager = JSON.parse(sessionStorage.getItem('warehouseManager'));
             if (loggedInManager) initApp(loggedInManager);
         }
@@ -123,7 +134,7 @@
                 sessionStorage.setItem('warehouseManager', JSON.stringify(managerData));
                 initApp(managerData);
             } catch (error) {
-                loginError.textContent = `שגיאה: ${error.message}`;
+                loginError.textContent = `${error.message}`;
             } finally {
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'כניסה';
@@ -138,6 +149,12 @@
         }
 
         function initApp(manager) {
+            console.log("Initializing with manager data:", manager);
+            if (!manager || !manager.managerId) {
+                console.error("Manager data is invalid or missing managerId. Logging out.");
+                onLogout();
+                return;
+            }
             currentManager = manager;
             document.getElementById('welcomeMessage').textContent = `מחסן ${manager.warehouse} | ${manager.name}`;
             switchView('mainView');
@@ -153,18 +170,17 @@
         }
 
         function getLoaderHTML() {
-            return `<div class="bg-white p-4 rounded-lg shadow-md animate-pulse">
-                        <div class="h-4 bg-slate-200 rounded w-3/4 mb-3"></div>
-                        <div class="h-3 bg-slate-200 rounded w-1/2 mb-4"></div>
-                        <div class="h-10 bg-slate-300 rounded w-full"></div>
-                    </div>`;
+            return Array(3).fill('').map(() => `<div class="bg-white p-4 rounded-xl shadow-md animate-pulse">
+                        <div class="h-5 bg-slate-200 rounded w-3/4 mb-3"></div>
+                        <div class="h-4 bg-slate-200 rounded w-1/2 mb-4"></div>
+                        <div class="h-12 bg-slate-300 rounded-lg w-full"></div>
+                    </div>`).join('');
         }
 
         async function fetchWarehouseOrders() {
             if (!currentManager) return;
-            // Show loaders only on first load
             if (knownOrderIds.size === 0) {
-                 newOrdersList.innerHTML = getLoaderHTML() + getLoaderHTML();
+                 newOrdersList.innerHTML = getLoaderHTML();
                  inProgressOrdersList.innerHTML = getLoaderHTML();
             }
            
@@ -172,10 +188,12 @@
                 const orders = await apiFetch('getWarehouseOrders', { warehouse: currentManager.warehouse });
                 renderOrders(orders);
             } catch (error) {
-                newOrdersList.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                                                <strong class="font-bold">שגיאת תקשורת:</strong>
-                                                <span class="block sm:inline">${error.message}</span>
-                                            </div>`;
+                const errorHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+                                    <p class="font-bold">שגיאת תקשורת</p>
+                                    <p>${error.message}</p>
+                                   </div>`;
+                newOrdersList.innerHTML = errorHTML;
+                inProgressOrdersList.innerHTML = '';
             }
         }
 
@@ -189,8 +207,8 @@
             }
             knownOrderIds = new Set(orders.map(o => o.orderId));
             
-            newOrdersList.innerHTML = newOrders.length > 0 ? newOrders.map(order => createOrderCard(order, 'acknowledge')).join('') : '<p class="text-slate-500 text-center p-4">אין הזמנות חדשות.</p>';
-            inProgressOrdersList.innerHTML = inProgress.length > 0 ? inProgress.map(order => createOrderCard(order, 'load')).join('') : '<p class="text-slate-500 text-center p-4">אין הזמנות בתהליך.</p>';
+            newOrdersList.innerHTML = newOrders.length > 0 ? newOrders.map(order => createOrderCard(order, 'acknowledge')).join('') : '<p class="text-slate-500 text-center p-4 bg-white/50 rounded-lg">אין הזמנות חדשות.</p>';
+            inProgressOrdersList.innerHTML = inProgress.length > 0 ? inProgress.map(order => createOrderCard(order, 'load')).join('') : '<p class="text-slate-500 text-center p-4 bg-white/50 rounded-lg">אין הזמנות בתהליך.</p>';
         }
 
         function createOrderCard(order, type) {
@@ -216,7 +234,7 @@
 
             return `
                 <div class="bg-white rounded-xl shadow-md p-5 flex flex-col gap-2">
-                    <h3 class="font-bold text-lg">${customerName} <span class="text-slate-500 font-normal text-sm">${orderIdShort}</span></h3>
+                    <h3 class="font-bold text-lg text-slate-800">${customerName} <span class="text-slate-500 font-normal text-sm">${orderIdShort}</span></h3>
                     <p class="text-slate-600 flex items-center gap-2"><i class="fas fa-map-marker-alt w-4 text-center text-slate-400"></i> ${address}</p>
                     <p class="text-slate-600 flex items-center gap-2"><i class="fas fa-clock w-4 text-center text-slate-400"></i> ${orderTime}</p>
                     ${buttonHtml}
@@ -229,10 +247,9 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
              try {
                 await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { status: newStatus } });
-                setTimeout(fetchWarehouseOrders, 500); // Fetch new data after a short delay
+                setTimeout(fetchWarehouseOrders, 500);
             } catch (error) {
                 console.error(`Error updating status for order ${orderId}`, error);
-                // The button will be re-rendered on the next fetch, so no need to reset its state here.
             }
         }
         
@@ -244,11 +261,21 @@
         }
         
         function switchView(viewId) {
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.getElementById(viewId).classList.add('active');
+            const views = document.querySelectorAll('.view');
+            views.forEach(v => {
+                if(v.id !== viewId) {
+                    v.classList.add('hidden');
+                } else {
+                    v.classList.remove('hidden');
+                }
+            });
         }
 
         async function initializeNotifications(managerId) {
+            if (!managerId) {
+                console.error("Cannot initialize notifications, managerId is missing.");
+                return;
+            }
             try {
                 await OneSignal.Notifications.requestPermission();
                 await OneSignal.login(managerId);
