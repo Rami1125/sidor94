@@ -16,16 +16,18 @@
     <!-- OneSignal SDK -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     
-    <!-- Leaflet Map Library -->
+    <!-- Leaflet Map & Routing Library -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 
     <style>
         :root {
             --primary-color: #3a86ff; --secondary-color: #03045e; --background-color: #f0f2f5;
             --text-color: #333; --white: #ffffff; --success: #2a9d8f; --warning: #fca311;
             --danger: #dc3545; --info: #4cc9f0; --whatsapp: #25D366;
-            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --shadow: 0 4px H15px rgba(0, 0, 0, 0.1);
             --border-radius: 16px;
         }
         html, body { height: 100%; overflow: hidden; }
@@ -53,22 +55,26 @@
         .card-header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f0f2f5; }
         .card-header h2 { font-size: 1.3rem; margin: 0; font-weight: 500; }
         .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; color: white; }
-        .map-canvas { height: 180px; width: 100%; background-color: #e9ecef; }
-        .metrics { padding: 10px 20px; background: #f8f9fa; text-align: center; font-weight: 500; color: var(--secondary-color); }
+        .map-canvas { height: 220px; width: 100%; background-color: #e9ecef; }
+        .metrics { padding: 12px 20px; background: #f8f9fa; text-align: center; font-weight: 500; color: var(--secondary-color); border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
         .card-content { padding: 20px; display: flex; flex-direction: column; gap: 15px; }
         .info-item { display: flex; align-items: center; gap: 15px; font-size: 1.1rem; }
         .info-item i { color: var(--primary-color); width: 24px; text-align: center; }
         .info-item a { color: var(--primary-color); text-decoration: none; font-weight: 500; }
         
-        .card-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 15px; background-color: #f8f9fa; border-top: 1px solid #eee;}
+        .card-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 15px; background-color: #f8f9fa; }
         .action-btn { background-color: var(--primary-color); color: var(--white); border: none; padding: 12px 8px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .action-btn.start { background-color: var(--warning); }
         .action-btn.complete { background-color: var(--success); }
         .action-btn.navigate { background-color: var(--info); }
         .action-btn.whatsapp { background-color: var(--whatsapp); }
         .action-btn:disabled { background-color: #ccc; cursor: not-allowed; }
-        
         .order-card[data-status="הושלם"] { opacity: 0.7; }
+
+        /* Hide leaflet routing itinerary */
+        .leaflet-routing-container {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -104,22 +110,13 @@
     </div>
     
     <script>
-        // *** UNIFIED API URL ***
         const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
 
-        const loginView = document.getElementById('loginView');
-        const mainView = document.getElementById('mainView');
-        const permissionOverlay = document.getElementById('permissionOverlay');
         const orderList = document.getElementById('orderList');
-        
-        let deferredPrompt, locationIntervalId, driverLocation = null;
-        let oneSignalFailed = false; 
-        
-        function sanitizeForJS(str) {
-            if (!str) return '';
-            return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
-        }
+        let driverLocation = null, oneSignalFailed = false;
+        let mapInstances = {}; // To hold map and routing control instances
 
+        // --- Core Functions: API Fetch, Sanitizer ---
         async function apiFetch(action, params = {}, method = 'GET', body = null) {
             const url = new URL(API_URL);
             if (method === 'GET') {
@@ -131,12 +128,18 @@
                 options.body = JSON.stringify({ action, data: body });
                 options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
             }
-            const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`Network error for action: ${action}`);
-            const result = await response.json();
-            if (result.status !== 'success') throw new Error(result.message);
-            return result.data;
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) throw new Error(`Network error for action: ${action}`);
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error(result.message);
+                return result.data;
+            } catch(error) {
+                console.error(`API Fetch Error (${action}):`, error);
+                throw error;
+            }
         }
+        function sanitizeForJS(str) { return str ? str.replace(/'/g, "\\'").replace(/"/g, '\\"') : ''; }
 
         // --- App Initialization & Login ---
         window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -144,7 +147,7 @@
             try {
                 await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
             } catch (e) {
-                console.error("OneSignal SDK initialization failed:", e);
+                console.error("OneSignal SDK init failed:", e);
                 oneSignalFailed = true;
             } finally {
                 initializeApp(); 
@@ -152,10 +155,11 @@
         });
 
         function initializeApp() {
+            // Attach all event listeners
             document.getElementById('loginBtn').addEventListener('click', onLogin);
             document.getElementById('logoutBtn').addEventListener('click', onLogout);
             document.getElementById('enableFeaturesBtn').addEventListener('click', onEnableFeatures);
-            document.getElementById('installBtn').addEventListener('click', onInstall);
+            document.getElementById('installBtn').addEventListener('click', () => deferredPrompt?.prompt());
             
             const loggedInDriver = sessionStorage.getItem('driverId');
             if (loggedInDriver) initApp(loggedInDriver);
@@ -169,6 +173,11 @@
                 initApp(driverId);
             }
         }
+        
+        function onLogout() {
+            sessionStorage.removeItem('driverId');
+            location.reload(); // Simple way to reset state
+        }
 
         function initApp(driverId) {
             switchView('mainView');
@@ -181,38 +190,44 @@
             const geoPermissionStatus = await navigator.permissions.query({name: 'geolocation'});
             const isPushEnabled = !oneSignalFailed && OneSignal.Notifications.permission;
             if (!isPushEnabled || geoPermissionStatus.state !== 'granted') {
-                permissionOverlay.style.display = 'flex';
+                document.getElementById('permissionOverlay').style.display = 'flex';
             } else {
-                permissionOverlay.style.display = 'none';
                 initializeFeatures(driverId);
             }
         }
         
         async function onEnableFeatures() {
-            permissionOverlay.style.display = 'none'; 
-            const driverId = sessionStorage.getItem('driverId');
+            document.getElementById('permissionOverlay').style.display = 'none'; 
             if (!oneSignalFailed) {
                 try { await OneSignal.Notifications.requestPermission(); } catch(e) { console.error("Notification permission failed", e); }
             }
-            initializeFeatures(driverId);
+            initializeFeatures(sessionStorage.getItem('driverId'));
         }
 
         function initializeFeatures(driverId) {
-            if (!oneSignalFailed) {
-                initializeNotifications(driverId);
-            }
+            if (!oneSignalFailed) initializeNotifications(driverId);
             startLocationTracking(driverId);
             fetchDriverOrders(driverId);
         }
+        
+        async function initializeNotifications(driverId) {
+            if(oneSignalFailed) return;
+            try {
+                await OneSignal.login(driverId);
+                const playerId = OneSignal.User.onesignalId;
+                if (playerId) await apiFetch('registerDevice', {}, 'POST', { driverId, deviceId: playerId });
+            } catch (error) { console.error("OneSignal login failed:", error); }
+        }
 
-        // --- Orders: Fetch & Render ---
+        // --- Orders: Fetch, Render, Update ---
         async function fetchDriverOrders(driverId) {
             orderList.innerHTML = '<p class="text-center p-8">טוען משימות...</p>';
+            mapInstances = {}; // Clear old map instances
             try {
                 const orders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0], driverId });
                 renderOrders(orders);
             } catch (error) {
-                orderList.innerHTML = `<p class="text-center p-8 text-red-600">שגיאה: ${error.message}</p>`;
+                orderList.innerHTML = `<p class="text-center p-8 text-red-600">שגיאה בטעינת המשימות: ${error.message}</p>`;
             }
         }
 
@@ -223,49 +238,139 @@
             }
             orderList.innerHTML = orders.sort((a,b) => (a.orderTime || "00:00").localeCompare(b.orderTime || "00:00")).map(createOrderCardHTML).join('');
             
-            orders.forEach(order => {
-                const mapEl = document.getElementById(`map-${order.orderId}`);
-                if(mapEl && order.latitude && order.longitude) {
-                    initializeOrderMap(mapEl, order.latitude, order.longitude, order.customerName);
-                } else if(mapEl) {
-                    mapEl.innerHTML = '<p class="text-center text-gray-500 pt-16">מיקום לא זמין</p>';
-                }
-            });
-            updateAllDistances(orders);
+            // After rendering, initialize maps for all cards
+            orders.forEach(order => initializeMapAndRoute(order));
+        }
+        
+        async function updateOrderStatus(event, orderId, newStatus) {
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try {
+                await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { status: newStatus } });
+                fetchDriverOrders(sessionStorage.getItem('driverId'));
+            } catch (error) {
+                alert(`שגיאה בעדכון סטטוס: ${error.message}`);
+                btn.disabled = false; // Re-enable on failure
+            }
         }
 
+        // --- Mapping & Location (The New Core) ---
+        function initializeMapAndRoute(order) {
+            const orderId = order.orderId;
+            const container = document.getElementById(`map-${orderId}`);
+            const metricsContainer = document.getElementById(`metrics-${orderId}`);
+            const destLat = parseFloat(order.latitude);
+            const destLon = parseFloat(order.longitude);
+
+            if (!container || !metricsContainer) return;
+            
+            // Clean up previous instance if it exists
+            if (mapInstances[orderId]) {
+                mapInstances[orderId].map.remove();
+            }
+
+            // Validate destination coordinates
+            if (isNaN(destLat) || isNaN(destLon)) {
+                container.innerHTML = '<p class="text-center text-gray-500 pt-16">כתובת יעד לא תקינה</p>';
+                metricsContainer.innerHTML = 'לא ניתן לחשב מסלול';
+                return;
+            }
+
+            // If driver location is not available yet, just show the destination
+            if (!driverLocation) {
+                const map = L.map(container).setView([destLat, destLon], 14);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                L.marker([destLat, destLon]).addTo(map).bindPopup(order.customerName);
+                mapInstances[orderId] = { map }; // Save map instance
+                metricsContainer.innerHTML = 'ממתין למיקום נהג...';
+                return;
+            }
+
+            // If we have driver and destination, create the route
+            const map = L.map(container); // Don't set view yet, routing control will do it
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            const truckIcon = L.icon({
+                iconUrl: 'https://img.icons8.com/ios-filled/50/000000/truck.png',
+                iconSize: [40, 40],
+            });
+
+            const routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(driverLocation.lat, driverLocation.lon),
+                    L.latLng(destLat, destLon)
+                ],
+                routeWhileDragging: false,
+                addWaypoints: false,
+                createMarker: function(i, waypoint, n) {
+                    if (i === 0) { // Start point (driver)
+                        return L.marker(waypoint.latLng, { icon: truckIcon, draggable: false });
+                    }
+                    // End point (destination)
+                    return L.marker(waypoint.latLng, { draggable: false }).bindPopup(order.customerName);
+                }
+            }).addTo(map);
+            
+            // Extract and display route summary
+            routingControl.on('routesfound', function(e) {
+                const route = e.routes[0];
+                const summary = route.summary;
+                const distance = (summary.totalDistance / 1000).toFixed(1);
+                const time = Math.round(summary.totalTime / 60);
+                metricsContainer.innerHTML = `<i class="fas fa-road"></i> ${distance} ק"מ | <i class="fas fa-stopwatch"></i> ~${time} דקות`;
+            });
+            
+            mapInstances[orderId] = { map, routingControl }; // Save instances
+        }
+        
+        function startLocationTracking(driverId) {
+            if (window.locationIntervalId) clearInterval(window.locationIntervalId);
+
+            const getLocation = () => {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const isFirstLocation = !driverLocation;
+                        driverLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
+                        
+                        // If it's the first time getting location, re-initialize all maps
+                        if (isFirstLocation) {
+                            const allOrders = Array.from(document.querySelectorAll('.order-card')).map(card => ({
+                                orderId: card.dataset.orderId,
+                                latitude: card.dataset.lat,
+                                longitude: card.dataset.lon,
+                                customerName: card.querySelector('h2').innerText
+                            }));
+                            allOrders.forEach(order => initializeMapAndRoute(order));
+                        }
+                        
+                        // Send location update to server
+                        apiFetch('updateDriverLocation', {}, 'POST', { driverId, latitude: driverLocation.lat, longitude: driverLocation.lon });
+                    },
+                    (error) => console.error('Geolocation error:', error),
+                    { enableHighAccuracy: true }
+                );
+            };
+
+            getLocation(); // Get location immediately
+            window.locationIntervalId = setInterval(getLocation, 60000); // And then every minute
+        }
+        
         function createOrderCardHTML(order) {
             const isStartDisabled = !['שויך', 'טעון'].includes(order.status);
             const isCompleteDisabled = order.status !== 'בדרך';
-            const statusInfo = {
-                'שויך': { text: 'שויך', color: 'bg-blue-400' }, 'טעון': { text: 'טעון', color: 'bg-purple-500' },
-                'בדרך': { text: 'בדרך', color: 'bg-yellow-500' }, 'הושלם': { text: 'הושלם', color: 'bg-green-500' },
-                'חדש': { text: 'חדש', color: 'bg-gray-400' },
-            };
+            const statusInfo = { 'שויך': { text: 'שויך', color: 'bg-blue-400' }, 'טעון': { text: 'טעון', color: 'bg-purple-500' }, 'בדרך': { text: 'בדרך', color: 'bg-yellow-500' }, 'הושלם': { text: 'הושלם', color: 'bg-green-500' } };
             const currentStatus = statusInfo[order.status] || { text: order.status, color: 'bg-gray-500' };
 
-            // FIX: Using customerPhone instead of phone
             return `
             <div class="order-card" data-order-id="${order.orderId}" data-lat="${order.latitude}" data-lon="${order.longitude}" data-status="${order.status}">
-                <div class="card-header">
-                    <h2>${order.customerName}</h2>
-                    <span class="status-badge ${currentStatus.color}">${currentStatus.text}</span>
-                </div>
-                <div id="map-${order.orderId}" class="map-canvas"></div>
-                <div class="metrics distance-metric"><i class="fas fa-spinner fa-spin"></i> מחשב מרחק...</div>
+                <div class="card-header"><h2>${order.customerName}</h2><span class="status-badge ${currentStatus.color}">${currentStatus.text}</span></div>
+                <div id="map-${order.orderId}" class="map-canvas"><p class="text-center pt-24 text-gray-500"><i class="fas fa-spinner fa-spin"></i> טוען מפה...</p></div>
+                <div id="metrics-${order.orderId}" class="metrics">מחשב מסלול...</div>
                 <div class="card-content">
-                    <div class="info-item">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>${order.address}</span>
-                    </div>
-                     <div class="info-item">
-                        <i class="fas fa-phone"></i>
-                        <a href="tel:${order.customerPhone || ''}">${order.customerPhone || 'מספר לא זמין'}</a>
-                    </div>
-                     <div class="info-item">
-                        <i class="fas fa-clock"></i>
-                        <span>שעת הזמנה: ${order.orderTime || 'לא צוינה'}</span>
-                    </div>
+                    <div class="info-item"><i class="fas fa-map-marker-alt"></i><span>${order.address}</span></div>
+                    <div class="info-item"><i class="fas fa-phone"></i><a href="tel:${order.customerPhone || ''}">${order.customerPhone || 'מספר לא זמין'}</a></div>
+                    <div class="info-item"><i class="fas fa-clock"></i><span>שעת הזמנה: ${order.orderTime || 'לא צוינה'}</span></div>
                 </div>
                 <div class="card-actions">
                     <button class="action-btn start" onclick="updateOrderStatus(event, '${order.orderId}', 'בדרך')" ${isStartDisabled ? 'disabled' : ''}><i class="fas fa-route"></i> התחל</button>
@@ -277,145 +382,12 @@
         }
         
         function shareOnWhatsApp(phone, customerName) {
-            if (!phone) {
-                alert('לא קיים מספר טלפון עבור לקוח זה.');
-                return;
-            }
+            if (!phone) { alert('לא קיים מספר טלפון עבור לקוח זה.'); return; }
             let cleanPhone = String(phone).replace(/[^0-9]/g, '');
-            if (cleanPhone.startsWith('0')) {
-                cleanPhone = '972' + cleanPhone.substring(1);
-            } else if (!cleanPhone.startsWith('972')) {
-                cleanPhone = '972' + cleanPhone;
-            }
-            
+            if (cleanPhone.startsWith('0')) cleanPhone = '972' + cleanPhone.substring(1);
             const driverId = sessionStorage.getItem('driverId') || 'הנהג';
             const message = `שלום ${customerName}, אני ${driverId} מחברת ח.סבן חומרי בנין בדרך אליך.\nאשמח אם תשתף/י אותי במיקום המדויק.`;
-            const encodedMessage = encodeURIComponent(message);
-            
-            const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMessage}`;
-            window.open(whatsappUrl, '_blank');
-        }
-
-        async function updateOrderStatus(event, orderId, newStatus) {
-            const btn = event.currentTarget;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            try {
-                await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { status: newStatus } });
-                fetchDriverOrders(sessionStorage.getItem('driverId'));
-            } catch (error) {
-                console.error("Error updating status:", error);
-                btn.disabled = false;
-            }
-        }
-
-        // --- Mapping & Location ---
-        function initializeOrderMap(container, lat, lon, customerName) {
-            const map = L.map(container, { center: [lat, lon], zoom: 15, scrollWheelZoom: false, dragging: false, zoomControl: false });
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            L.marker([lat, lon]).addTo(map).bindPopup(customerName);
-        }
-
-        // FIX: More robust location tracking and distance calculation logic
-        function startLocationTracking(driverId) {
-            if (locationIntervalId) clearInterval(locationIntervalId);
-
-            const getLocation = () => {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const isFirstLocation = !driverLocation;
-                        driverLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
-
-                        // If it's the first time getting location, immediately update distances
-                        if (isFirstLocation) {
-                            const ordersOnScreen = Array.from(document.querySelectorAll('.order-card')).map(card => ({
-                                orderId: card.dataset.orderId, latitude: card.dataset.lat, longitude: card.dataset.lon
-                            }));
-                            if (ordersOnScreen.length > 0) {
-                                calculateAndDisplayDistances(ordersOnScreen);
-                            }
-                        }
-                        
-                        // Send location data to server
-                        apiFetch('updateDriverLocation', {}, 'POST', { driverId, latitude: driverLocation.lat, longitude: driverLocation.lon });
-                    },
-                    (error) => console.error('Geolocation error:', error),
-                    { enableHighAccuracy: true }
-                );
-            };
-
-            getLocation(); // Get location immediately
-            locationIntervalId = setInterval(getLocation, 60000); // And then every minute
-        }
-        
-        function updateAllDistances(orders) {
-             // This function is now simpler. It just runs the calculation if location is available.
-             // Responsibility for getting location is now on startLocationTracking.
-            if (driverLocation) {
-                calculateAndDisplayDistances(orders);
-            }
-        }
-
-        function calculateAndDisplayDistances(orders) {
-            orders.forEach(order => {
-                const orderEl = document.querySelector(`[data-order-id="${order.orderId}"]`);
-                const orderLat = parseFloat(order.latitude);
-                const orderLon = parseFloat(order.longitude);
-
-                if (orderEl && driverLocation && !isNaN(orderLat) && !isNaN(orderLon)) {
-                    const distance = calculateDistance(driverLocation.lat, driverLocation.lon, orderLat, orderLon);
-                    const time = (distance / 40) * 60; // Assume avg speed of 40km/h
-                    const distanceEl = orderEl.querySelector('.distance-metric');
-                    if (distanceEl) {
-                        distanceEl.innerHTML = `<i class="fas fa-road"></i> ${distance.toFixed(1)} ק"מ | <i class="fas fa-stopwatch"></i> ~${Math.round(time)} דקות`;
-                    }
-                } else if(orderEl) {
-                     const distanceEl = orderEl.querySelector('.distance-metric');
-                     if(distanceEl) distanceEl.innerHTML = `<i class="fas fa-road"></i> מרחק לא ידוע`;
-                }
-            });
-        }
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        }
-
-        // --- PWA & Logout ---
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            document.getElementById('installBtn').style.display = 'block';
-        });
-
-        async function onInstall() {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                await deferredPrompt.userChoice;
-                deferredPrompt = null;
-                document.getElementById('installBtn').style.display = 'none';
-            }
-        }
-
-        function onLogout() {
-            const driverId = sessionStorage.getItem('driverId');
-            if (window.OneSignal && !oneSignalFailed) OneSignal.logout();
-            if (locationIntervalId) clearInterval(locationIntervalId);
-            sessionStorage.removeItem('driverId');
-            switchView('loginView');
-        }
-
-        async function initializeNotifications(driverId) {
-            if(oneSignalFailed) return;
-            try {
-                await OneSignal.login(driverId);
-                const playerId = OneSignal.User.onesignalId;
-                if (playerId) await apiFetch('registerDevice', {}, 'POST', { driverId, deviceId: playerId });
-            } catch (error) { console.error("OneSignal login failed:", error); }
+            window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`, '_blank');
         }
 
         function switchView(viewId) {
