@@ -79,8 +79,7 @@
     </div>
     
     <script>
-        // *** IMPORTANT ***
-        // After deploying the updated Code.gs script, replace the URL below with your new Web App URL.
+        // *** UNIFIED API URL ***
         const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
 
         const loginView = document.getElementById('loginView');
@@ -232,7 +231,7 @@
                 orderList.innerHTML = '<p>אין לך משימות להיום.</p>';
                 return;
             }
-            orderList.innerHTML = orders.sort((a,b) => a.orderTime.localeCompare(b.orderTime)).map(order => `
+            orderList.innerHTML = orders.sort((a,b) => (a.orderTime || "00:00").localeCompare(b.orderTime || "00:00")).map(order => `
                 <div class="order-card" data-status="${order.status}">
                     <div class="card-content">
                         <h2>${order.customerName}</h2>
@@ -269,3 +268,4 @@
     </script>
 </body>
 </html>
+
