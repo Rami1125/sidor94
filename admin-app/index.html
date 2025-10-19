@@ -38,9 +38,17 @@
         .scheduler-column { background-color: #f0f3f5; border-radius: var(--border-radius); padding: 15px; display: flex; flex-direction: column; }
         .scheduler-column h3 { text-align: center; padding-bottom: 10px; border-bottom: 2px solid var(--primary-color); margin-bottom: 15px; position: sticky; top: 0; background-color: #f0f3f5; z-index: 10;}
         .order-pool, .driver-lane { min-height: 300px; list-style-type: none; padding: 0; flex-grow: 1; overflow-y: auto; max-height: 60vh; }
-        .schedule-card { background: var(--white); padding: 10px 15px; border-radius: 5px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: grab; border-right: 4px solid var(--secondary-color); }
-        .schedule-card p { margin: 2px 0; font-size: 0.9em; }
-        .schedule-card .card-customer { font-weight: 500; font-size: 1em; }
+        .schedule-card { 
+            background: var(--white); padding: 10px 15px; border-radius: 5px; 
+            margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            cursor: grab; border-right: 4px solid var(--secondary-color);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .schedule-card-details p { margin: 2px 0; font-size: 0.9em; }
+        .schedule-card-details .card-customer { font-weight: 500; font-size: 1em; }
+        .card-actions { display: flex; align-items: center; gap: 5px; }
+        .action-button { background: none; border: none; font-size: 1.2rem; color: var(--secondary-color); cursor: pointer; padding: 5px;}
+        .action-button:hover { color: var(--primary-color); }
         .ghost-card { background: #cce5ff; opacity: 0.7; border: 2px dashed var(--primary-color); }
         .form-group { margin-bottom: 15px; position: relative; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
@@ -53,10 +61,17 @@
         .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); max-height: 80vh; display: flex; flex-direction: column;}
         .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; }
         .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
-        .history-table-container { overflow-y: auto; flex-grow: 1; }
-        #historyContent table { width: 100%; border-collapse: collapse; }
-        #historyContent th, #historyContent td { padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; }
-        #historyContent th { background-color: #f2f2f2; }
+        .table-container { overflow-y: auto; flex-grow: 1; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; }
+        th { background-color: #f2f2f2; }
+        #commentsContainer { max-height: 45vh; overflow-y: auto; background-color: #f1f5f9; border-radius: 8px; padding: 10px; margin-bottom: 15px;}
+        .comment { background-color: var(--white); border-radius: 12px; padding: 10px 15px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .comment p { margin: 0; }
+        .comment .author { font-weight: 500; font-size: 0.9rem; color: var(--primary-color); margin-bottom: 4px; }
+        #commentForm { display: flex; gap: 10px; }
+        #commentForm input { flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; }
+        #commentForm button { width: auto; }
     </style>
 </head>
 <body>
@@ -96,19 +111,25 @@
                 </div>
                 <div class="card">
                     <h2><i class="fas fa-history"></i> ארכיון</h2>
-                    <button id="showHistoryBtn" style="width: 100%;"><i class="fas fa-history"></i> הצג היסטוריית הזמנות</button>
+                    <button id="showHistoryBtn" style="width: 100%; margin-bottom: 10px;"><i class="fas fa-history"></i> היסטוריית הזמנות</button>
+                    <button id="showLogsBtn" style="width: 100%; background-color: var(--info);"><i class="fas fa-clipboard-list"></i> תיעוד צפיות</button>
                 </div>
             </div>
         </div>
     </div>
     
-    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>היסטוריית הזמנות</h2><div id="historyContent"></div></div></div>
+    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>היסטוריית הזמנות</h2><div id="historyContent" class="table-container"></div></div></div>
     <div id="analyticsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוחות וביצועים</h2><div id="analyticsContent"></div></div></div>
+    <div id="logsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תיעוד צפיות במסמכים</h2><div id="logsContent" class="table-container"></div></div></div>
+    <div id="pdfModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תצוגת מסמך</h2><iframe id="pdfViewer" style="width:100%; height: 70vh; border:none;"></iframe></div></div>
+    <div id="commentsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>הערות להזמנה</h2><div id="commentsContent"></div></div></div>
 
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
         
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
+        const currentUser = 'Admin';
+        const currentRole = 'Administrator';
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
         const cities = ["תל אביב-יפו", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה", "בני ברק", "באר שבע", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה", "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "רעננה", "רמלה", "גבעתיים", "הוד השרון"];
 
@@ -206,7 +227,7 @@
             logEvent("Updating map...");
             if (!liveMap) return;
             try {
-                const { drivers } = await apiFetch('getLiveMapData');
+                const { drivers, pendingOrders } = await apiFetch('getLiveMapData');
                 
                 Object.values(driverMarkers).forEach(m => m.remove());
                 orderMarkersLayer.clearLayers();
@@ -281,12 +302,12 @@
             try {
                 const historyData = await apiFetch('getHistory');
                 if (!historyData.length) { content.innerHTML = '<p>לא נמצאו נתוני היסטוריה.</p>'; return; }
-                let tableHTML = `<div class="history-table-container"><table><thead><tr><th>זמן</th><th>מזהה</th><th>לקוח</th><th>נהג</th><th>סטטוס</th></tr></thead><tbody>`;
+                let tableHTML = `<table><thead><tr><th>זמן</th><th>מזהה</th><th>לקוח</th><th>נהג</th><th>סטטוס</th></tr></thead><tbody>`;
                 historyData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
                            .forEach(record => {
                     tableHTML += `<tr><td>${new Date(record.timestamp).toLocaleString('he-IL')}</td><td>${record.orderId || 'N/A'}</td><td>${record.customerName || 'N/A'}</td><td>${record.driverId || '-'}</td><td>${record.status || 'N/A'}</td></tr>`;
                 });
-                content.innerHTML = tableHTML + `</tbody></table></div>`;
+                content.innerHTML = tableHTML + `</tbody></table>`;
             } catch (error) {
                 content.innerHTML = `<p style="color:red;">שגיאה בטעינת ההיסטוריה: ${error.message}</p>`;
             }
@@ -314,6 +335,99 @@
                 content.innerHTML = `<p style="color:red;">שגיאה בטעינת דוחות: ${error.message}</p>`;
             }
         }
+
+        async function openLogsModal() {
+            const { content } = openModal('logsModal', 'logsContent', 'טוען תיעוד...');
+            try {
+                const logsData = await apiFetch('getLogs');
+                if (!logsData.length) { content.innerHTML = '<p>לא נמצאו נתוני תיעוד.</p>'; return; }
+                let tableHTML = `<table><thead><tr><th>זמן</th><th>משתמש</th><th>תפקיד</th><th>מזהה הזמנה</th><th>פעולה</th><th>פתח מסמך</th></tr></thead><tbody>`;
+                logsData.sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp))
+                           .forEach(log => {
+                    tableHTML += `<tr>
+                        <td>${new Date(log.Timestamp).toLocaleString('he-IL')}</td>
+                        <td>${log.User || 'N/A'}</td>
+                        <td>${log.Role || 'N/A'}</td>
+                        <td>${log.OrderID || '-'}</td>
+                        <td>${log.Action || 'N/A'}</td>
+                        <td><button class="action-button" style="padding: 2px 8px; font-size: 0.8em;" onclick="openPdfModal('${log.OrderID}')" title="פתח PDF"><i class="fas fa-file-pdf"></i></button></td>
+                    </tr>`;
+                });
+                content.innerHTML = tableHTML + `</tbody></table>`;
+            } catch (error) {
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת התיעוד: ${error.message}</p>`;
+            }
+        }
+        
+        async function openPdfModal(orderId) {
+            if (!orderId || orderId === '-') {
+                alert('אין מזהה הזמנה זמין.');
+                return;
+            }
+            const pdfModal = document.getElementById('pdfModal');
+            const pdfViewer = document.getElementById('pdfViewer');
+            pdfViewer.src = ''; 
+            pdfModal.style.display = 'block';
+
+            try {
+                const url = await apiFetch('getOrderPDF', { orderId });
+                if (url) {
+                    pdfViewer.src = url;
+                    await apiFetch('logPDFView', {}, 'POST', { user: currentUser, role: currentRole, orderId });
+                } else {
+                    alert('לא נמצא מסמך PDF עבור הזמנה זו.');
+                    pdfModal.style.display = 'none';
+                }
+            } catch (error) {
+                alert('שגיאה בטעינת המסמך: ' + error.message);
+                pdfModal.style.display = 'none';
+            }
+        }
+
+        async function openCommentsModal(orderId) {
+            const { content } = openModal('commentsModal', 'commentsContent', 'טוען הערות...');
+            try {
+                const comments = await apiFetch('getComments', { orderId });
+                content.innerHTML = `
+                    <div id="commentsContainer">
+                        ${(comments && comments.length > 0) ? comments.map(c => `
+                            <div class="comment">
+                                <p class="author">${c.author || 'לא ידוע'}</p>
+                                <p>${c.text || ''}</p>
+                            </div>`).join('') : '<p>אין הערות להזמנה זו.</p>'}
+                    </div>
+                    <form id="commentForm">
+                        <input type="text" id="commentInput" placeholder="הקלד הערה..." required>
+                        <button type="submit">שלח</button>
+                    </form>
+                `;
+                document.getElementById('commentForm').addEventListener('submit', (e) => handleCommentSubmit(e, orderId));
+            } catch (error) {
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת הערות: ${error.message}</p>`;
+            }
+        }
+
+        async function handleCommentSubmit(event, orderId) {
+            event.preventDefault();
+            const input = document.getElementById('commentInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const button = event.target.querySelector('button');
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                await apiFetch('postComment', {}, 'POST', { orderId, author: currentUser, text });
+                input.value = '';
+                await openCommentsModal(orderId);
+            } catch (error) {
+                alert('שגיאה בשליחת הערה: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'שלח';
+            }
+        }
         
         document.addEventListener('DOMContentLoaded', async () => {
             logEvent("DOM Loaded. Initializing app.", "success");
@@ -326,6 +440,7 @@
 
             document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
             document.getElementById('showAnalyticsBtn').addEventListener('click', openAnalyticsModal);
+            document.getElementById('showLogsBtn').addEventListener('click', openLogsModal);
             document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
             document.querySelectorAll('.close-button').forEach(btn => {
                 btn.onclick = () => btn.closest('.modal').style.display = 'none';
@@ -336,7 +451,22 @@
         });
 
         function createScheduleCard(order) {
-            return `<li class="schedule-card" data-order-id="${order.orderId}"><p class="card-customer">${order.customerName || 'N/A'}</p><p><i class="fas fa-map-marker-alt"></i> ${order.address || 'N/A'}</p><p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p></li>`;
+            return `
+                <li class="schedule-card" data-order-id="${order.orderId}">
+                    <div class="schedule-card-details">
+                        <p class="card-customer">${order.customerName || 'N/A'}</p>
+                        <p><i class="fas fa-map-marker-alt"></i> ${order.address || 'N/A'}</p>
+                        <p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p>
+                    </div>
+                    <div class="card-actions">
+                         <button class="action-button" onclick="openCommentsModal('${order.orderId}')" title="הצג הערות">
+                            <i class="fas fa-comments"></i>
+                        </button>
+                        <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                    </div>
+                </li>`;
         }
     </script>
 </body>
