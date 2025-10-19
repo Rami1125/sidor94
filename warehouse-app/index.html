@@ -7,9 +7,6 @@
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -18,53 +15,30 @@
 
     <style>
         :root {
-            --primary-color: #007bff;
-            --success: #28a745;
-            --warning: #ffc107;
+            --primary-color: #007bff; --success: #28a745; --warning: #ffc107;
             --shadow-light: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
         }
-        html, body {
-            height: 100%;
-            overflow: hidden;
-        }
-        body { 
-            font-family: 'Rubik', sans-serif; 
-            margin: 0; 
-            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
-            color: #333;
-        }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: 'Rubik', sans-serif; margin: 0; background: linear-gradient(135deg, #f5f7fa, #c3cfe2); }
         .view { display: none !important; height: 100vh; }
         .view.active { display: flex !important; flex-direction: column; }
-        
         .glass-card {
-            background: rgba(255, 255, 255, 0.4);
-            box-shadow: var(--shadow-light);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.4); box-shadow: var(--shadow-light); backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.6);
         }
-
         #loginView { justify-content: center; align-items: center; }
         .login-card { padding: 40px; text-align: center; width: 90%; max-width: 400px; }
-        .login-card h2 { font-size: 1.8rem; margin-bottom: 20px; }
-        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: none; border-radius: 12px; font-size: 1.2rem; text-align: center; background-color: rgba(255,255,255,0.5); color: #333; }
-        .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color:white; border:none; border-radius: 12px; font-size: 1.2rem; cursor: pointer; transition: transform 0.2s; }
-        .login-card button:hover { transform: scale(1.05); }
-
+        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: none; border-radius: 12px; font-size: 1.2rem; text-align: center; }
+        .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color:white; border:none; border-radius: 12px; font-size: 1.2rem; cursor: pointer; }
         .app-header { padding: 15px 20px; z-index: 10; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        #welcomeMessage { margin:0; font-size: 1.5em; }
-        
         main { flex-grow: 1; overflow-y: auto; padding: 0 15px; }
         .order-section { margin-bottom: 30px; }
         .order-section h2 { padding-bottom: 10px; display: flex; align-items: center; gap: 10px; font-size: 1.5rem; }
         .order-card { margin: 10px 0; padding: 20px; }
-        .order-card h4 { font-size: 1.2rem; margin-bottom: 10px; }
-        .order-card p { opacity: 0.8; }
         .order-card button { width: 100%; padding: 12px; border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 1em; margin-top: 15px; }
         .btn-acknowledge { background-color: var(--success); }
         .btn-load { background-color: var(--warning); }
-        button:disabled { background-color: #999; cursor: not-allowed; opacity: 0.7; }
+        button:disabled { background-color: #999; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -80,9 +54,7 @@
     <div id="mainView" class="view">
         <header class="app-header glass-card" style="margin: 15px; height: 70px;">
             <h1 id="welcomeMessage"></h1>
-            <button id="logoutBtn" style="background:none; border:none; color:#333; font-size: 1.5em;">
-                <i class="fas fa-sign-out-alt"></i>
-            </button>
+            <button id="logoutBtn" style="background:none; border:none; color:#333; font-size: 1.5em;"><i class="fas fa-sign-out-alt"></i></button>
         </header>
         <main>
             <div id="newOrders" class="order-section">
@@ -97,76 +69,74 @@
     </div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzZlYDN9AOKwRzxUA1e3St6GWMmDZ93mrNMxetjwC03N6O6jjfBClzhUL3tWnrmgfSF/exec';
+        // *** IMPORTANT ***
+        // After deploying the updated Code.gs script, replace the URL below with your new Web App URL.
+        const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
         
         const loginView = document.getElementById('loginView');
         const mainView = document.getElementById('mainView');
         const loginBtn = document.getElementById('loginBtn');
         const logoutBtn = document.getElementById('logoutBtn');
-        const managerIdInput = document.getElementById('managerIdInput');
-        const welcomeMessage = document.getElementById('welcomeMessage');
         const newOrdersList = document.getElementById('newOrdersList');
         const inProgressOrdersList = document.getElementById('inProgressOrdersList');
 
-        let currentManager = null;
-        let refreshInterval;
-        let knownOrderIds = new Set();
-
-        function logEvent(message, type = 'info', data = '') {
-            console.log(`[${type.toUpperCase()}] ${new Date().toLocaleTimeString()}: ${message}`, data);
+        let currentManager = null, refreshInterval, knownOrderIds = new Set();
+        
+        async function apiFetch(action, params = {}, method = 'GET', body = null) {
+            const url = new URL(API_URL);
+            if (method === 'GET') {
+                url.searchParams.append('action', action);
+                Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+            }
+            const options = { method };
+            if (method === 'POST') {
+                options.body = JSON.stringify({ action, data: body });
+                options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
+            }
+            const response = await fetch(url, options);
+            if (!response.ok) throw new Error(`Network error`);
+            const result = await response.json();
+            if (result.status !== 'success') throw new Error(result.message);
+            return result.data;
         }
 
         window.OneSignalDeferred = window.OneSignalDeferred || [];
-        OneSignalDeferred.push(async function(OneSignal) {
-            try {
-                await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
-                initializeApp(false);
-            } catch (e) {
-                logEvent("OneSignal init failed", 'error', e);
-                initializeApp(true);
-            }
+        OneSignalDeferred.push(async (OneSignal) => {
+            await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
+            initializeApp();
         });
 
-        // --- FIX: Restored full function implementations ---
-        function initializeApp(oneSignalFailed = false) {
-            logEvent("Initializing app...");
-            loginBtn.addEventListener('click', () => onLogin(oneSignalFailed));
+        function initializeApp() {
+            loginBtn.addEventListener('click', onLogin);
             logoutBtn.addEventListener('click', onLogout);
             const loggedInManager = JSON.parse(sessionStorage.getItem('warehouseManager'));
-            if (loggedInManager) {
-                initApp(loggedInManager, oneSignalFailed);
-            } else {
-                switchView('loginView');
-            }
+            if (loggedInManager) initApp(loggedInManager);
         }
         
-        function onLogin(oneSignalFailed) {
-            const managerId = managerIdInput.value.trim().toUpperCase();
+        function onLogin() {
+            const managerId = document.getElementById('managerIdInput').value.trim().toUpperCase();
             if(!managerId) return;
-            const managerData = { id: managerId, name: managerId === 'OREN' ? 'אורן' : 'תמיר', warehouse: managerId === 'OREN' ? 'החרש' : 'התלמיד' };
+            const managerData = { id: managerId, name: managerId, warehouse: managerId === 'OREN' ? 'החרש' : 'התלמיד' };
             sessionStorage.setItem('warehouseManager', JSON.stringify(managerData));
-            initApp(managerData, oneSignalFailed);
+            initApp(managerData);
         }
 
         function onLogout() {
-            logEvent("User logged out");
             sessionStorage.removeItem('warehouseManager');
             if(refreshInterval) clearInterval(refreshInterval);
             if(window.OneSignal) OneSignal.logout();
             switchView('loginView');
         }
 
-        function initApp(manager, oneSignalFailed = false) {
-            logEvent(`Initializing session for manager: ${manager.id}`, 'success');
+        function initApp(manager) {
             currentManager = manager;
-            welcomeMessage.textContent = `מחסן ${manager.warehouse} | ברוך הבא ${manager.name}`;
+            document.getElementById('welcomeMessage').textContent = `מחסן ${manager.warehouse} | ${manager.name}`;
             switchView('mainView');
-            if (!oneSignalFailed) initializeNotifications(manager.id);
+            initializeNotifications(manager.id);
             startPolling();
         }
         
         function startPolling() {
-            logEvent("Starting to poll for orders...");
             if (refreshInterval) clearInterval(refreshInterval);
             const poll = async () => { await fetchWarehouseOrders(); };
             poll();
@@ -175,20 +145,11 @@
 
         async function fetchWarehouseOrders() {
             if (!currentManager) return;
-            logEvent(`Fetching orders for warehouse: ${currentManager.warehouse}...`);
             try {
-                const response = await fetch(`${API_URL}?action=getWarehouseOrders&warehouse=${currentManager.warehouse}`);
-                if (!response.ok) throw new Error(`Server returned error: ${response.status}`);
-                const result = await response.json();
-                if (result.status === 'success' && Array.isArray(result.data)) {
-                    logEvent(`Successfully fetched ${result.data.length} orders.`, 'success');
-                    renderOrders(result.data);
-                } else {
-                    throw new Error(result.message || 'Invalid data format from server');
-                }
+                const orders = await apiFetch('getWarehouseOrders', { warehouse: currentManager.warehouse });
+                renderOrders(orders);
             } catch (error) {
-                logEvent('Error fetching orders', 'error', error);
-                newOrdersList.innerHTML = `<p style="color:red;">שגיאת תקשורת עם השרת.</p>`;
+                newOrdersList.innerHTML = `<p style="color:red;">שגיאת תקשורת עם השרת: ${error.message}</p>`;
             }
         }
 
@@ -196,15 +157,12 @@
             newOrdersList.innerHTML = '';
             inProgressOrdersList.innerHTML = '';
             
-            const NEW_ORDER_STATUSES = ['ממתין לאישור מחסן', 'חדש', 'חדשה'];
-            const newOrders = orders.filter(o => NEW_ORDER_STATUSES.includes(o.status));
+            const newOrders = orders.filter(o => ['חדש', 'ממתין לאישור מחסן'].includes(o.status));
             const inProgress = orders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
 
-            if (knownOrderIds.size > 0) {
-                const newIncomingIds = new Set(newOrders.map(o => o.orderId));
-                if ([...newIncomingIds].some(id => !knownOrderIds.has(id))) {
-                    playNotificationSound();
-                }
+            const newIncomingIds = new Set(newOrders.map(o => o.orderId));
+            if (knownOrderIds.size > 0 && [...newIncomingIds].some(id => !knownOrderIds.has(id))) {
+                playNotificationSound();
             }
             knownOrderIds = new Set(orders.map(o => o.orderId));
 
@@ -218,15 +176,15 @@
         function createOrderCard(order, type) {
             let buttonHtml = '';
             if (type === 'acknowledge') {
-                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.orderId}', 'באיסוף', 'acknowledge')">אשר קבלת הזמנה</button>`;
+                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.orderId}', 'באיסוף')">אשר קבלה</button>`;
             } else if (order.status === 'באיסוף') {
-                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.orderId}', 'טעון', 'load')">סמן כטעון</button>`;
+                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.orderId}', 'טעון')">סמן כטעון</button>`;
             } else {
-                 buttonHtml = `<p style="color:var(--success); font-weight:bold; text-align:center; margin-top: 15px;">הועמס בהצלחה ✔️</p>`;
+                 buttonHtml = `<p style="color:var(--success); font-weight:bold; text-align:center;">הועמס ✔️</p>`;
             }
 
             return `
-                <div class="order-card glass-card" data-order-id="${order.orderId}">
+                <div class="order-card glass-card">
                     <h4>${order.customerName} (${order.orderId.substring(0,6)})</h4>
                     <p><strong>כתובת:</strong> ${order.address}</p>
                     <p><strong>שעה:</strong> ${order.orderTime}</p>
@@ -234,49 +192,25 @@
                 </div>`;
         }
         
-        async function updateOrderStatus(event, orderId, newStatus, type) {
-            logEvent(`Updating order ${orderId} to status: ${newStatus}`);
+        async function updateOrderStatus(event, orderId, newStatus) {
             const btn = event.target;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעדכן...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
              try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } }),
-                    redirect: 'follow'
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-
-                const result = await response.json();
-                if (result.status !== 'success') {
-                    throw new Error(result.message || 'Unknown server error');
-                }
-
-                logEvent(`Update request sent for order ${orderId}.`, 'success');
-                setTimeout(fetchWarehouseOrders, 1000);
+                await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { status: newStatus } });
+                setTimeout(fetchWarehouseOrders, 500);
             } catch (error) {
-                logEvent(`Error updating status for order ${orderId}`, 'error', error);
+                console.error(`Error updating status for order ${orderId}`, error);
                 btn.disabled = false;
-                btn.innerHTML = 'שגיאה! נסה שוב';
-                setTimeout(() => {
-                    btn.innerHTML = type === 'acknowledge' ? 'אשר קבלת הזמנה' : 'סמן כטעון';
-                }, 3000);
+                btn.innerHTML = 'שגיאה!';
             }
         }
         
         async function playNotificationSound() {
             try {
                 await Tone.start();
-                const synth = new Tone.Synth().toDestination();
-                synth.triggerAttackRelease("C5", "8n");
-            } catch(e) {
-                console.error('Could not play sound', e);
-            }
+                new Tone.Synth().toDestination().triggerAttackRelease("C5", "8n");
+            } catch(e) { console.error('Could not play sound', e); }
         }
         
         function switchView(viewId) {
@@ -289,21 +223,12 @@
                 await OneSignal.Notifications.requestPermission();
                 await OneSignal.login(managerId);
                 const playerId = OneSignal.User.onesignalId;
-                if (playerId) {
-                    await fetch(API_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        body: JSON.stringify({ 
-                            action: 'registerWarehouseDevice', 
-                            data: { managerId, deviceId: playerId } 
-                        })
-                    });
-                }
-             } catch (e) {
-                 logEvent("Error initializing notifications", 'error', e);
-             }
+                if (playerId) await apiFetch('registerWarehouseDevice', {}, 'POST', { managerId, deviceId: playerId });
+             } catch (e) { console.error("Error initializing notifications", e); }
         }
+
+        // Initial load
+        initializeApp();
     </script>
 </body>
 </html>
-
