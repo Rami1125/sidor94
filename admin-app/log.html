@@ -1,0 +1,165 @@
+<!-- ... existing code ... -->
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --background-color: #f8f9fa;
+            --text-color: #343a40;
+            --white: #ffffff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+        }
+        body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 20px; color: var(--text-color); }
+        .container { max-width: 1800px; margin: 0 auto; }
+        .header-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { text-align: center; color: var(--primary-color); flex-grow: 1; }
+        h2 { text-align: center; margin-bottom: 20px; color: var(--primary-color); }
+        .main-layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
+        .card { background: var(--white); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 20px; }
+        #liveMap { height: 400px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; z-index: 5; }
+        .scheduler-container { display: grid; grid-template-columns: 250px repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; min-height: 400px; }
+        .scheduler-column { background-color: #f0f3f5; border-radius: var(--border-radius); padding: 15px; display: flex; flex-direction: column; }
+        .scheduler-column h3 { text-align: center; padding-bottom: 10px; border-bottom: 2px solid var(--primary-color); margin-bottom: 15px; position: sticky; top: 0; background-color: #f0f3f5; z-index: 10;}
+        .order-pool, .driver-lane { min-height: 300px; list-style-type: none; padding: 0; flex-grow: 1; overflow-y: auto; max-height: 60vh; }
+        .schedule-card { 
+            background: var(--white); padding: 10px 15px; border-radius: 5px; 
+            margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            cursor: grab; border-right: 4px solid var(--secondary-color);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .schedule-card-details p { margin: 2px 0; font-size: 0.9em; }
+        .schedule-card-details .card-customer { font-weight: 500; font-size: 1em; }
+        .pdf-button { background: none; border: none; font-size: 1.2rem; color: var(--secondary-color); cursor: pointer; padding: 5px;}
+        .pdf-button:hover { color: var(--primary-color); }
+        .ghost-card { background: #cce5ff; opacity: 0.7; border: 2px dashed var(--primary-color); }
+        .form-group { margin-bottom: 15px; position: relative; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; box-sizing: border-box; }
+        .address-group { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); max-height: 80vh; display: flex; flex-direction: column;}
+        .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+        .table-container { overflow-y: auto; flex-grow: 1; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+<!-- ... existing code ... -->
+                <div class="card">
+                    <h2><i class="fas" fa-cogs"></i> כלים וניהול</h2>
+                    <button id="showHistoryBtn" style="width: 100%; margin-bottom: 10px;"><i class="fas fa-history"></i> היסטוריית הזמנות</button>
+                    <button id="showLogsBtn" style="width: 100%; background-color: var(--info);"><i class="fas fa-clipboard-list"></i> תיעוד צפיות</button>
+                    <button id="showAnalyticsBtn" style="width: 100%; background-color: var(--success); margin-top: 10px;"><i class="fas fa-chart-bar"></i> דאשבורד</button>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>היסטוריית הזמנות</h2><div id="historyContent" class="table-container"></div></div></div>
+    <div id="analyticsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוחות וביצועים</h2><div id="analyticsContent"></div></div></div>
+    <div id="logsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תיעוד צפיות במסמכים</h2><div id="logsContent" class="table-container"></div></div></div>
+    <div id="pdfModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תצוגת מסמך</h2><iframe id="pdfViewer" style="width:100%; height: 70vh; border:none;"></iframe></div></div>
+
+    <script>
+        const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
+        
+        // ... existing script ...
+
+        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
+        const currentUser = 'Admin'; // Hardcoded for admin panel
+        const currentRole = 'Administrator';
+        
+        // ... existing code ...
+        
+        async function openHistoryModal() {
+// ... existing code ...
+        }
+        
+        async function openAnalyticsModal() {
+// ... existing code ...
+        }
+
+        async function openLogsModal() {
+            const { modal, content } = openModal('logsModal', 'logsContent', 'טוען תיעוד...');
+            try {
+                const logsData = await apiFetch('getLogs');
+                if (!logsData.length) { content.innerHTML = '<p>לא נמצאו נתוני תיעוד.</p>'; return; }
+                let tableHTML = `<table><thead><tr><th>זמן</th><th>משתמש</th><th>תפקיד</th><th>מזהה הזמנה</th><th>פעולה</th><th>פתח מסמך</th></tr></thead><tbody>`;
+                logsData.sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp))
+                           .forEach(log => {
+                    tableHTML += `<tr>
+                        <td>${new Date(log.Timestamp).toLocaleString('he-IL')}</td>
+                        <td>${log.User || 'N/A'}</td>
+                        <td>${log.Role || 'N/A'}</td>
+                        <td>${log.OrderID || '-'}</td>
+                        <td>${log.Action || 'N/A'}</td>
+                        <td><button class="pdf-button" onclick="openPdfModal('${log.OrderID}')" title="פתח PDF"><i class="fas fa-file-pdf"></i></button></td>
+                    </tr>`;
+                });
+                content.innerHTML = tableHTML + `</tbody></table>`;
+            } catch (error) {
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת התיעוד: ${error.message}</p>`;
+            }
+        }
+        
+        async function openPdfModal(orderId) {
+            if (!orderId || orderId === '-') {
+                alert('אין מזהה הזמנה זמין.');
+                return;
+            }
+            const pdfModal = document.getElementById('pdfModal');
+            const pdfViewer = document.getElementById('pdfViewer');
+            pdfViewer.src = ''; // Clear previous content
+            pdfModal.style.display = 'block';
+
+            try {
+                const url = await apiFetch('getOrderPDF', { orderId });
+                if (url) {
+                    pdfViewer.src = url;
+                    // Log the view event
+                    await apiFetch('logPDFView', {}, 'POST', { user: currentUser, role: currentRole, orderId });
+                } else {
+                    alert('לא נמצא מסמך PDF עבור הזמנה זו.');
+                    pdfModal.style.display = 'none';
+                }
+            } catch (error) {
+                alert('שגיאה בטעינת המסמך: ' + error.message);
+                pdfModal.style.display = 'none';
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            // ... existing code ...
+            
+            document.getElementById('showLogsBtn').addEventListener('click', openLogsModal);
+            
+            // ... existing event listeners ...
+        });
+
+        function createScheduleCard(order) {
+            return `
+                <li class="schedule-card" data-order-id="${order.orderId}">
+                    <div class="schedule-card-details">
+                        <p class="card-customer">${order.customerName || 'N/A'}</p>
+                        <p><i class="fas fa-map-marker-alt"></i> ${order.address || 'N/A'}</p>
+                        <p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p>
+                    </div>
+                    <button class="pdf-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                </li>`;
+        }
+    </script>
+</body>
+</html>
