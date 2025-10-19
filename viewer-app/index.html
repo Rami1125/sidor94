@@ -62,8 +62,7 @@
     </div>
 
     <script>
-        // *** IMPORTANT ***
-        // After deploying the updated Code.gs script, replace the URL below with your new Web App URL.
+        // *** UNIFIED API URL ***
         const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
         
         const orderListContainer = document.getElementById('orderList');
@@ -134,7 +133,7 @@
             const filtered = orders.filter(o => Object.values(o).some(val => String(val).toLowerCase().includes(searchTerm)));
             orderListContainer.innerHTML = filtered.length === 0 
                 ? '<p class="text-center p-8">לא נמצאו הזמנות.</p>'
-                : filtered.sort((a,b) => (a.orderTime || "").localeCompare(b.orderTime || "")).map(order => `
+                : filtered.sort((a,b) => (a.orderTime || "00:00").localeCompare(b.orderTime || "00:00")).map(order => `
                     <div class="order-item-clickable p-3 border-b border-gray-200 cursor-pointer transition-all" onclick="openOrderModal('${order.orderId}')">
                         <p class="font-bold">${order.customerName}</p>
                         <div class="flex justify-between text-sm text-gray-600"><span>נהג: ${order.driverId || 'טרם שובץ'}</span><span>סטטוס: ${order.status}</span></div>
@@ -180,6 +179,7 @@
             
             try {
                 const order = await apiFetch('getOrderDetails', { orderId });
+                // FIX: Added a safety check `(order.comments || [])` to prevent errors if comments array is missing.
                 content.innerHTML = `
                     <div class="p-6 flex-shrink-0 border-b flex justify-between items-center">
                         <h2 class="text-2xl font-bold">פרטי הזמנה: ${order.customerName}</h2>
@@ -191,7 +191,7 @@
                         <div class="mt-4">
                             <h3 class="font-bold mb-2">הערות:</h3>
                             <div id="commentsContainer" class="space-y-2">
-                                ${order.comments.map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author}</p><p>${c.text}</p></div>`).join('')}
+                                ${(order.comments || []).map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author || ''}</p><p>${c.text || ''}</p></div>`).join('')}
                             </div>
                             <form id="commentForm" class="mt-4 flex gap-2">
                                 <input type="text" placeholder="הוסף הערה..." class="flex-grow p-2 border rounded">
@@ -214,8 +214,8 @@
             try {
                 await apiFetch('postComment', {}, 'POST', { orderId, author: userName, text });
                 input.value = '';
-                const order = await apiFetch('getOrderDetails', { orderId });
-                document.getElementById('commentsContainer').innerHTML = order.comments.map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author}</p><p>${c.text}</p></div>`).join('');
+                // Re-open (refresh) the modal content
+                openOrderModal(orderId);
             } catch (error) {
                 alert(`שגיאה בשליחת תגובה: ${error.message}`);
             }
@@ -228,3 +228,4 @@
     </script>
 </body>
 </html>
+
