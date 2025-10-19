@@ -9,48 +9,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCbVYMijMs8zH6m4iiSiBfn_RiCMuau9ps"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        :root {
-            --primary-color: #007BFF;
-            --background-color: #f4f7f9;
-            --shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-        }
-        body { 
-            font-family: 'Rubik', sans-serif; 
-            background-color: var(--background-color);
-        }
-        .kpi-card:hover { 
-            transform: translateY(-5px); 
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
-        }
-        .order-item-clickable:hover { 
-            background-color: #f9fafb; 
-            transform: translateX(-3px);
-            border-right-color: var(--primary-color);
-        }
-        #orderList::-webkit-scrollbar, #driverList::-webkit-scrollbar {
-            width: 6px;
-        }
-        #orderList::-webkit-scrollbar-thumb, #driverList::-webkit-scrollbar-thumb {
-            background-color: var(--primary-color);
-            border-radius: 3px;
-        }
-        .driver-list-item {
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .driver-list-item:hover {
-            background-color: #e0f2fe;
-        }
-        .comment { 
-            background-color: #f1f5f9; 
-            border-radius: 12px;
-        }
-        .comment.own { 
-            background-color: #e0f2fe; 
-        }
+        body { font-family: 'Rubik', sans-serif; background-color: #f4f7f9; }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); }
+        .order-item-clickable:hover { background-color: #f9fafb; }
+        .modal { transition: opacity 0.3s ease; }
+        .comment { background-color: #f1f5f9; border-radius: 12px; }
+        .comment.own { background-color: #e0f2fe; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -70,8 +38,8 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             <div class="lg:col-span-2 xl:col-span-3 bg-white p-6 rounded-lg shadow-md flex flex-col md:flex-row gap-4">
-                <div id="liveMap" class="h-96 md:h-[600px] w-full z-0 rounded-lg flex-grow bg-gray-200 flex items-center justify-center"><p class="text-gray-500">טוען מפה...</p></div>
-                <div class="flex-shrink-0 md:w-48">
+                <div id="liveMap" class="h-96 md:h-[600px] w-full z-0 rounded-lg flex-grow bg-gray-200"></div>
+                <div class="flex-shrink-0 md:w-56">
                     <h3 class="font-bold mb-2 text-lg">נהגים פעילים</h3>
                     <div id="driverList" class="h-48 md:h-[550px] overflow-y-auto pr-2 space-y-2"></div>
                 </div>
@@ -88,30 +56,40 @@
     </div>
 
     <div id="orderDetailsModal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden opacity-0">
-        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" id="modalContent"></div>
+        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" id="modalContent">
+            <!-- Modal content will be injected here -->
+        </div>
     </div>
 
     <script>
-        // --- FIX: Updated API_URL ---
-        const API_URL = 'https://script.google.com/macros/s/AKfycbwc6sMzYWKm61T1dv_HHrNCwKKYpovUIC8_Xy0ghhiB8UjtnEZKjZnjqMDNCRHKVIwB/exec';
+        // *** IMPORTANT ***
+        // After deploying the updated Code.gs script, replace the URL below with your new Web App URL.
+        const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
         
-        // DOM Elements
         const orderListContainer = document.getElementById('orderList');
         const driverListContainer = document.getElementById('driverList');
         const dateFilter = document.getElementById('dateFilter');
-        const kpiTotal = document.getElementById('kpi-total');
-        const kpiCompleted = document.getElementById('kpi-completed');
-        const kpiInProgress = document.getElementById('kpi-in-progress');
-        const kpiPending = document.getElementById('kpi-pending');
         const modal = document.getElementById('orderDetailsModal');
-        const modalContent = document.getElementById('modalContent');
-        const liveMapElement = document.getElementById('liveMap');
+        
+        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), currentOrders = [], userName = '';
 
-        let liveMap;
-        let driverMarkers = {};
-        let orderMarkers = [];
-        let currentOrders = [];
-        let userName = '';
+        async function apiFetch(action, params = {}, method = 'GET', body = null) {
+            const url = new URL(API_URL);
+            if (method === 'GET') {
+                url.searchParams.append('action', action);
+                Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+            }
+            const options = { method };
+            if (method === 'POST') {
+                options.body = JSON.stringify({ action, data: body });
+                options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
+            }
+            const response = await fetch(url, options);
+            if (!response.ok) throw new Error(`Network error for action: ${action}`);
+            const result = await response.json();
+            if (result.status !== 'success') throw new Error(result.message);
+            return result.data;
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             userName = localStorage.getItem('deliveryMasterViewerName') || prompt("נא להזין את שמך:") || 'אורח';
@@ -120,96 +98,133 @@
             initializeMap();
             fetchInitialData();
             setInterval(fetchInitialData, 30000);
-            document.getElementById('orderSearch').addEventListener('keyup', () => renderOrderList(currentOrders));
+            document.getElementById('orderSearch').addEventListener('input', () => renderOrderList(currentOrders));
             dateFilter.addEventListener('change', fetchInitialData);
         });
         
         async function fetchInitialData() {
             try {
-                const selectedDate = dateFilter.value;
-                const [ordersResponse, mapResponse] = await Promise.all([
-                    fetch(`${API_URL}?action=getOrders&date=${selectedDate}`),
-                    fetch(`${API_URL}?action=getLiveMapData`)
+                const [orders, mapData] = await Promise.all([
+                    apiFetch('getOrders', { date: dateFilter.value }),
+                    apiFetch('getLiveMapData')
                 ]);
-
-                if (!ordersResponse.ok) throw new Error(`שגיאת רשת בטעינת הזמנות (סטטוס: ${ordersResponse.status})`);
-                const ordersResult = await ordersResponse.json();
-                if (ordersResult.status === 'success') {
-                    currentOrders = ordersResult.data;
-                    updateKPIs(currentOrders);
-                    renderOrderList(currentOrders);
-                } else {
-                    // Throw the specific error from the server
-                    throw new Error(ordersResult.message || 'שגיאה לא ידועה מהשרת');
-                }
-
-                if (!mapResponse.ok) throw new Error(`שגיאת רשת בטעינת מפה (סטטוס: ${mapResponse.status})`);
-                const mapResult = await mapResponse.json();
-                if (mapResult.status === 'success') {
-                    updateMap(mapResult.data);
-                } else {
-                    throw new Error(mapResult.message || 'שגיאה בנתוני מפה מהשרת');
-                }
+                currentOrders = orders;
+                updateKPIs(orders);
+                renderOrderList(orders);
+                updateMap(mapData);
             } catch (error) {
-                console.error("Error fetching initial data:", error);
-                const errorMessage = `שגיאת תקשורת: ${error.message}. <br><b>זוהי ככל הנראה שגיאה בצד השרת (Code.gs).</b> ודא שהגרסה האחרונה שוגרה כראוי לפי המדריך.`;
-                orderListContainer.innerHTML = `<div class="p-4 text-center text-red-600 bg-red-100 border border-red-400 rounded-lg"><h3 class="font-bold text-lg">כשל בטעינת נתונים</h3><p class="text-sm">${errorMessage}</p></div>`;
+                console.error("Error fetching data:", error);
+                orderListContainer.innerHTML = `<div class="p-4 text-center text-red-600">${error.message}</div>`;
             }
         }
         
-        // All other functions (updateKPIs, renderOrderList, initializeMap, updateMap, etc.) remain unchanged from the previous correct version.
         function updateKPIs(orders) {
             const total = orders.length;
             const completed = orders.filter(o => o.status === 'הושלם').length;
             const inProgress = orders.filter(o => o.status === 'בדרך').length;
             const pending = total - completed - inProgress;
-            kpiTotal.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">סה"כ הזמנות</h3><p class="text-4xl font-bold text-blue-600">${total}</p>`;
-            kpiCompleted.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">הושלמו</h3><p class="text-4xl font-bold text-green-500">${completed}</p>`;
-            kpiInProgress.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">בדרך</h3><p class="text-4xl font-bold text-yellow-500">${inProgress}</p>`;
-            kpiPending.innerHTML = `<h3 class="text-lg font-semibold text-gray-500">ממתינות</h3><p class="text-4xl font-bold text-gray-600">${pending}</p>`;
+            document.getElementById('kpi-total').innerHTML = `<h3 class="font-semibold text-gray-500">סה"כ</h3><p class="text-4xl font-bold text-blue-600">${total}</p>`;
+            document.getElementById('kpi-completed').innerHTML = `<h3 class="font-semibold text-gray-500">הושלמו</h3><p class="text-4xl font-bold text-green-500">${completed}</p>`;
+            document.getElementById('kpi-in-progress').innerHTML = `<h3 class="font-semibold text-gray-500">בדרך</h3><p class="text-4xl font-bold text-yellow-500">${inProgress}</p>`;
+            document.getElementById('kpi-pending').innerHTML = `<h3 class="font-semibold text-gray-500">ממתינות</h3><p class="text-4xl font-bold text-gray-600">${pending}</p>`;
         }
+        
         function renderOrderList(orders) {
             const searchTerm = document.getElementById('orderSearch').value.toLowerCase();
-            const filteredOrders = orders.filter(o => Object.values(o).some(val => String(val).toLowerCase().includes(searchTerm)));
-            if (filteredOrders.length === 0) {
-                orderListContainer.innerHTML = '<p class="text-gray-500 text-center p-8">לא נמצאו הזמנות.</p>'; return;
-            }
-            orderListContainer.innerHTML = filteredOrders.sort((a,b) => (a.orderTime || "").localeCompare(b.orderTime || "")).map(order => `<div class="order-item-clickable border-b" data-order-id="${order.orderId}" onclick="openOrderModal('${order.orderId}')"><p class="font-bold">${order.customerName}</p><div class="flex justify-between text-sm text-gray-600"><span>נהג: ${order.driverId || 'טרם שובץ'}</span><span>סטטוס: ${order.status}</span></div></div>`).join('');
+            const filtered = orders.filter(o => Object.values(o).some(val => String(val).toLowerCase().includes(searchTerm)));
+            orderListContainer.innerHTML = filtered.length === 0 
+                ? '<p class="text-center p-8">לא נמצאו הזמנות.</p>'
+                : filtered.sort((a,b) => (a.orderTime || "").localeCompare(b.orderTime || "")).map(order => `
+                    <div class="order-item-clickable p-3 border-b border-gray-200 cursor-pointer transition-all" onclick="openOrderModal('${order.orderId}')">
+                        <p class="font-bold">${order.customerName}</p>
+                        <div class="flex justify-between text-sm text-gray-600"><span>נהג: ${order.driverId || 'טרם שובץ'}</span><span>סטטוס: ${order.status}</span></div>
+                    </div>`).join('');
         }
-        async function initializeMap() {
-             try {
-                const { Map } = await google.maps.importLibrary("maps");
-                liveMap = new Map(liveMapElement, { center: { lat: 32.0853, lng: 34.7818 }, zoom: 9, mapId: 'DELIVERY_MASTER_MAP', mapTypeControl: false, streetViewControl: false, });
-            } catch (error) { 
-                console.error("Map initialization error:", error);
-                liveMapElement.innerHTML = `<div class="p-4 text-center text-red-600 bg-red-100 border border-red-400 rounded-lg"><h3 class="font-bold text-lg">שגיאת מפה</h3><p class="text-sm">טעינת Google Maps נכשלה. ייתכן שנדרש תיקון להרשאות מפתח ה-API.</p></div>`;
-            }
+        
+        function initializeMap() {
+            liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
+            orderMarkersLayer.addTo(liveMap);
         }
-        async function updateMap(mapData) {
+
+        function updateMap(mapData) {
             if (!liveMap || !mapData) return;
-            Object.values(driverMarkers).forEach(marker => marker.setMap(null));
-            driverMarkers = {};
+            Object.values(driverMarkers).forEach(marker => marker.remove());
+            orderMarkersLayer.clearLayers();
             driverListContainer.innerHTML = '';
-            if (mapData.drivers.length === 0) {
-                driverListContainer.innerHTML = '<p class="text-sm text-gray-500">אין נהגים פעילים</p>';
-            }
+
             mapData.drivers.forEach(driver => {
-                if (!driver.location) return;
-                const marker = new google.maps.Marker({ position: { lat: driver.location.latitude, lng: driver.location.longitude }, map: liveMap });
-                driverMarkers[driver.driverId] = marker;
-                const driverElement = document.createElement('div');
-                driverElement.className = 'driver-list-item p-2 rounded-md flex items-center gap-2';
-                driverElement.innerHTML = `<i class="fas fa-truck text-blue-500"></i> <span>${driver.name}</span>`;
-                driverElement.onclick = () => focusOnDriver(driver.driverId);
-                driverListContainer.appendChild(driverElement);
+                if (driver.location) {
+                    driverMarkers[driver.driverId] = L.marker([driver.location.latitude, driver.location.longitude]).addTo(liveMap);
+                    const el = document.createElement('div');
+                    el.className = 'p-2 rounded-md flex items-center gap-2 cursor-pointer hover:bg-blue-100';
+                    el.innerHTML = `<i class="fas fa-truck text-blue-500"></i> <span>${driver.name}</span>`;
+                    el.onclick = () => liveMap.setView([driver.location.latitude, driver.location.longitude], 14);
+                    driverListContainer.appendChild(el);
+                }
+            });
+             mapData.orders.forEach(o => {
+                if (o.latitude && o.status !== 'הושלם') {
+                   const iconUrl = (!o.driverId) ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png' : 'https://cdn-icons-png.flaticon.com/512/3405/3405255.png';
+                   L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl, iconSize: [32, 32] }) })
+                       .addTo(orderMarkersLayer).bindPopup(`<b>${o.customerName}</b><br>${o.driverId || 'ממתין לשיבוץ'}`);
+                }
             });
         }
-        function focusOnDriver(driverId) { /* Unchanged */ }
-        async function openOrderModal(orderId) { /* Unchanged */ }
-        async function handleCommentSubmit(e, orderId) { /* Unchanged */ }
-        async function handleSaveInternalNote(orderId) { /* Unchanged */ }
-        function closeModal() { /* Unchanged */ }
+        
+        async function openOrderModal(orderId) {
+            const content = document.getElementById('modalContent');
+            content.innerHTML = '<p class="p-8 text-center">טוען פרטי הזמנה...</p>';
+            modal.classList.remove('hidden');
+            modal.classList.add('opacity-100');
+            
+            try {
+                const order = await apiFetch('getOrderDetails', { orderId });
+                content.innerHTML = `
+                    <div class="p-6 flex-shrink-0 border-b flex justify-between items-center">
+                        <h2 class="text-2xl font-bold">פרטי הזמנה: ${order.customerName}</h2>
+                        <button onclick="closeModal()" class="text-2xl">&times;</button>
+                    </div>
+                    <div class="p-6 flex-grow overflow-y-auto">
+                        <p><strong>סטטוס:</strong> ${order.status}</p>
+                        <p><strong>כתובת:</strong> ${order.address}</p>
+                        <div class="mt-4">
+                            <h3 class="font-bold mb-2">הערות:</h3>
+                            <div id="commentsContainer" class="space-y-2">
+                                ${order.comments.map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author}</p><p>${c.text}</p></div>`).join('')}
+                            </div>
+                            <form id="commentForm" class="mt-4 flex gap-2">
+                                <input type="text" placeholder="הוסף הערה..." class="flex-grow p-2 border rounded">
+                                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">שלח</button>
+                            </form>
+                        </div>
+                    </div>`;
+                document.getElementById('commentForm').addEventListener('submit', (e) => handleCommentSubmit(e, orderId));
+            } catch (error) {
+                content.innerHTML = `<div class="p-8 text-center text-red-500">${error.message} <button onclick="closeModal()">סגור</button></div>`;
+            }
+        }
+
+        async function handleCommentSubmit(e, orderId) {
+            e.preventDefault();
+            const input = e.target.querySelector('input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            try {
+                await apiFetch('postComment', {}, 'POST', { orderId, author: userName, text });
+                input.value = '';
+                const order = await apiFetch('getOrderDetails', { orderId });
+                document.getElementById('commentsContainer').innerHTML = order.comments.map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author}</p><p>${c.text}</p></div>`).join('');
+            } catch (error) {
+                alert(`שגיאה בשליחת תגובה: ${error.message}`);
+            }
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            modal.classList.remove('opacity-100');
+        }
     </script>
 </body>
 </html>
-
