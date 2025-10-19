@@ -113,8 +113,9 @@
         const orderList = document.getElementById('orderList');
         
         let deferredPrompt, locationIntervalId, driverLocation = null;
+        // FIX: Global flag to track OneSignal status
+        let oneSignalFailed = false; 
         
-        // FIX: Helper function to prevent syntax errors from special characters in names
         function sanitizeForJS(str) {
             if (!str) return '';
             return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
@@ -140,9 +141,20 @@
 
         // --- App Initialization & Login ---
         window.OneSignalDeferred = window.OneSignalDeferred || [];
+        // FIX: Added robust error handling for IndexedDB and other OneSignal init failures.
         OneSignalDeferred.push(async (OneSignal) => {
-            await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
-            initializeApp();
+            try {
+                await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
+            } catch (e) {
+                console.error("OneSignal SDK initialization failed:", e);
+                if (e.name === 'UnknownError' && e.message.includes('indexedDB')) {
+                    console.error("This may be caused by private browsing mode or browser storage issues. Push notifications will be disabled.");
+                }
+                oneSignalFailed = true; // Set the global flag on failure
+            } finally {
+                // Initialize the app regardless of OneSignal's status
+                initializeApp(); 
+            }
         });
 
         function initializeApp() {
@@ -173,7 +185,8 @@
         // --- Permissions & Features ---
         async function checkAndRequestPermissions(driverId) {
             const geoPermissionStatus = await navigator.permissions.query({name: 'geolocation'});
-            const isPushEnabled = OneSignal.Notifications.permission;
+            // FIX: Check the global flag before checking notification permission
+            const isPushEnabled = !oneSignalFailed && OneSignal.Notifications.permission;
             if (!isPushEnabled || geoPermissionStatus.state !== 'granted') {
                 permissionOverlay.style.display = 'flex';
             } else {
@@ -185,12 +198,18 @@
         async function onEnableFeatures() {
             permissionOverlay.style.display = 'none'; 
             const driverId = sessionStorage.getItem('driverId');
-            try { await OneSignal.Notifications.requestPermission(); } catch(e) { console.error("Notification permission failed", e); }
+            // FIX: Check the global flag before requesting permissions
+            if (!oneSignalFailed) {
+                try { await OneSignal.Notifications.requestPermission(); } catch(e) { console.error("Notification permission failed", e); }
+            }
             initializeFeatures(driverId);
         }
 
         function initializeFeatures(driverId) {
-            initializeNotifications(driverId);
+            // FIX: Check the global flag before initializing notifications
+            if (!oneSignalFailed) {
+                initializeNotifications(driverId);
+            }
             startLocationTracking(driverId);
             fetchDriverOrders(driverId);
         }
@@ -234,7 +253,6 @@
             };
             const currentStatus = statusInfo[order.status] || { text: order.status, color: 'bg-gray-500' };
 
-            // FIX: Using the sanitizeForJS function on customerName to prevent errors
             return `
             <div class="order-card" data-order-id="${order.orderId}" data-lat="${order.latitude}" data-lon="${order.longitude}" data-status="${order.status}">
                 <div class="card-header">
@@ -383,6 +401,7 @@
         }
 
         async function initializeNotifications(driverId) {
+            if(oneSignalFailed) return;
             try {
                 await OneSignal.login(driverId);
                 const playerId = OneSignal.User.onesignalId;
