@@ -10,71 +10,67 @@
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
 
     <style>
-        body { 
-            font-family: 'Rubik', sans-serif; 
-            -webkit-tap-highlight-color: transparent;
-            overscroll-behavior-y: contain; /* Prevents pull-to-refresh */
+        :root {
+            --primary-color: #007bff; --success: #28a745; --warning: #ffc107;
+            --shadow-light: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
         }
-        .view {
-            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: 'Rubik', sans-serif; margin: 0; background: linear-gradient(135deg, #f5f7fa, #c3cfe2); }
+        .view { display: none !important; height: 100vh; }
+        .view.active { display: flex !important; flex-direction: column; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.4); box-shadow: var(--shadow-light); backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.6);
         }
-        .view.hidden {
-            opacity: 0;
-            transform: scale(0.98);
-            pointer-events: none;
-        }
-        main::-webkit-scrollbar { width: 6px; }
-        main::-webkit-scrollbar-track { background: transparent; }
-        main::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        #loginView { justify-content: center; align-items: center; }
+        .login-card { padding: 40px; text-align: center; width: 90%; max-width: 400px; }
+        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: none; border-radius: 12px; font-size: 1.2rem; text-align: center; }
+        .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color:white; border:none; border-radius: 12px; font-size: 1.2rem; cursor: pointer; }
+        .app-header { padding: 15px 20px; z-index: 10; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        main { flex-grow: 1; overflow-y: auto; padding: 0 15px; }
+        .order-section { margin-bottom: 30px; }
+        .order-section h2 { padding-bottom: 10px; display: flex; align-items: center; gap: 10px; font-size: 1.5rem; }
+        .order-card { margin: 10px 0; padding: 20px; }
+        .order-card button { width: 100%; padding: 12px; border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 1em; margin-top: 15px; }
+        .btn-acknowledge { background-color: var(--success); }
+        .btn-load { background-color: var(--warning); }
+        button:disabled { background-color: #999; cursor: not-allowed; }
     </style>
 </head>
-<body class="bg-gradient-to-br from-slate-50 to-slate-200 text-slate-800">
+<body>
 
-    <div id="loginView" class="view flex absolute inset-0 items-center justify-center p-4">
-        <div class="w-full max-w-sm mx-auto bg-white/70 backdrop-blur-xl p-8 rounded-2xl shadow-lg border border-white/50 text-center">
-            <i class="fas fa-warehouse text-5xl text-blue-600 mb-4"></i>
-            <h2 class="text-2xl font-bold mb-2">טרמינל מחסן</h2>
-            <p class="text-slate-500 mb-6">נא הזן קוד מנהל כדי להמשיך</p>
-            <input type="text" id="managerIdInput" placeholder="הזן קוד מנהל" class="w-full text-center text-lg p-3 border-2 border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-            <p id="loginError" class="text-red-500 min-h-[20px] my-2 text-sm font-semibold"></p>
-            <button id="loginBtn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-transform transform active:scale-95 disabled:bg-slate-400 disabled:cursor-not-allowed">
-                כניסה
-            </button>
+    <div id="loginView" class="view active">
+        <div class="login-card glass-card">
+            <h2>כניסת מנהל מחסן</h2>
+            <input type="text" id="managerIdInput" placeholder="הזן קוד מנהל (OREN/TAMIR)">
+            <button id="loginBtn">כניסה</button>
         </div>
     </div>
 
-    <div id="mainView" class="view hidden absolute inset-0 flex flex-col h-screen">
-        <header class="bg-white/80 backdrop-blur-sm flex-shrink-0 z-10 p-4 shadow-sm flex justify-between items-center">
-            <h1 id="welcomeMessage" class="text-xl font-bold text-slate-700"></h1>
-            <button id="logoutBtn" class="text-slate-500 hover:text-red-600 text-2xl transition">
-                <i class="fas fa-sign-out-alt"></i>
-            </button>
+    <div id="mainView" class="view">
+        <header class="app-header glass-card" style="margin: 15px; height: 70px;">
+            <h1 id="welcomeMessage"></h1>
+            <button id="logoutBtn" style="background:none; border:none; color:#333; font-size: 1.5em;"><i class="fas fa-sign-out-alt"></i></button>
         </header>
-        <main class="flex-grow overflow-y-auto p-4">
-            <div id="ordersGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                <div id="newOrders" class="order-section">
-                    <h2 class="text-2xl font-bold mb-4 flex items-center gap-3 sticky top-0 bg-gradient-to-b from-slate-100 via-slate-100 to-transparent py-2 -mx-2 px-2">
-                        <i class="fas fa-inbox text-blue-500"></i> הזמנות חדשות
-                    </h2>
-                    <div id="newOrdersList" class="space-y-4"></div>
-                </div>
-                <div id="inProgressOrders" class="order-section md:col-span-1 lg:col-span-2 xl:col-span-3">
-                     <h2 class="text-2xl font-bold mb-4 flex items-center gap-3 sticky top-0 bg-gradient-to-b from-slate-100 via-slate-100 to-transparent py-2 -mx-2 px-2">
-                        <i class="fas fa-tasks text-amber-500"></i> הזמנות בתהליך
-                    </h2>
-                    <div id="inProgressOrdersList" class="space-y-4"></div>
-                </div>
+        <main>
+            <div id="newOrders" class="order-section">
+                <h2><i class="fas fa-inbox"></i> הזמנות חדשות לאישור</h2>
+                <div id="newOrdersList"></div>
+            </div>
+            <div id="inProgressOrders" class="order-section">
+                <h2><i class="fas fa-tasks"></i> הזמנות בתהליך</h2>
+                <div id="inProgressOrdersList"></div>
             </div>
         </main>
     </div>
 
     <script>
-        // *** UNIFIED API URL ***
+        // *** IMPORTANT ***
+        // After deploying the updated Code.gs script, replace the URL below with your new Web App URL.
         const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
         
         const loginView = document.getElementById('loginView');
@@ -83,7 +79,6 @@
         const logoutBtn = document.getElementById('logoutBtn');
         const newOrdersList = document.getElementById('newOrdersList');
         const inProgressOrdersList = document.getElementById('inProgressOrdersList');
-        const loginError = document.getElementById('loginError');
 
         let currentManager = null, refreshInterval, knownOrderIds = new Set();
         
@@ -114,31 +109,16 @@
         function initializeApp() {
             loginBtn.addEventListener('click', onLogin);
             logoutBtn.addEventListener('click', onLogout);
-            document.getElementById('managerIdInput').addEventListener('keyup', (e) => {
-                if(e.key === 'Enter') onLogin();
-            });
             const loggedInManager = JSON.parse(sessionStorage.getItem('warehouseManager'));
             if (loggedInManager) initApp(loggedInManager);
         }
         
-        async function onLogin() {
+        function onLogin() {
             const managerId = document.getElementById('managerIdInput').value.trim().toUpperCase();
             if(!managerId) return;
-            
-            loginBtn.disabled = true;
-            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מאמת...';
-            loginError.textContent = '';
-
-            try {
-                const managerData = await apiFetch('validateWarehouseManager', {}, 'POST', { managerId });
-                sessionStorage.setItem('warehouseManager', JSON.stringify(managerData));
-                initApp(managerData);
-            } catch (error) {
-                loginError.textContent = `${error.message}`;
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'כניסה';
-            }
+            const managerData = { id: managerId, name: managerId, warehouse: managerId === 'OREN' ? 'החרש' : 'התלמיד' };
+            sessionStorage.setItem('warehouseManager', JSON.stringify(managerData));
+            initApp(managerData);
         }
 
         function onLogout() {
@@ -149,55 +129,34 @@
         }
 
         function initApp(manager) {
-            console.log("Initializing with manager data:", manager);
-            if (!manager || !manager.managerId) {
-                console.error("Manager data is invalid or missing managerId. Logging out.");
-                onLogout();
-                return;
-            }
             currentManager = manager;
             document.getElementById('welcomeMessage').textContent = `מחסן ${manager.warehouse} | ${manager.name}`;
             switchView('mainView');
-            initializeNotifications(manager.managerId);
+            initializeNotifications(manager.id);
             startPolling();
         }
         
         function startPolling() {
             if (refreshInterval) clearInterval(refreshInterval);
             const poll = async () => { await fetchWarehouseOrders(); };
-            poll(); // Initial call
-            refreshInterval = setInterval(poll, 20000); // Poll every 20 seconds
-        }
-
-        function getLoaderHTML() {
-            return Array(3).fill('').map(() => `<div class="bg-white p-4 rounded-xl shadow-md animate-pulse">
-                        <div class="h-5 bg-slate-200 rounded w-3/4 mb-3"></div>
-                        <div class="h-4 bg-slate-200 rounded w-1/2 mb-4"></div>
-                        <div class="h-12 bg-slate-300 rounded-lg w-full"></div>
-                    </div>`).join('');
+            poll();
+            refreshInterval = setInterval(poll, 20000);
         }
 
         async function fetchWarehouseOrders() {
             if (!currentManager) return;
-            if (knownOrderIds.size === 0) {
-                 newOrdersList.innerHTML = getLoaderHTML();
-                 inProgressOrdersList.innerHTML = getLoaderHTML();
-            }
-           
             try {
                 const orders = await apiFetch('getWarehouseOrders', { warehouse: currentManager.warehouse });
                 renderOrders(orders);
             } catch (error) {
-                const errorHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
-                                    <p class="font-bold">שגיאת תקשורת</p>
-                                    <p>${error.message}</p>
-                                   </div>`;
-                newOrdersList.innerHTML = errorHTML;
-                inProgressOrdersList.innerHTML = '';
+                newOrdersList.innerHTML = `<p style="color:red;">שגיאת תקשורת עם השרת: ${error.message}</p>`;
             }
         }
 
         function renderOrders(orders) {
+            newOrdersList.innerHTML = '';
+            inProgressOrdersList.innerHTML = '';
+            
             const newOrders = orders.filter(o => ['חדש', 'ממתין לאישור מחסן'].includes(o.status));
             const inProgress = orders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
 
@@ -206,43 +165,35 @@
                 playNotificationSound();
             }
             knownOrderIds = new Set(orders.map(o => o.orderId));
-            
-            newOrdersList.innerHTML = newOrders.length > 0 ? newOrders.map(order => createOrderCard(order, 'acknowledge')).join('') : '<p class="text-slate-500 text-center p-4 bg-white/50 rounded-lg">אין הזמנות חדשות.</p>';
-            inProgressOrdersList.innerHTML = inProgress.length > 0 ? inProgress.map(order => createOrderCard(order, 'load')).join('') : '<p class="text-slate-500 text-center p-4 bg-white/50 rounded-lg">אין הזמנות בתהליך.</p>';
+
+            if (newOrders.length === 0) newOrdersList.innerHTML = '<p>אין הזמנות חדשות.</p>';
+            newOrders.forEach(order => newOrdersList.innerHTML += createOrderCard(order, 'acknowledge'));
+
+            if (inProgress.length === 0) inProgressOrdersList.innerHTML = '<p>אין הזמנות בתהליך.</p>';
+            inProgress.forEach(order => inProgressOrdersList.innerHTML += createOrderCard(order, 'load'));
         }
 
         function createOrderCard(order, type) {
             let buttonHtml = '';
-            const customerName = order.customerName || 'לא ידוע';
-            const orderIdShort = order.orderId ? `(${order.orderId.substring(0,6)})` : '';
-            const address = order.address || 'לא צוינה כתובת';
-            const orderTime = order.orderTime || 'לא צוינה';
-            
             if (type === 'acknowledge') {
-                buttonHtml = `<button class="w-full mt-4 bg-green-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-transform transform active:scale-95 disabled:bg-slate-400" onclick="updateOrderStatus(event, '${order.orderId}', 'באיסוף')">
-                                <i class="fas fa-check-circle mr-2"></i> אשר קבלה
-                              </button>`;
+                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.orderId}', 'באיסוף')">אשר קבלה</button>`;
             } else if (order.status === 'באיסוף') {
-                buttonHtml = `<button class="w-full mt-4 bg-amber-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-amber-600 transition-transform transform active:scale-95 disabled:bg-slate-400" onclick="updateOrderStatus(event, '${order.orderId}', 'טעון')">
-                                <i class="fas fa-box-open mr-2"></i> סמן כטעון
-                              </button>`;
+                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.orderId}', 'טעון')">סמן כטעון</button>`;
             } else {
-                 buttonHtml = `<div class="w-full mt-4 bg-slate-200 text-slate-600 font-bold py-3 px-4 rounded-lg text-center">
-                                <i class="fas fa-truck-loading mr-2"></i> הועמס
-                               </div>`;
+                 buttonHtml = `<p style="color:var(--success); font-weight:bold; text-align:center;">הועמס ✔️</p>`;
             }
 
             return `
-                <div class="bg-white rounded-xl shadow-md p-5 flex flex-col gap-2">
-                    <h3 class="font-bold text-lg text-slate-800">${customerName} <span class="text-slate-500 font-normal text-sm">${orderIdShort}</span></h3>
-                    <p class="text-slate-600 flex items-center gap-2"><i class="fas fa-map-marker-alt w-4 text-center text-slate-400"></i> ${address}</p>
-                    <p class="text-slate-600 flex items-center gap-2"><i class="fas fa-clock w-4 text-center text-slate-400"></i> ${orderTime}</p>
+                <div class="order-card glass-card">
+                    <h4>${order.customerName} (${order.orderId.substring(0,6)})</h4>
+                    <p><strong>כתובת:</strong> ${order.address}</p>
+                    <p><strong>שעה:</strong> ${order.orderTime}</p>
                     ${buttonHtml}
                 </div>`;
         }
         
         async function updateOrderStatus(event, orderId, newStatus) {
-            const btn = event.target.closest('button');
+            const btn = event.target;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
              try {
@@ -250,6 +201,8 @@
                 setTimeout(fetchWarehouseOrders, 500);
             } catch (error) {
                 console.error(`Error updating status for order ${orderId}`, error);
+                btn.disabled = false;
+                btn.innerHTML = 'שגיאה!';
             }
         }
         
@@ -261,21 +214,11 @@
         }
         
         function switchView(viewId) {
-            const views = document.querySelectorAll('.view');
-            views.forEach(v => {
-                if(v.id !== viewId) {
-                    v.classList.add('hidden');
-                } else {
-                    v.classList.remove('hidden');
-                }
-            });
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
         }
 
         async function initializeNotifications(managerId) {
-            if (!managerId) {
-                console.error("Cannot initialize notifications, managerId is missing.");
-                return;
-            }
             try {
                 await OneSignal.Notifications.requestPermission();
                 await OneSignal.login(managerId);
@@ -284,7 +227,8 @@
              } catch (e) { console.error("Error initializing notifications", e); }
         }
 
+        // Initial load
+        initializeApp();
     </script>
 </body>
 </html>
-
