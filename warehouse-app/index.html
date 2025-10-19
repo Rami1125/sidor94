@@ -69,8 +69,7 @@
     </div>
 
     <script>
-        // *** IMPORTANT ***
-        // After deploying the updated Code.gs script, replace the URL below with your new Web App URL.
+        // *** UNIFIED API URL ***
         const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
         
         const loginView = document.getElementById('loginView');
@@ -187,7 +186,7 @@
                 <div class="order-card glass-card">
                     <h4>${order.customerName} (${order.orderId.substring(0,6)})</h4>
                     <p><strong>כתובת:</strong> ${order.address}</p>
-                    <p><strong>שעה:</strong> ${order.orderTime}</p>
+                    <p><strong>שעה:</strong> ${order.orderTime || 'לא צוינה'}</p>
                     ${buttonHtml}
                 </div>`;
         }
@@ -232,3 +231,4 @@
     </script>
 </body>
 </html>
+
