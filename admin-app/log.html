@@ -447,8 +447,8 @@
             try {
                 const data = await apiFetch('getVersion');
                 logEvent(`API Version confirmed: ${data.version}`, 'success');
-                 if (data.version !== "20.0") {
-                    const msg = `Warning: Mismatched API version. Expected 20.0 but found ${data.version}. Please redeploy the script.`;
+                 if (data.version !== "21.0") {
+                    const msg = `Warning: Mismatched API version. Expected 21.0 but found ${data.version}. Please redeploy the script.`;
                     alert(msg);
                     logEvent(msg, 'error');
                 }
