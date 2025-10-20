@@ -447,8 +447,8 @@
             try {
                 const data = await apiFetch('getVersion');
                 logEvent(`API Version confirmed: ${data.version}`, 'success');
-                 if (data.version !== "21.0") {
-                    const msg = `Warning: Mismatched API version. Expected 21.0 but found ${data.version}. Please redeploy the script.`;
+                 if (data.version !== "22.0") {
+                    const msg = `Warning: Mismatched API version. Expected 22.0 but found ${data.version}. Please redeploy the script.`;
                     alert(msg);
                     logEvent(msg, 'error');
                 }
@@ -505,8 +505,8 @@
                 <div class="finalize-section">
                     <h4><i class="fas fa-exclamation-circle"></i> ממתין למספר הזמנה מקומקס</h4>
                     <div class="finalize-input-group">
-                        <input type="text" id="finalize-input-${order.internalId}" placeholder="הזן מספר הזמנה..." required>
-                        <button onclick="handleSaveOrderId('${order.internalId}')">שמור מספר</button>
+                        <input type="text" id="finalize-input-${order.internalId}" placeholder="הזן מספר הזמנה..." required onkeydown="if(event.key==='Enter'){handleSaveOrderId('${order.internalId}'); event.preventDefault();}">
+                        <button onclick="handleSaveOrderId('${order.internalId}')">שמור</button>
                     </div>
                 </div>` : '';
             
