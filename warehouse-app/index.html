@@ -87,7 +87,7 @@
     </div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzuTVGyet9nYa2UoCUOPe64ldmHB4aRH_sLYYZth8r3GgeGPsWFKRVCZGpsk2F39SV0/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbx0kCkRrWgChgcKLOXGFWCyEr86W4MZsz29kVP_SCYAxCd3PSM0fiPHZ_zu_xnrUnXF/exec';
         
         const loginView = document.getElementById('loginView');
         const mainView = document.getElementById('mainView');
@@ -174,8 +174,7 @@
             newOrdersList.innerHTML = '';
             inProgressOrdersList.innerHTML = '';
             
-            // --- FIX: Added 'חדשה' to the list of new order statuses ---
-            const newOrders = orders.filter(o => ['חדש', 'חדשה', 'ממתין לאישור מחסן'].includes(o.status));
+            const newOrders = orders.filter(o => ['חדש', 'שויך'].includes(o.status));
             const inProgress = orders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
             
             const newIncomingIds = new Set(newOrders.map(o => o.orderId));
@@ -200,13 +199,14 @@
             } else {
                  actionButtonHtml = `<p style="color:var(--success); font-weight:bold; text-align:center;">הועמס ✔️</p>`;
             }
+            const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
 
             return `
                 <div class="order-card glass-card">
                     <h4>${order.customerName} (${order.orderId ? String(order.orderId).substring(0,6) : 'N/A'})</h4>
-                    <p><strong>כתובת:</strong> ${order.address}</p>
+                    <p><strong>נהג:</strong> ${order.driverId || 'טרם שויך'}</p>
                     <p><strong>שעה:</strong> ${order.orderTime || 'לא צוינה'}</p>
-                    <button class="btn-pdf" onclick="openPdfModal('${order.orderId}')">הצג מסמך</button>
+                    <button class="btn-pdf" onclick="openPdfModal('${order.orderId}')" ${!hasPdf ? 'disabled' : ''}>הצג מסמך</button>
                     ${actionButtonHtml}
                 </div>`;
         }
@@ -272,4 +272,3 @@
     </script>
 </body>
 </html>
-
