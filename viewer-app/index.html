@@ -28,6 +28,7 @@
             padding: 5px 10px;
             border-radius: 8px;
             background-color: rgba(0, 123, 255, 0.1);
+            cursor: pointer;
         }
     </style>
 </head>
@@ -132,19 +133,68 @@
         }
         
         function updateKPIs(orders) {
-            // Logic remains the same as original
+            const total = orders.length;
+            const completed = orders.filter(o => o.status === 'הושלם').length;
+            const inProgress = orders.filter(o => ['בדרך', 'באיסוף'].includes(o.status)).length;
+            const pending = total - completed - inProgress;
+            
+            document.getElementById('kpi-total').innerHTML = `<div class="text-3xl font-bold text-blue-500">${total}</div><p class="text-gray-500">סה"כ הזמנות</p>`;
+            document.getElementById('kpi-completed').innerHTML = `<div class="text-3xl font-bold text-green-500">${completed}</div><p class="text-gray-500">הושלמו</p>`;
+            document.getElementById('kpi-in-progress').innerHTML = `<div class="text-3xl font-bold text-yellow-500">${inProgress}</div><p class="text-gray-500">בתהליך</p>`;
+            document.getElementById('kpi-pending').innerHTML = `<div class="text-3xl font-bold text-gray-600">${pending}</div><p class="text-gray-500">ממתינות</p>`;
         }
         
         function renderOrderList(orders) {
-             // Logic remains the same as original
+             const searchTerm = document.getElementById('orderSearch').value.toLowerCase();
+             const list = document.getElementById('orderList');
+             const filteredOrders = orders.filter(o => 
+                 (o.customerName && o.customerName.toLowerCase().includes(searchTerm)) ||
+                 (o.address && o.address.toLowerCase().includes(searchTerm)) ||
+                 (o.driverId && o.driverId.toLowerCase().includes(searchTerm))
+             );
+             if (filteredOrders.length === 0) {
+                 list.innerHTML = '<p class="text-center text-gray-500">לא נמצאו הזמנות.</p>';
+                 return;
+             }
+             list.innerHTML = filteredOrders
+                 .sort((a,b) => (a.orderTime || "00:00").localeCompare(b.orderTime || "00:00"))
+                 .map(o => `
+                 <div class="order-item-clickable p-3 border-b cursor-pointer" onclick="openOrderModal('${o.orderId}')">
+                     <p class="font-semibold">${o.customerName}</p>
+                     <p class="text-sm text-gray-600">${o.address}</p>
+                     <p class="text-sm text-gray-500">נהג: ${o.driverId || 'טרם שויך'}</p>
+                 </div>
+             `).join('');
         }
         
         function initializeMap() {
-             // Logic remains the same as original
+             liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
+             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
+             orderMarkersLayer.addTo(liveMap);
         }
 
-        function updateMap(mapData) {
-             // Logic remains the same as original
+        function updateMap({drivers, orders}) {
+            Object.values(driverMarkers).forEach(m => m.remove());
+            driverMarkers = {};
+            orderMarkersLayer.clearLayers();
+            const driverList = document.getElementById('driverList');
+            driverList.innerHTML = '';
+
+            drivers.forEach(d => {
+                if (d.location?.latitude) {
+                    driverMarkers[d.driverId] = L.marker([d.location.latitude, d.location.longitude]).addTo(liveMap).bindPopup(`<b>${d.name}</b>`);
+                    driverList.innerHTML += `<div class="p-2 border-b">${d.name}</div>`;
+                }
+            });
+             if (driverList.innerHTML === '') driverList.innerHTML = '<p class="text-gray-500">אין נהגים פעילים כרגע.</p>';
+
+            orders.forEach(o => {
+                if (o.latitude && o.status !== 'הושלם') {
+                   const iconUrl = (!o.driverId) ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png' : 'https://cdn-icons-png.flaticon.com/512/3405/3405255.png';
+                   L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl, iconSize: [32, 32] }) })
+                       .addTo(orderMarkersLayer).bindPopup(`<b>${o.customerName}</b><br>שויך ל: ${o.driverId || 'טרם'}`);
+                }
+            });
         }
         
         async function openOrderModal(orderId) {
@@ -152,32 +202,26 @@
             const content = document.getElementById('modalContent');
             content.innerHTML = '<p class="p-8 text-center">טוען פרטי הזמנה...</p>';
             modal.classList.remove('hidden');
-            modal.classList.add('opacity-100');
+            setTimeout(() => modal.classList.add('opacity-100'), 10);
             
             try {
-                const [order, comments] = await Promise.all([
-                    apiFetch('getOrderDetails', { orderId }),
-                    apiFetch('getComments', { orderId })
-                ]);
-                
-                let pdfLinkHtml = '';
-                if(order.pdfLink){
-                    pdfLinkHtml = `<a href="#" class="pdf-link" onclick="event.preventDefault(); openPdfModal('${order.orderId}')"><i class="fas fa-file-pdf"></i> הצג מסמך הזמנה</a>`;
-                }
+                const order = await apiFetch('getOrderDetails', { orderId });
+                const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
 
                 content.innerHTML = `
                     <div class="p-6 flex-shrink-0 border-b flex justify-between items-center">
-                        <h2 class="text-2xl font-bold">פרטי הזמנה: ${order.customerName}</h2>
+                        <h2 class="text-2xl font-bold">${order.customerName}</h2>
                         <button onclick="closeModal('orderDetailsModal')" class="text-2xl">&times;</button>
                     </div>
                     <div class="p-6 flex-grow overflow-y-auto">
-                        <p><strong>סטטוס:</strong> ${order.status}</p>
+                        <p><strong>סטטוס:</strong> <span class="font-semibold">${order.status}</span></p>
                         <p><strong>כתובת:</strong> ${order.address}</p>
-                        ${pdfLinkHtml}
+                        <p><strong>נהג:</strong> ${order.driverId || 'לא שויך'}</p>
+                        ${hasPdf ? `<a href="#" class="pdf-link" onclick="event.preventDefault(); openPdfModal('${order.orderId}')"><i class="fas fa-file-pdf"></i> הצג מסמך הזמנה</a>` : ''}
                         <div class="mt-4">
                             <h3 class="font-bold mb-2">הערות:</h3>
-                            <div id="commentsContainer" class="space-y-2">
-                                ${(comments || []).map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author || ''}</p><p>${c.text || ''}</p></div>`).join('')}
+                            <div id="commentsContainer" class="space-y-2 max-h-48 overflow-y-auto">
+                                ${(order.comments || []).map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author || ''}</p><p>${c.text || ''}</p></div>`).join('') || '<p class="text-gray-500">אין הערות</p>'}
                             </div>
                             <form id="commentForm" class="mt-4 flex gap-2">
                                 <input type="text" placeholder="הוסף הערה..." class="flex-grow p-2 border rounded">
@@ -196,7 +240,7 @@
             const pdfViewer = document.getElementById('pdfViewer');
             pdfViewer.src = '';
             pdfModal.classList.remove('hidden');
-            pdfModal.classList.add('opacity-100');
+             setTimeout(() => pdfModal.classList.add('opacity-100'), 10);
 
             try {
                 const url = await apiFetch('getOrderPDF', { orderId });
@@ -214,15 +258,30 @@
         }
 
         async function handleCommentSubmit(e, orderId) {
-            // Logic remains the same as original
+            e.preventDefault();
+            const form = e.target;
+            const input = form.querySelector('input');
+            const button = form.querySelector('button');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try {
+                await apiFetch('postComment', {}, 'POST', {orderId, author: userName, text});
+                openOrderModal(orderId);
+            } catch (error) {
+                alert('שגיאה בשליחת הערה: ' + error.message);
+                button.disabled = false;
+                button.innerText = 'שלח';
+            }
         }
 
         function closeModal(modalId) {
             const modal = document.getElementById(modalId);
-            modal.classList.add('hidden');
             modal.classList.remove('opacity-100');
+            setTimeout(() => modal.classList.add('hidden'), 300);
         }
     </script>
 </body>
 </html>
-
