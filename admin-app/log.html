@@ -68,9 +68,11 @@
         th, td { padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; }
         th { background-color: #f2f2f2; }
         .sync-buttons button { margin-bottom: 10px; }
-        .finalize-section { display: flex; gap: 10px; margin-top: 10px; }
-        .finalize-section input { flex-grow: 1; }
-        .finalize-section button { width: auto; font-size: 0.9em; padding: 8px 12px; }
+        .finalize-section { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; }
+        .finalize-section h4 { margin: 0; font-size: 0.95em; color: var(--warning); text-align: center;}
+        .finalize-input-group { display: flex; gap: 10px; }
+        .finalize-input-group input { flex-grow: 1; }
+        .finalize-input-group button { width: auto; font-size: 0.9em; padding: 8px 12px; }
     </style>
 </head>
 <body>
@@ -143,7 +145,7 @@
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbzuTVGyet9nYa2UoCUOPe64ldmHB4aRH_sLYYZth8r3GgeGPsWFKRVCZGpsk2F39SV0/exec';
         
-        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [], customersData = [];
+        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
         const currentUser = 'Admin';
         const currentRole = 'Administrator';
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
@@ -222,22 +224,20 @@
             });
 
             try {
-                // Find the real orderId from the internalId to send to the server
                 const order = allTodayOrders.find(o => o.internalId === internalId);
                 if (!order || !order.orderId) {
                     logEvent(`Cannot update driver for placeholder order ${internalId}`, 'warning');
-                    buildScheduler(); // Revert visually
+                    buildScheduler();
                     return;
                 }
                 
                 await apiFetch('updateOrder', {}, 'POST', { orderId: order.orderId, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
                 logEvent(`Update for order ${order.orderId} successful.`, 'success');
-                // Refresh data to ensure consistency
                 allTodayOrders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] });
                 updateMap();
             } catch (error) {
                 logEvent(`Failed to update order: ${error.message}`, "error");
-                buildScheduler(); // Rebuild on failure to revert visually
+                buildScheduler();
             }
         }
 
@@ -257,16 +257,13 @@
             if (!liveMap) return;
             try {
                 const { drivers, orders } = await apiFetch('getLiveMapData');
-                
                 Object.values(driverMarkers).forEach(m => m.remove());
                 orderMarkersLayer.clearLayers();
-
                 drivers.forEach(d => {
                     if (d.location?.latitude) {
                         driverMarkers[d.driverId] = L.marker([d.location.latitude, d.location.longitude]).addTo(liveMap).bindPopup(`<b>${d.name}</b>`);
                     }
                 });
-
                 orders.forEach(o => {
                     if (o.latitude && o.status !== 'הושלם') {
                        const iconUrl = (!o.driverId) 
@@ -327,12 +324,56 @@
                 await apiFetch('finalizeOrder', {}, 'POST', { internalId, finalOrderId });
                 logEvent(`Order ${internalId} finalized with ID ${finalOrderId}`, 'success');
                 alert('מספר ההזמנה נשמר בהצלחה!');
-                await buildScheduler(); // Refresh the scheduler to show the updated card
+                await buildScheduler();
             } catch (error) {
                 logEvent(`Failed to finalize order ${internalId}: ${error.message}`, 'error');
                 alert(`שגיאה בשמירת מספר הזמנה: ${error.message}`);
                 btn.disabled = false;
                 btn.textContent = 'שמור מספר';
+            }
+        }
+
+        async function handleCustomerIdBlur(event) {
+            const customerId = event.target.value.trim();
+            if (!customerId) return;
+
+            logEvent(`Fetching details for customer ID: ${customerId}`);
+            try {
+                const customerDetails = await apiFetch('getCustomerDetailsById', { customerId });
+                if (customerDetails) {
+                    logEvent('Customer details found', 'success', customerDetails);
+                    document.getElementById('customerName').value = customerDetails.name || '';
+                    document.getElementById('customerPhone').value = customerDetails.phone || '';
+
+                    const address = customerDetails.address || '';
+                    const addressParts = address.split(',');
+                    const city = addressParts.length > 1 ? addressParts[1].trim() : '';
+                    const streetAndNum = addressParts[0] || '';
+                    
+                    const match = streetAndNum.match(/(.*?)\s*([\d/]+.*)$/);
+                    let street = streetAndNum;
+                    let number = '';
+                    if (match) {
+                        street = match[1].trim();
+                        number = match[2].trim();
+                    }
+
+                    document.getElementById('street').value = street;
+                    document.getElementById('houseNumber').value = number;
+                    
+                    const citySelect = document.getElementById('city');
+                    const cityOption = Array.from(citySelect.options).find(opt => opt.value === city);
+                    if (cityOption) citySelect.value = city;
+
+                } else {
+                    logEvent(`No existing customer found for ID: ${customerId}. Ready for new customer creation.`, 'info');
+                    // Clear fields except name if it was manually entered
+                    document.getElementById('customerPhone').value = '';
+                    document.getElementById('street').value = '';
+                    document.getElementById('houseNumber').value = '';
+                }
+            } catch (error) {
+                logEvent(`Error fetching customer details: ${error.message}`, 'error');
             }
         }
 
@@ -361,9 +402,9 @@
                            .forEach(record => {
                     tableHTML += `<tr>
                         <td>${record.Timestamp ? new Date(record.Timestamp).toLocaleString('he-IL') : 'N/A'}</td>
-                        <td>${record.CustomerName || 'N/A'}</td>
-                        <td>${record.Status || 'N/A'}</td>
-                        <td>${record.DriverID || '-'}</td>
+                        <td>${record.customerName || 'N/A'}</td>
+                        <td>${record.status || 'N/A'}</td>
+                        <td>${record.driverId || '-'}</td>
                     </tr>`;
                 });
                 content.innerHTML = tableHTML + `</tbody></table>`;
@@ -372,8 +413,6 @@
             }
         }
         
-        // ... (other modal functions like openAnalyticsModal, openLogsModal remain the same) ...
-
         async function openPdfModal(orderId) {
             if (!orderId || orderId === '-') {
                 alert('אין מזהה הזמנה זמין.');
@@ -401,8 +440,8 @@
             try {
                 const data = await apiFetch('getVersion');
                 logEvent(`API Version confirmed: ${data.version}`, 'success');
-                 if (data.version !== "18.0") {
-                    const msg = `Warning: Mismatched API version. Expected 18.0 but found ${data.version}. Please redeploy the script.`;
+                 if (data.version !== "19.0") {
+                    const msg = `Warning: Mismatched API version. Expected 19.0 but found ${data.version}. Please redeploy the script.`;
                     alert(msg);
                     logEvent(msg, 'error');
                 }
@@ -422,9 +461,8 @@
             await updateMap(); 
             setInterval(() => { buildScheduler(); updateMap(); }, 30000);
 
+            document.getElementById('customerId').addEventListener('blur', handleCustomerIdBlur);
             document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
-            // document.getElementById('showAnalyticsBtn').addEventListener('click', openAnalyticsModal);
-            // document.getElementById('showLogsBtn').addEventListener('click', openLogsModal);
             document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
             
             document.querySelectorAll('.close-button').forEach(btn => {
@@ -436,7 +474,6 @@
         });
 
         function createScheduleCard(order) {
-            // A placeholder card cannot be dragged and has no PDF.
             const isPlaceholder = !order.orderId && order.internalId;
             const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
 
@@ -448,7 +485,7 @@
                         <p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p>
                     </div>
                     <div class="card-actions">
-                         <button class="action-button" onclick="openCommentsModal('${order.orderId}')" title="הצג הערות" ${isPlaceholder ? 'disabled' : ''}>
+                         <button class="action-button" onclick="openCommentsModal('${isPlaceholder ? order.internalId : order.orderId}')" title="הצג הערות">
                             <i class="fas fa-comments"></i>
                         </button>
                         <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'disabled' : ''}>
@@ -459,19 +496,21 @@
 
             const finalizeSection = isPlaceholder ? `
                 <div class="finalize-section">
-                    <input type="text" id="finalize-input-${order.internalId}" placeholder="הזן מספר הזמנה מ-COMAX" required>
-                    <button onclick="handleSaveOrderId('${order.internalId}')">שמור מספר</button>
+                    <h4>נדרש מספר הזמנה מקומקס</h4>
+                    <div class="finalize-input-group">
+                        <input type="text" id="finalize-input-${order.internalId}" placeholder="הזן מספר הזמנה..." required>
+                        <button onclick="handleSaveOrderId('${order.internalId}')">שמור מספר</button>
+                    </div>
                 </div>` : '';
             
             const liClass = isPlaceholder ? 'schedule-card placeholder' : 'schedule-card';
-            // Use internalId for dataset if it exists, otherwise fall back to orderId
             const dataId = order.internalId || order.orderId;
 
             return `<li class="${liClass}" data-internal-id="${dataId}">${mainContent}${finalizeSection}</li>`;
         }
 
         // Placeholder for functions that are not modified but needed for completeness
-        async function openCommentsModal(orderId) { if(orderId) alert(`Opening comments for ${orderId}`); }
+        async function openCommentsModal(id) { alert(`Opening comments for ${id}`); }
         async function openAnalyticsModal() { alert('Analytics modal'); }
         async function openLogsModal() { alert('Logs modal'); }
         async function openUnlinkedDocsModal() { alert('Unlinked Docs modal'); }
