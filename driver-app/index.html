@@ -66,7 +66,6 @@
         .close-button { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
         #pdfViewer { width: 100%; height: 75vh; border: none; }
         
-        /* Hide leaflet routing itinerary */
         .leaflet-routing-container { display: none; }
     </style>
 </head>
@@ -180,6 +179,7 @@
             if (!oneSignalFailed) initializeNotifications(driverId);
             startLocationTracking(driverId);
             fetchDriverOrders(driverId);
+            setInterval(() => fetchDriverOrders(driverId), 30000); // Refresh orders periodically
         }
         
         async function initializeNotifications(driverId) {
@@ -194,7 +194,6 @@
 
         async function fetchDriverOrders(driverId) {
             orderList.innerHTML = '<p class="text-center p-8">טוען משימות...</p>';
-            mapInstances = {};
             try {
                 const orders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0], driverId });
                 renderOrders(orders);
@@ -226,22 +225,51 @@
         }
 
         function initializeMapAndRoute(order) {
-            // Logic remains the same as original
+            if (!driverLocation || !order.latitude) return;
+            const mapId = `map-${order.orderId}`;
+            if (document.getElementById(mapId) && !mapInstances[mapId]) {
+                 const map = L.map(mapId, { zoomControl: false, attributionControl: false }).setView([32.0853, 34.7818], 10);
+                 mapInstances[mapId] = map;
+                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+                 const routingControl = L.Routing.control({
+                     waypoints: [
+                         L.latLng(driverLocation.latitude, driverLocation.longitude),
+                         L.latLng(order.latitude, order.longitude)
+                     ],
+                     createMarker: () => null, 
+                     routeWhileDragging: false,
+                     lineOptions: { styles: [{color: '#03045e', weight: 5}] }
+                 }).addTo(map);
+
+                 routingControl.on('routesfound', function(e) {
+                     const route = e.routes[0];
+                     const summary = route.summary;
+                     document.getElementById(`metrics-${order.orderId}`).innerText = 
+                         `מרחק: ${(summary.totalDistance / 1000).toFixed(1)} ק"מ | זמן: ${Math.round(summary.totalTime / 60)} דקות`;
+                 });
+            }
         }
         
         function startLocationTracking(driverId) {
-             // Logic remains the same as original
+             navigator.geolocation.watchPosition(
+                (pos) => {
+                    driverLocation = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+                    apiFetch('updateDriverLocation', {}, 'POST', { driverId, ...driverLocation });
+                },
+                (err) => console.error(err),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
         }
         
         function createOrderCardHTML(order) {
             const isStartDisabled = !['שויך', 'טעון'].includes(order.status);
             const isCompleteDisabled = order.status !== 'בדרך';
-            const statusInfo = { 'שויך': { text: 'שויך' }, 'טעון': { text: 'טעון' }, 'בדרך': { text: 'בדרך' }, 'הושלם': { text: 'הושלם' } };
-            const currentStatus = statusInfo[order.status] || { text: order.status };
+            const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
 
             return `
             <div class="order-card" data-order-id="${order.orderId}">
-                <div class="card-header"><h2>${order.customerName}</h2><span>${currentStatus.text}</span></div>
+                <div class="card-header"><h2>${order.customerName}</h2><span>${order.status}</span></div>
                 <div id="map-${order.orderId}" class="map-canvas"></div>
                 <div id="metrics-${order.orderId}" class="metrics"></div>
                 <div class="card-content">
@@ -253,7 +281,7 @@
                     <button class="action-btn start" onclick="updateOrderStatus(event, '${order.orderId}', 'בדרך')" ${isStartDisabled ? 'disabled' : ''}><i class="fas fa-route"></i> התחל</button>
                     <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}" target="_blank" class="action-btn navigate"><i class="fas fa-diamond-turn-right"></i> נווט</a>
                     <button class="action-btn whatsapp full-width" onclick="shareOnWhatsApp('${order.customerPhone}', '${sanitizeForJS(order.customerName)}')"><i class="fab fa-whatsapp"></i> שלח מיקום</button>
-                    <button class="action-btn" onclick="openPdfModal('${order.orderId}')" style="background-color: var(--secondary-color);"><i class="fas fa-file-pdf"></i> הצג מסמך</button>
+                    <button class="action-btn" onclick="openPdfModal('${order.orderId}')" style="background-color: var(--secondary-color);" ${!hasPdf ? 'disabled' : ''}><i class="fas fa-file-pdf"></i> הצג מסמך</button>
                     <button class="action-btn complete" onclick="updateOrderStatus(event, '${order.orderId}', 'הושלם')" ${isCompleteDisabled ? 'disabled' : ''}><i class="fas fa-check-circle"></i> סיים</button>
                 </div>
             </div>`;
@@ -285,7 +313,14 @@
         }
 
         function shareOnWhatsApp(phone, customerName) {
-            // Logic remains the same as original
+             if (!driverLocation) {
+                alert("לא ניתן לשתף מיקום עדיין, המתן לאיכון GPS.");
+                return;
+            }
+            const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${driverLocation.latitude},${driverLocation.longitude}`;
+            const message = encodeURIComponent(`שלום ${customerName}, הנהג בדרך אליך. תוכל לעקוב אחר מיקומו כאן: ${mapsUrl}`);
+            const whatsappUrl = `https://wa.me/${phone}?text=${message}`;
+            window.open(whatsappUrl, '_blank');
         }
 
         function switchView(viewId) {
@@ -295,4 +330,3 @@
     </script>
 </body>
 </html>
-
