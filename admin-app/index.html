@@ -104,12 +104,12 @@
                     <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
                     <form id="createOrderForm" autocomplete="off">
                         <div class="form-group">
-                            <label for="customerId">מספר לקוח (מ-COMAX)</label>
-                            <input type="text" id="customerId" required>
+                            <label for="customerName">שם לקוח (התחל להקליד)</label>
+                            <input type="text" id="customerName" list="customers-list" required>
                         </div>
                         <div class="form-group">
-                            <label for="customerName">שם לקוח</label>
-                            <input type="text" id="customerName" required>
+                            <label for="customerId">מספר לקוח (מ-COMAX)</label>
+                            <input type="text" id="customerId">
                         </div>
                         <div class="form-group">
                             <label for="contactPerson">איש קשר</label>
@@ -154,11 +154,12 @@
     <div id="unlinkedDocsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוח מסמכים ללא שיוך</h2><div id="unlinkedDocsContent" class="table-container"></div></div></div>
 
     <div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+    <datalist id="customers-list"></datalist>
 
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycbzf3AtCGWbrPXBdoa4xo0_0qmT4qD9llLH8zAGp2ouc4Yu1Hm5M_FUkIVhr6SwrNkSG/exec';
         
-        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
+        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [], customersData = [];
         const currentUser = 'Admin';
         const currentRole = 'Administrator';
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
@@ -384,53 +385,7 @@
                 btn.textContent = 'שמור מספר';
             }
         }
-
-        async function handleCustomerIdBlur(event) {
-            const customerId = event.target.value.trim();
-            if (!customerId) return;
-
-            logEvent(`Fetching details for customer ID: ${customerId}`);
-            try {
-                const customerDetails = await apiFetch('getCustomerDetailsById', { customerId });
-                if (customerDetails) {
-                    logEvent('Customer details found', 'success', customerDetails);
-                    document.getElementById('customerName').value = customerDetails.name || '';
-                    document.getElementById('contactPerson').value = customerDetails.contactPerson || '';
-                    document.getElementById('customerPhone').value = customerDetails.phone || '';
-
-                    const address = customerDetails.address || '';
-                    const addressParts = address.split(',');
-                    const city = addressParts.length > 1 ? addressParts[1].trim() : '';
-                    const streetAndNum = addressParts[0] || '';
-                    
-                    const match = streetAndNum.match(/(.*?)\s*([\d/]+.*)$/);
-                    let street = streetAndNum;
-                    let number = '';
-                    if (match) {
-                        street = match[1].trim();
-                        number = match[2].trim();
-                    }
-
-                    document.getElementById('street').value = street;
-                    document.getElementById('houseNumber').value = number;
-                    
-                    const citySelect = document.getElementById('city');
-                    const cityOption = Array.from(citySelect.options).find(opt => opt.value === city);
-                    if (cityOption) citySelect.value = city;
-
-                } else {
-                    logEvent(`No existing customer found for ID: ${customerId}. Ready for new customer creation.`, 'info');
-                    document.getElementById('customerName').value = '';
-                    document.getElementById('contactPerson').value = '';
-                    document.getElementById('customerPhone').value = '';
-                    document.getElementById('street').value = '';
-                    document.getElementById('houseNumber').value = '';
-                }
-            } catch (error) {
-                logEvent(`Error fetching customer details: ${error.message}`, 'error');
-            }
-        }
-
+        
         function populateDropdowns() {
             const deliveryTypeSelect = document.getElementById('deliveryType');
             deliveryTypes.forEach(type => { deliveryTypeSelect.innerHTML += `<option value="${type}">${type}</option>`; });
@@ -540,8 +495,8 @@
             try {
                 const data = await apiFetch('getVersion');
                 logEvent(`API Version confirmed: ${data.version}`, 'success');
-                 if (data.version !== "22.2") {
-                    const msg = `Warning: Mismatched API version. Expected 22.2 but found ${data.version}. Please redeploy the script.`;
+                 if (data.version !== "22.6") {
+                    const msg = `Warning: Mismatched API version. Expected 22.6 but found ${data.version}. Please redeploy the script.`;
                     alert(msg);
                     logEvent(msg, 'error');
                 }
@@ -551,17 +506,73 @@
             }
         }
         
-        document.addEventListener('DOMContentLoaded', async () => {
-            logEvent("DOM Loaded. Initializing app.", "success");
-            
+        async function loadInitialData() {
             await checkApiVersion();
             initializeMap();
             populateDropdowns();
+            try {
+                customersData = await apiFetch('getCustomers');
+                populateCustomerDatalist(customersData);
+                logEvent("Customer data loaded.", 'success');
+            } catch (error) {
+                logEvent("Failed to load customer data", 'error', error);
+                showToast('שגיאה בטעינת רשימת הלקוחות', 'error');
+            }
             await buildScheduler();
             await updateMap(); 
             setInterval(() => { buildScheduler(); updateMap(); }, 30000);
+        }
 
-            document.getElementById('customerId').addEventListener('blur', handleCustomerIdBlur);
+        function populateCustomerDatalist(customers) {
+            const dataList = document.getElementById('customers-list');
+            dataList.innerHTML = '';
+            customers.forEach(customer => {
+                if (customer.name) {
+                    const option = document.createElement('option');
+                    option.value = customer.name;
+                    dataList.appendChild(option);
+                }
+            });
+        }
+        
+        function handleCustomerSelection(event) {
+            const selectedName = event.target.value;
+            const selectedCustomer = customersData.find(c => c.name === selectedName);
+
+            if (selectedCustomer) {
+                logEvent(`Selected customer: ${selectedName}`, 'info', selectedCustomer);
+                document.getElementById('customerId').value = selectedCustomer.customerId || '';
+                document.getElementById('contactPerson').value = selectedCustomer.contactPerson || '';
+                document.getElementById('customerPhone').value = selectedCustomer.phone || '';
+                
+                const address = selectedCustomer.address || '';
+                const addressParts = address.split(',');
+                const city = addressParts.length > 1 ? addressParts[1].trim() : '';
+                const streetAndNum = addressParts[0] || '';
+                
+                const match = streetAndNum.match(/(.*?)\s*([\d/]+.*)$/);
+                let street = streetAndNum;
+                let number = '';
+                if (match) {
+                    street = match[1].trim();
+                    number = match[2].trim();
+                }
+
+                document.getElementById('street').value = street;
+                document.getElementById('houseNumber').value = number;
+                
+                const citySelect = document.getElementById('city');
+                const cityOption = Array.from(citySelect.options).find(opt => opt.value === city);
+                if (cityOption) citySelect.value = city;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            logEvent("DOM Loaded. Initializing app.", "success");
+            
+            loadInitialData();
+
+            document.getElementById('customerName').addEventListener('input', handleCustomerSelection);
             document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
             document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
             
