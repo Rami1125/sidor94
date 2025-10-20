@@ -72,6 +72,7 @@
         #commentForm { display: flex; gap: 10px; }
         #commentForm input { flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; }
         #commentForm button { width: auto; }
+        .sync-buttons button { margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -105,6 +106,15 @@
                         <button type="submit">צור הזמנה</button>
                     </form>
                 </div>
+                 <!-- NEW: System Sync Card -->
+                <div class="card">
+                    <h2><i class="fas fa-sync-alt"></i> סנכרון מערכת</h2>
+                    <div class="sync-buttons">
+                        <button id="syncEmailsBtn"><i class="fas fa-envelope"></i> סנכרון מיילים מקומקס</button>
+                        <button id="syncDocsBtn"><i class="fas fa-file-import"></i> סנכרון מסמכים להזמנות</button>
+                        <button id="unlinkedDocsBtn" style="background-color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> דוח מסמכים ללא שיוך</button>
+                    </div>
+                </div>
                 <div class="card">
                     <h2><i class="fas fa-chart-line"></i> דוחות וביצועים</h2>
                     <button id="showAnalyticsBtn" style="width: 100%; background-color: var(--success);"><i class="fas fa-chart-bar"></i> הצג דאשבורד</button>
@@ -123,10 +133,15 @@
     <div id="logsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תיעוד צפיות במסמכים</h2><div id="logsContent" class="table-container"></div></div></div>
     <div id="pdfModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תצוגת מסמך</h2><iframe id="pdfViewer" style="width:100%; height: 70vh; border:none;"></iframe></div></div>
     <div id="commentsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>הערות להזמנה</h2><div id="commentsContent"></div></div></div>
+    <!-- NEW: Unlinked Docs Modal -->
+    <div id="unlinkedDocsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוח מסמכים ללא שיוך</h2><div id="unlinkedDocsContent" class="table-container"></div></div></div>
+
 
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
-        
+        // Placeholder for the Comax Processor API - replace with the actual URL when available
+        const COMAX_API_URL = 'https://script.google.com/macros/s/AKfycbxGad0zYllTYhc-jMwnUnMwufdCF00aMUMfba-_aUxEMZG1z2k71u72Qw8J4xFEQSZg/exec';
+
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
         const currentUser = 'Admin';
         const currentRole = 'Administrator';
@@ -154,6 +169,21 @@
             const result = await response.json();
             if (result.status !== 'success') throw new Error(result.message);
             return result.data;
+        }
+        
+        // NEW: Function to call the external Comax processor script
+        async function triggerExternalSync(action) {
+            // In a real scenario, you'd use the COMAX_API_URL
+            // For now, we'll simulate it with a placeholder alert
+            alert(`This would trigger the '${action}' action on the Comax Processor script.`);
+            return {status: "success", message: "Action triggered (simulation)."};
+            
+            // Real implementation would look like this:
+            /*
+            const response = await fetch(`${COMAX_API_URL}?action=${action}`);
+            if (!response.ok) throw new Error('Network response was not ok.');
+            return await response.json();
+            */
         }
         
         async function buildScheduler() {
@@ -202,7 +232,7 @@
             });
 
             try {
-                await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { driverId: newDriverId } });
+                await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
                 logEvent(`Update for order ${orderId} successful.`, 'success');
                 allTodayOrders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] });
                 updateMap();
@@ -227,7 +257,7 @@
             logEvent("Updating map...");
             if (!liveMap) return;
             try {
-                const { drivers, pendingOrders } = await apiFetch('getLiveMapData');
+                const { drivers, orders } = await apiFetch('getLiveMapData');
                 
                 Object.values(driverMarkers).forEach(m => m.remove());
                 orderMarkersLayer.clearLayers();
@@ -238,7 +268,7 @@
                     }
                 });
 
-                allTodayOrders.forEach(o => {
+                orders.forEach(o => {
                     if (o.latitude && o.status !== 'הושלם') {
                        const iconUrl = (!o.driverId) 
                            ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png' // Pending
@@ -291,9 +321,11 @@
         
         function openModal(modalId, contentId, loadingMessage) {
             const modal = document.getElementById(modalId);
-            const content = document.getElementById(contentId);
+            const content = document.getElementById(contentId || modalId + 'Content');
             modal.style.display = 'block';
-            content.innerHTML = `<p>${loadingMessage}</p>`;
+            if (content && loadingMessage) {
+                content.innerHTML = `<p>${loadingMessage}</p>`;
+            }
             return {modal, content};
         }
 
@@ -302,10 +334,10 @@
             try {
                 const historyData = await apiFetch('getHistory');
                 if (!historyData.length) { content.innerHTML = '<p>לא נמצאו נתוני היסטוריה.</p>'; return; }
-                let tableHTML = `<table><thead><tr><th>זמן</th><th>מזהה</th><th>לקוח</th><th>נהג</th><th>סטטוס</th></tr></thead><tbody>`;
-                historyData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                let tableHTML = `<table><thead><tr><th>תאריך</th><th>לקוח</th><th>סטטוס</th><th>נהג</th></tr></thead><tbody>`;
+                historyData.sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp))
                            .forEach(record => {
-                    tableHTML += `<tr><td>${new Date(record.timestamp).toLocaleString('he-IL')}</td><td>${record.orderId || 'N/A'}</td><td>${record.customerName || 'N/A'}</td><td>${record.driverId || '-'}</td><td>${record.status || 'N/A'}</td></tr>`;
+                    tableHTML += `<tr><td>${new Date(record.Timestamp).toLocaleString('he-IL')}</td><td>${record.CustomerName || 'N/A'}</td><td>${record.Status || 'N/A'}</td><td>${record.DriverID || '-'}</td></tr>`;
                 });
                 content.innerHTML = tableHTML + `</tbody></table>`;
             } catch (error) {
@@ -341,7 +373,7 @@
             try {
                 const logsData = await apiFetch('getLogs');
                 if (!logsData.length) { content.innerHTML = '<p>לא נמצאו נתוני תיעוד.</p>'; return; }
-                let tableHTML = `<table><thead><tr><th>זמן</th><th>משתמש</th><th>תפקיד</th><th>מזהה הזמנה</th><th>פעולה</th><th>פתח מסמך</th></tr></thead><tbody>`;
+                let tableHTML = `<table><thead><tr><th>זמן</th><th>משתמש</th><th>תפקיד</th><th>מזהה הזמנה</th><th>פעולה</th></tr></thead><tbody>`;
                 logsData.sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp))
                            .forEach(log => {
                     tableHTML += `<tr>
@@ -350,7 +382,6 @@
                         <td>${log.Role || 'N/A'}</td>
                         <td>${log.OrderID || '-'}</td>
                         <td>${log.Action || 'N/A'}</td>
-                        <td><button class="action-button" style="padding: 2px 8px; font-size: 0.8em;" onclick="openPdfModal('${log.OrderID}')" title="פתח PDF"><i class="fas fa-file-pdf"></i></button></td>
                     </tr>`;
                 });
                 content.innerHTML = tableHTML + `</tbody></table>`;
@@ -406,6 +437,30 @@
                 content.innerHTML = `<p style="color:red;">שגיאה בטעינת הערות: ${error.message}</p>`;
             }
         }
+        
+        // NEW: Function to open the unlinked documents modal
+        async function openUnlinkedDocsModal() {
+            const { content } = openModal('unlinkedDocsModal', 'unlinkedDocsContent', 'טוען דוח...');
+            try {
+                const docs = await apiFetch('getUnlinkedDocuments');
+                if (!docs.length) {
+                    content.innerHTML = '<p>כל המסמכים שנסרקו שויכו בהצלחה.</p>';
+                    return;
+                }
+                let tableHTML = `<table><thead><tr><th>תאריך סריקה</th><th>מספר הזמנה</th><th>קישור למסמך</th></tr></thead><tbody>`;
+                docs.forEach(doc => {
+                    tableHTML += `<tr>
+                        <td>${new Date(doc.Timestamp).toLocaleString('he-IL')}</td>
+                        <td>${doc['מספר הזמנה']}</td>
+                        <td><a href="${doc.pdfLink}" target="_blank">פתח מסמך</a></td>
+                    </tr>`;
+                });
+                content.innerHTML = tableHTML + `</tbody></table>`;
+            } catch (error) {
+                 content.innerHTML = `<p style="color:red;">שגיאה בטעינת הדוח: ${error.message}</p>`;
+            }
+        }
+
 
         async function handleCommentSubmit(event, orderId) {
             event.preventDefault();
@@ -442,6 +497,37 @@
             document.getElementById('showAnalyticsBtn').addEventListener('click', openAnalyticsModal);
             document.getElementById('showLogsBtn').addEventListener('click', openLogsModal);
             document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
+            
+            // NEW: Event listeners for sync buttons
+            document.getElementById('unlinkedDocsBtn').addEventListener('click', openUnlinkedDocsModal);
+            document.getElementById('syncEmailsBtn').addEventListener('click', async (e) => {
+                const btn = e.currentTarget;
+                btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מבצע...';
+                try {
+                    // This calls the external (simulated) script
+                    await triggerExternalSync('processComaxEmails');
+                    alert('סנכרון המיילים הופעל. התוצאות יופיעו בקרוב.');
+                } catch(error) {
+                    alert('שגיאה בהפעלת סנכרון מיילים: ' + error.message);
+                } finally {
+                     btn.disabled = false; btn.innerHTML = '<i class="fas fa-envelope"></i> סנכרון מיילים מקומקס';
+                }
+            });
+            document.getElementById('syncDocsBtn').addEventListener('click', async (e) => {
+                 const btn = e.currentTarget;
+                btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מבצע...';
+                try {
+                     // This calls the external (simulated) script
+                    await triggerExternalSync('syncScannedToMainOrders');
+                    alert('סנכרון המסמכים הופעל. המערכת תתעדכן בקרוב.');
+                    setTimeout(buildScheduler, 5000); // Refresh scheduler after a delay
+                } catch(error) {
+                    alert('שגיאה בהפעלת סנכרון מסמכים: ' + error.message);
+                } finally {
+                     btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> סנכרון מסמכים להזמנות';
+                }
+            });
+
             document.querySelectorAll('.close-button').forEach(btn => {
                 btn.onclick = () => btn.closest('.modal').style.display = 'none';
             });
@@ -451,6 +537,8 @@
         });
 
         function createScheduleCard(order) {
+            // Check if pdfLink exists and is not an empty string
+            const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
             return `
                 <li class="schedule-card" data-order-id="${order.orderId}">
                     <div class="schedule-card-details">
@@ -462,7 +550,7 @@
                          <button class="action-button" onclick="openCommentsModal('${order.orderId}')" title="הצג הערות">
                             <i class="fas fa-comments"></i>
                         </button>
-                        <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה">
+                        <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'style="display:none;"' : ''}>
                             <i class="fas fa-paperclip"></i>
                         </button>
                     </div>
@@ -471,4 +559,3 @@
     </script>
 </body>
 </html>
-
