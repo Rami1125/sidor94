@@ -73,6 +73,14 @@
         .finalize-input-group { display: flex; gap: 10px; }
         .finalize-input-group input { flex-grow: 1; }
         .finalize-input-group button { width: auto; font-size: 0.9em; padding: 8px 12px; }
+        
+        #commentsContainer { max-height: 45vh; overflow-y: auto; background-color: #f1f5f9; border-radius: 8px; padding: 10px; margin-bottom: 15px;}
+        .comment { background-color: var(--white); border-radius: 12px; padding: 10px 15px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .comment p { margin: 0; }
+        .comment .author { font-weight: 500; font-size: 0.9rem; color: var(--primary-color); margin-bottom: 4px; }
+        #commentForm { display: flex; gap: 10px; }
+        #commentForm input { flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; }
+        #commentForm button { width: auto; }
     </style>
 </head>
 <body>
@@ -145,9 +153,10 @@
     <div id="commentsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>הערות להזמנה</h2><div id="commentsContent"></div></div></div>
     <div id="unlinkedDocsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוח מסמכים ללא שיוך</h2><div id="unlinkedDocsContent" class="table-container"></div></div></div>
 
+    <div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbx0kCkRrWgChgcKLOXGFWCyEr86W4MZsz29kVP_SCYAxCd3PSM0fiPHZ_zu_xnrUnXF/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzf3AtCGWbrPXBdoa4xo0_0qmT4qD9llLH8zAGp2ouc4Yu1Hm5M_FUkIVhr6SwrNkSG/exec';
         
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
         const currentUser = 'Admin';
@@ -178,6 +187,43 @@
             return result.data;
         }
         
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            let bgColor, iconClass;
+
+            switch(type) {
+                case 'success': bgColor = 'var(--success)'; iconClass = 'fas fa-check-circle'; break;
+                case 'error': bgColor = 'var(--danger)'; iconClass = 'fas fa-exclamation-circle'; break;
+                default: bgColor = 'var(--info)'; iconClass = 'fas fa-info-circle'; break;
+            }
+
+            toast.style.backgroundColor = bgColor;
+            toast.style.color = 'white';
+            toast.style.padding = '15px 20px';
+            toast.style.borderRadius = '8px';
+            toast.style.marginBottom = '10px';
+            toast.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s, transform 0.5s';
+            toast.style.transform = 'translateX(100%)';
+            toast.innerHTML = `<i class="${iconClass}" style="margin-left: 10px;"></i> ${message}`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+            }, 100);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 500);
+            }, 5000);
+        }
+
         async function buildScheduler() {
             logEvent("Building scheduler...");
             document.getElementById('scheduler').innerHTML = '<p>טוען נתונים...</p>';
@@ -304,10 +350,11 @@
                  await apiFetch('createOrder', {}, 'POST', orderData);
                 logEvent('New order placeholder created successfully.', 'success');
                 document.getElementById('createOrderForm').reset();
+                showToast('הזמנת ביניים נוצרה בהצלחה!', 'success');
                 setTimeout(() => { buildScheduler(); updateMap(); }, 800);
             } catch(error) {
                 logEvent(`Error creating order placeholder: ${error.message}`, 'error');
-                alert(`שגיאה ביצירת הזמנה: ${error.message}`);
+                showToast(`שגיאה ביצירת הזמנה: ${error.message}`, 'error');
             } finally {
                 btn.disabled = false; btn.textContent = 'צור הזמנת ביניים';
             }
@@ -328,11 +375,11 @@
             try {
                 await apiFetch('finalizeOrder', {}, 'POST', { internalId, finalOrderId });
                 logEvent(`Order ${internalId} finalized with ID ${finalOrderId}`, 'success');
-                alert('מספר ההזמנה נשמר בהצלחה!');
+                showToast('מספר ההזמנה נשמר בהצלחה!', 'success');
                 await buildScheduler();
             } catch (error) {
                 logEvent(`Failed to finalize order ${internalId}: ${error.message}`, 'error');
-                alert(`שגיאה בשמירת מספר הזמנה: ${error.message}`);
+                showToast(`שגיאה בשמירת מספר הזמנה: ${error.message}`, 'error');
                 btn.disabled = false;
                 btn.textContent = 'שמור מספר';
             }
@@ -443,12 +490,58 @@
             }
         }
         
+        async function openUnlinkedDocsModal() {
+            const { content } = openModal('unlinkedDocsModal', 'unlinkedDocsContent', 'טוען דוח...');
+            try {
+                const docs = await apiFetch('getUnlinkedDocuments');
+                if (!docs || !docs.length) {
+                    content.innerHTML = '<p>כל המסמכים שנסרקו שויכו בהצלחה.</p>';
+                    return;
+                }
+                let tableHTML = `<table><thead><tr><th>תאריך סריקה</th><th>מספר הזמנה</th><th>קישור למסמך</th></tr></thead><tbody>`;
+                docs.forEach(doc => {
+                    tableHTML += `<tr>
+                        <td>${doc.scanTimestamp ? new Date(doc.scanTimestamp).toLocaleString('he-IL') : 'N/A'}</td>
+                        <td>${doc.extractedOrderNumber || 'לא זוהה'}</td>
+                        <td><a href="${doc.pdfLink}" target="_blank">פתח מסמך</a></td>
+                    </tr>`;
+                });
+                content.innerHTML = tableHTML + `</tbody></table>`;
+            } catch (error) {
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת הדוח: ${error.message}</p>`;
+            }
+        }
+
+        async function handleSyncAction(event, action, actionName) {
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מבצע...';
+            showToast(`מתחיל ${actionName}...`, 'info');
+
+            try {
+                const result = await apiFetch(action, {}, 'POST', {});
+                logEvent(`${actionName} completed successfully.`, 'success', result);
+                showToast(result.message, 'success');
+                if (action === 'syncScannedToMainOrders') {
+                    await buildScheduler(); // Refresh board if documents were linked
+                }
+            } catch (error) {
+                logEvent(`Error during ${actionName}: ${error.message}`, 'error');
+                showToast(`שגיאה ב${actionName}: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+
         async function checkApiVersion() {
             try {
                 const data = await apiFetch('getVersion');
                 logEvent(`API Version confirmed: ${data.version}`, 'success');
-                 if (data.version !== "22.0") {
-                    const msg = `Warning: Mismatched API version. Expected 22.0 but found ${data.version}. Please redeploy the script.`;
+                 if (data.version !== "22.2") {
+                    const msg = `Warning: Mismatched API version. Expected 22.2 but found ${data.version}. Please redeploy the script.`;
                     alert(msg);
                     logEvent(msg, 'error');
                 }
@@ -472,6 +565,10 @@
             document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
             document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
             
+            document.getElementById('syncEmailsBtn').addEventListener('click', (e) => handleSyncAction(e, 'processComaxEmails', 'סנכרון מיילים'));
+            document.getElementById('syncDocsBtn').addEventListener('click', (e) => handleSyncAction(e, 'syncScannedToMainOrders', 'סנכרון מסמכים'));
+            document.getElementById('unlinkedDocsBtn').addEventListener('click', openUnlinkedDocsModal);
+
             document.querySelectorAll('.close-button').forEach(btn => {
                 btn.onclick = () => btn.closest('.modal').style.display = 'none';
             });
@@ -516,12 +613,53 @@
             return `<li class="${liClass}" data-internal-id="${dataId}">${mainContent}${finalizeSection}</li>`;
         }
 
-        // Placeholder for functions that are not modified but needed for completeness
-        async function openCommentsModal(id) { alert(`Opening comments for ${id}`); }
+        async function openCommentsModal(orderId) {
+            const { content } = openModal('commentsModal', 'commentsContent', 'טוען הערות...');
+            try {
+                const comments = await apiFetch('getComments', { orderId });
+                content.innerHTML = `
+                    <div id="commentsContainer">
+                        ${(comments && comments.length > 0) ? comments.map(c => `
+                            <div class="comment">
+                                <p class="author">${c.author || 'לא ידוע'}</p>
+                                <p>${c.text || ''}</p>
+                            </div>`).join('') : '<p>אין הערות להזמנה זו.</p>'}
+                    </div>
+                    <form id="commentForm">
+                        <input type="text" id="commentInput" placeholder="הקלד הערה..." required>
+                        <button type="submit">שלח</button>
+                    </form>
+                `;
+                document.getElementById('commentForm').addEventListener('submit', (e) => handleCommentSubmit(e, orderId));
+            } catch (error) {
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת הערות: ${error.message}</p>`;
+            }
+        }
+        
+        async function handleCommentSubmit(event, orderId) {
+            event.preventDefault();
+            const input = document.getElementById('commentInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const button = event.target.querySelector('button');
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                await apiFetch('postComment', {}, 'POST', { orderId, author: currentUser, text });
+                input.value = '';
+                await openCommentsModal(orderId);
+            } catch (error) {
+                alert('שגיאה בשליחת הערה: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'שלח';
+            }
+        }
+        
         async function openAnalyticsModal() { alert('Analytics modal'); }
         async function openLogsModal() { alert('Logs modal'); }
-        async function openUnlinkedDocsModal() { alert('Unlinked Docs modal'); }
-        async function triggerExternalSync(action) { alert(`Triggering ${action}`); }
 
     </script>
 </body>
