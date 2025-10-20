@@ -157,7 +157,7 @@
     <datalist id="customers-list"></datalist>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyP5D9bA4EnzPs7cjxSl0GqHCaeqd06dZ-Sz55B-4MdtUZGeLQ16MAF-cCdlW6uOf_A/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzBRihbF8Owo8BKBRb8UhRWgl6AWooaxmhekMcHIYAxbvCBHNIcTwBUegP2SzPNWCPi/exec';
         
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [], customersData = [];
         const currentUser = 'Admin';
@@ -348,8 +348,9 @@
             logEvent(`Creating order placeholder...`, 'info', orderData);
 
             try {
-                 await apiFetch('createOrder', {}, 'POST', orderData);
-                logEvent('New order placeholder created successfully.', 'success');
+                 const result = await apiFetch('createOrder', {}, 'POST', orderData);
+                logEvent('New order placeholder created successfully on backend.', 'success', result);
+                logEvent("--- מלשינון: מנסה לרענן את לוח השיבוצים. אם ההזמנה לא מופיעה, יש לבדוק את תקינות הנתונים בגיליון 'Orders' ---");
                 document.getElementById('createOrderForm').reset();
                 showToast('הזמנת ביניים נוצרה בהצלחה!', 'success');
                 setTimeout(() => { buildScheduler(); updateMap(); }, 800);
