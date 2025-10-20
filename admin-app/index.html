@@ -51,6 +51,7 @@
         .card-actions { display: flex; align-items: center; gap: 5px; }
         .action-button { background: none; border: none; font-size: 1.2rem; color: var(--secondary-color); cursor: pointer; padding: 5px;}
         .action-button:hover { color: var(--primary-color); }
+        .action-button.share-link:hover { color: #28a745; }
         .ghost-card { background: #cce5ff; opacity: 0.7; border: 2px dashed var(--primary-color); }
         .form-group { margin-bottom: 15px; position: relative; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
@@ -73,7 +74,6 @@
         .finalize-input-group { display: flex; gap: 10px; }
         .finalize-input-group input { flex-grow: 1; }
         .finalize-input-group button { width: auto; font-size: 0.9em; padding: 8px 12px; }
-        
         #commentsContainer { max-height: 45vh; overflow-y: auto; background-color: #f1f5f9; border-radius: 8px; padding: 10px; margin-bottom: 15px;}
         .comment { background-color: var(--white); border-radius: 12px; padding: 10px 15px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .comment p { margin: 0; }
@@ -157,7 +157,7 @@
     <datalist id="customers-list"></datalist>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyJEvrlbwMBamXPpdBVaMifrUuhncnNI5GpDy6VG92vFhbN-ua3ZJ9MGI4No9AeYWzo/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycby-nQJUJ5deCHhWCggBWWkJ_VTWPFixf_FVsZtM-DhX3UmZ6uuEIbs56-YGeue4X-Cd/exec';
         
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [], customersData = [];
         const currentUser = 'Admin';
@@ -495,8 +495,8 @@
             try {
                 const data = await apiFetch('getVersion');
                 logEvent(`API Version confirmed: ${data.version}`, 'success');
-                 if (data.version !== "22.6") {
-                    const msg = `Warning: Mismatched API version. Expected 22.6 but found ${data.version}. Please redeploy the script.`;
+                 if (data.version !== "22.8") {
+                    const msg = `Warning: Mismatched API version. Expected 22.8 but found ${data.version}. Please redeploy the script.`;
                     alert(msg);
                     logEvent(msg, 'error');
                 }
@@ -535,35 +535,56 @@
             });
         }
         
+        function populateFormWithCustomerData(customer) {
+            if (!customer) return;
+            
+            const lowerCaseCustomer = {};
+            for (const key in customer) {
+                lowerCaseCustomer[key.toLowerCase()] = customer[key];
+            }
+
+            logEvent(`Populating form with customer data`, 'info', lowerCaseCustomer);
+
+            document.getElementById('customerName').value = lowerCaseCustomer.name || '';
+            document.getElementById('customerId').value = lowerCaseCustomer.customerid || '';
+            document.getElementById('contactPerson').value = lowerCaseCustomer.contactperson || '';
+            document.getElementById('customerPhone').value = lowerCaseCustomer.phone || '';
+            
+            const address = lowerCaseCustomer.address || '';
+            const addressParts = address.split(',');
+            const city = addressParts.length > 1 ? addressParts[1].trim() : '';
+            const streetAndNum = addressParts[0] || '';
+            
+            const match = streetAndNum.match(/(.*?)\s*([\d/]+.*)$/);
+            let street = streetAndNum;
+            let number = '';
+            if (match) {
+                street = match[1].trim();
+                number = match[2].trim();
+            }
+
+            document.getElementById('street').value = street;
+            document.getElementById('houseNumber').value = number;
+            
+            const citySelect = document.getElementById('city');
+            const cityOption = Array.from(citySelect.options).find(opt => opt.value === city);
+            if (cityOption) citySelect.value = city;
+        }
+
         function handleCustomerSelection(event) {
             const selectedName = event.target.value;
             const selectedCustomer = customersData.find(c => c.name === selectedName);
-
             if (selectedCustomer) {
-                logEvent(`Selected customer: ${selectedName}`, 'info', selectedCustomer);
-                document.getElementById('customerId').value = selectedCustomer.customerId || '';
-                document.getElementById('contactPerson').value = selectedCustomer.contactPerson || '';
-                document.getElementById('customerPhone').value = selectedCustomer.phone || '';
-                
-                const address = selectedCustomer.address || '';
-                const addressParts = address.split(',');
-                const city = addressParts.length > 1 ? addressParts[1].trim() : '';
-                const streetAndNum = addressParts[0] || '';
-                
-                const match = streetAndNum.match(/(.*?)\s*([\d/]+.*)$/);
-                let street = streetAndNum;
-                let number = '';
-                if (match) {
-                    street = match[1].trim();
-                    number = match[2].trim();
-                }
+                populateFormWithCustomerData(selectedCustomer);
+            }
+        }
 
-                document.getElementById('street').value = street;
-                document.getElementById('houseNumber').value = number;
-                
-                const citySelect = document.getElementById('city');
-                const cityOption = Array.from(citySelect.options).find(opt => opt.value === city);
-                if (cityOption) citySelect.value = city;
+        function handleCustomerIdInput(event) {
+            const customerId = event.target.value.trim();
+            if (!customerId) return;
+            const customer = customersData.find(c => String(c.customerId) === customerId);
+            if (customer) {
+                populateFormWithCustomerData(customer);
             }
         }
 
@@ -573,6 +594,7 @@
             loadInitialData();
 
             document.getElementById('customerName').addEventListener('input', handleCustomerSelection);
+            document.getElementById('customerId').addEventListener('blur', handleCustomerIdInput);
             document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
             document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
             
@@ -591,6 +613,7 @@
         function createScheduleCard(order) {
             const isPlaceholder = !order.orderId && order.internalId;
             const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
+            const trackingId = order.trackingId;
 
             const mainContent = `
                 <div class="card-main-content">
@@ -605,6 +628,9 @@
                         </button>
                         <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'disabled' : ''}>
                             <i class="fas fa-paperclip" ${hasPdf ? 'style="color: var(--primary-color);"' : ''}></i>
+                        </button>
+                        <button class="action-button share-link" onclick="copyTrackingLink('${trackingId}')" title="שתף לינק מעקב" ${!trackingId ? 'disabled' : ''}>
+                            <i class="fas fa-share-alt"></i>
                         </button>
                     </div>
                 </div>`;
@@ -622,6 +648,24 @@
             const dataId = order.internalId || order.orderId;
 
             return `<li class="${liClass}" data-internal-id="${dataId}">${mainContent}${finalizeSection}</li>`;
+        }
+
+        function copyTrackingLink(trackingId) {
+            if (!trackingId) {
+                showToast('לא קיים לינק מעקב להזמנה זו עדיין.', 'error');
+                return;
+            }
+            
+            const url = `${window.location.origin.replace('http:', 'https:')}//customer-app/?trackId=${trackingId}`;
+            
+            const tempInput = document.createElement('input');
+            tempInput.value = url;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            showToast('לינק המעקב הועתק!', 'success');
         }
 
         async function openCommentsModal(orderId) {
