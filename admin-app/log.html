@@ -44,7 +44,7 @@
             cursor: grab; border-right: 4px solid var(--secondary-color);
             display: flex; flex-direction: column; gap: 8px;
         }
-        .schedule-card.placeholder { border-right-color: var(--warning); }
+        .schedule-card.placeholder { border-right-color: var(--warning); background-color: #fffaf0; }
         .card-main-content { display: flex; justify-content: space-between; align-items: center; width: 100%;}
         .schedule-card-details p { margin: 2px 0; font-size: 0.9em; }
         .schedule-card-details .card-customer { font-weight: 500; font-size: 1em; }
@@ -69,7 +69,7 @@
         th { background-color: #f2f2f2; }
         .sync-buttons button { margin-bottom: 10px; }
         .finalize-section { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; }
-        .finalize-section h4 { margin: 0; font-size: 0.95em; color: var(--warning); text-align: center;}
+        .finalize-section h4 { margin: 0; font-size: 0.95em; color: var(--warning); text-align: center; font-weight: bold;}
         .finalize-input-group { display: flex; gap: 10px; }
         .finalize-input-group input { flex-grow: 1; }
         .finalize-input-group button { width: auto; font-size: 0.9em; padding: 8px 12px; }
@@ -103,7 +103,11 @@
                             <label for="customerName">שם לקוח</label>
                             <input type="text" id="customerName" required>
                         </div>
-                        <div class="form-group"><label for="customerPhone">טלפון לקוח</label><input type="tel" id="customerPhone" required></div>
+                        <div class="form-group">
+                            <label for="contactPerson">איש קשר</label>
+                            <input type="text" id="contactPerson">
+                        </div>
+                        <div class="form-group"><label for="customerPhone">טלפון</label><input type="tel" id="customerPhone" required></div>
                         <div class="form-group"><label for="city">עיר</label><select id="city" required></select></div>
                         <div class="form-group address-group">
                             <div><label for="street">רחוב</label><input type="text" id="street" required></div>
@@ -143,7 +147,7 @@
 
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzuTVGyet9nYa2UoCUOPe64ldmHB4aRH_sLYYZth8r3GgeGPsWFKRVCZGpsk2F39SV0/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzI-ICuvO1M5124bnbaETn1G8S9eA6eQo10K2v0ZxibP6S-pXHffhWrMRHYys_ZdRx9/exec';
         
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
         const currentUser = 'Admin';
@@ -287,6 +291,7 @@
             const orderData = {
                 customerId: document.getElementById('customerId').value,
                 customerName: document.getElementById('customerName').value,
+                contactPerson: document.getElementById('contactPerson').value,
                 customerPhone: document.getElementById('customerPhone').value,
                 city: document.getElementById('city').value,
                 street: document.getElementById('street').value,
@@ -343,6 +348,7 @@
                 if (customerDetails) {
                     logEvent('Customer details found', 'success', customerDetails);
                     document.getElementById('customerName').value = customerDetails.name || '';
+                    document.getElementById('contactPerson').value = customerDetails.contactPerson || '';
                     document.getElementById('customerPhone').value = customerDetails.phone || '';
 
                     const address = customerDetails.address || '';
@@ -367,7 +373,8 @@
 
                 } else {
                     logEvent(`No existing customer found for ID: ${customerId}. Ready for new customer creation.`, 'info');
-                    // Clear fields except name if it was manually entered
+                    document.getElementById('customerName').value = '';
+                    document.getElementById('contactPerson').value = '';
                     document.getElementById('customerPhone').value = '';
                     document.getElementById('street').value = '';
                     document.getElementById('houseNumber').value = '';
@@ -398,10 +405,10 @@
                 const historyData = await apiFetch('getHistory');
                 if (!historyData.length) { content.innerHTML = '<p>לא נמצאו נתוני היסטוריה.</p>'; return; }
                 let tableHTML = `<table><thead><tr><th>תאריך</th><th>לקוח</th><th>סטטוס</th><th>נהג</th></tr></thead><tbody>`;
-                historyData.sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp))
+                historyData.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate))
                            .forEach(record => {
                     tableHTML += `<tr>
-                        <td>${record.Timestamp ? new Date(record.Timestamp).toLocaleString('he-IL') : 'N/A'}</td>
+                        <td>${record.orderDate ? new Date(record.orderDate).toLocaleDateString('he-IL') : 'N/A'}</td>
                         <td>${record.customerName || 'N/A'}</td>
                         <td>${record.status || 'N/A'}</td>
                         <td>${record.driverId || '-'}</td>
@@ -440,8 +447,8 @@
             try {
                 const data = await apiFetch('getVersion');
                 logEvent(`API Version confirmed: ${data.version}`, 'success');
-                 if (data.version !== "19.0") {
-                    const msg = `Warning: Mismatched API version. Expected 19.0 but found ${data.version}. Please redeploy the script.`;
+                 if (data.version !== "20.0") {
+                    const msg = `Warning: Mismatched API version. Expected 20.0 but found ${data.version}. Please redeploy the script.`;
                     alert(msg);
                     logEvent(msg, 'error');
                 }
@@ -496,7 +503,7 @@
 
             const finalizeSection = isPlaceholder ? `
                 <div class="finalize-section">
-                    <h4>נדרש מספר הזמנה מקומקס</h4>
+                    <h4><i class="fas fa-exclamation-circle"></i> ממתין למספר הזמנה מקומקס</h4>
                     <div class="finalize-input-group">
                         <input type="text" id="finalize-input-${order.internalId}" placeholder="הזן מספר הזמנה..." required>
                         <button onclick="handleSaveOrderId('${order.internalId}')">שמור מספר</button>
