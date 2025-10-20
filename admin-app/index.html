@@ -140,13 +140,13 @@
 
     <script>
         const API_URL = 'https://script.google.com/macros/s/AKfycby_VQ0cAMNBGbCPJVHibQ-k32n0L2pM0NqnhgT27T5jIoKVCbxA8cGmGLspKY7eZvxU/exec';
-        const COMAX_API_URL = 'https://script.google.com/macros/s/YOUR_COMAX_PROCESSOR_SCRIPT_ID/exec';
+        const COMAX_API_URL = 'https://script.google.com/macros/s/AKfycbxGad0zYllTYhc-jMwnUnMwufdCF00aMUMfba-_aUxEMZG1z2k71u72Qw8J4xFEQSZg/exec';
 
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [], customersData = [];
         const currentUser = 'Admin';
         const currentRole = 'Administrator';
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
-        const cities = ["תל אביב-יפו", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה", "בני ברק", "באר שבע", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה", "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "רעננה", "רמלה", "גבעתיים", "הוד השרון"];
+        const cities = ["תל אביב-יפו","טייבה", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה", "בני ברק", "באר שבע", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה", "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "רעננה", "רמלה", "גבעתיים", "הוד השרון"];
 
         function logEvent(message, type = 'info', data = '') {
              const style = `color:${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'}; font-weight: bold;`;
@@ -477,9 +477,9 @@
             try {
                 const data = await apiFetch('getVersion');
                 logEvent(`API Version confirmed: ${data.version}`, 'success');
-                 if (data.version !== "16.2") {
-                    alert(`Warning: Mismatched API version. Expected 16.2 but found ${data.version}. Please redeploy the script.`);
-                    logEvent(`Mismatched API version. Expected 16.2, found ${data.version}`, 'error');
+                 if (data.version !== "17.0") {
+                    alert(`Warning: Mismatched API version. Expected 17.0 but found ${data.version}. Please redeploy the script.`);
+                    logEvent(`Mismatched API version. Expected 17.0, found ${data.version}`, 'error');
                 }
             } catch(error) {
                 logEvent(`Could not verify API version: ${error.message}`, 'error');
@@ -606,7 +606,7 @@
                          <button class="action-button" onclick="openCommentsModal('${order.orderId}')" title="הצג הערות">
                             <i class="fas fa-comments"></i>
                         </button>
-                        <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'style="display:none;"' : ''}>
+                        <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? '' : 'style="color: var(--primary-color);"'}>
                             <i class="fas fa-paperclip"></i>
                         </button>
                     </div>
