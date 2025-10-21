@@ -22,6 +22,7 @@
             right: -25px;
             top: 50%;
             transform: translateY(-50%);
+            border: 4px solid #f1f5f9;
         }
         .timeline-line {
             position: absolute;
@@ -72,13 +73,18 @@
     </div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzIDt9Zz-tTL1-OtT0GW_IqKR0P6D9kBpKkIwn7301eFr2ggLDMnggtFUd59r6Qdte3kg/exec';
+        // --- v27.9 Maintenance Start ---
+
+        // =================================================================
+        // DeliveryMaster Customer App - v27.9 (Synced)
+        // =================================================================
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzPl-UH4hgX47FJZ-O2y7CTDU026hIzEntVDuGnSviWV1mY33as18nWyMxj7znCQA/exec';
         let refreshInterval;
 
         const STATUS_DEFINITIONS = {
             'התקבלה': { title: 'ההזמנה התקבלה', icon: 'fas fa-receipt', order: 1, statuses: ['חדש', 'ממתין למספר'] },
-            'במחסן': { title: 'בטיפול במחסן', icon: 'fas fa-warehouse', order: 2, statuses: ['שויך', 'באיסוף'] },
-            'בדרך': { title: 'הנהג יצא לדרך', icon: 'fas fa-truck', order: 3, statuses: ['טעון', 'בדרך'] },
+            'במחסן': { title: 'בטיפול במחסן', icon: 'fas fa-warehouse', order: 2, statuses: ['שויך', 'באיסוף', 'טעון'] },
+            'בדרך': { title: 'הנהג יצא לדרך', icon: 'fas fa-truck', order: 3, statuses: ['בדרך'] },
             'הושלם': { title: 'ההזמנה סופקה', icon: 'fas fa-check-circle', order: 4, statuses: ['הושלם'] }
         };
 
@@ -95,22 +101,37 @@
             if (refreshInterval) clearInterval(refreshInterval);
             refreshInterval = setInterval(() => fetchTrackingData(trackId), 30000); // Refresh every 30 seconds
         });
-
-        async function fetchTrackingData(trackId) {
+        
+        async function apiFetch(action, params = {}) {
+            const url = new URL(API_URL);
+            url.searchParams.append('action', action);
+            Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+            
             try {
-                const response = await fetch(`${API_URL}?action=getTrackingData&trackId=${trackId}`);
+                const response = await fetch(url);
                 if (!response.ok) throw new Error("בעיית תקשורת עם השרת.");
                 
                 const result = await response.json();
                 if (result.status !== 'success' || !result.data) {
                     throw new Error(result.message || "ההזמנה לא נמצאה.");
                 }
+                return result.data;
+            } catch (error) {
+                console.error("API Fetch Error:", error.message);
+                throw error;
+            }
+        }
 
-                renderOrderData(result.data);
-                if (result.data.status === 'הושלם' && refreshInterval) {
+
+        async function fetchTrackingData(trackId) {
+            try {
+                // IMPORTANT: The backend function `getTrackingData` needs to be implemented in Code.gs
+                // For now, this will fail until the function is added to the server script.
+                const data = await apiFetch('getTrackingData', { trackId });
+                renderOrderData(data);
+                if (data.status === 'הושלם' && refreshInterval) {
                     clearInterval(refreshInterval);
                 }
-
             } catch (error) {
                 showError(error.message);
                 if (refreshInterval) clearInterval(refreshInterval);
@@ -118,9 +139,7 @@
         }
 
         function renderOrderData(data) {
-            document.getElementById('loading-state').classList.add('hidden');
-            document.getElementById('main-content').classList.remove('hidden');
-
+            showState('main-content');
             document.getElementById('customer-name').textContent = data.customerName;
 
             const timelineContainer = document.getElementById('timeline');
@@ -153,15 +172,22 @@
                     return STATUS_DEFINITIONS[key].order;
                 }
             }
-            return 1; // Default to the first step
+            return 1; // Default to the first step if status is unrecognized
+        }
+        
+        function showState(stateId) {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('error-state').classList.add('hidden');
+            document.getElementById('main-content').classList.add('hidden');
+            document.getElementById(stateId).classList.remove('hidden');
         }
 
         function showError(message) {
-            document.getElementById('loading-state').classList.add('hidden');
-            document.getElementById('error-state').classList.remove('hidden');
+            showState('error-state');
             document.getElementById('error-message').textContent = message;
         }
 
+        // --- v27.9 Maintenance End ---
     </script>
 </body>
 </html>
