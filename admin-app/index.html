@@ -157,46 +157,34 @@
     <datalist id="customers-list"></datalist>
 
     <script>
+        // =================================================================
+        // DeliveryMaster Admin App - v24.3
+        // =================================================================
+
+        // ⚠️ עדכון קריטי: הדבק כאן את כתובת ה-URL החדשה שקיבלת מהפריסה
         const API_URL = 'https://script.google.com/macros/s/AKfycbyKMQUlu6SKu8vxHgSJ8gNBuNXhTG9FbXvWz4JbfBKAlqCJsRL8r_wr32Qqx0_Q2mk/exec';
         
+        const EXPECTED_API_VERSION = "24.3";
+        const LOG_ORIGIN = 'Admin';
+        const currentUser = 'Admin'; 
+        
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [], customersData = [];
-        const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
-        const cities = ["תל אביב-יפו", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה", "בני ברק", "באר שבע", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה", "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "רעננה", "רמלה", "גבעתיים", "הוד השרון"];
-
-        // =================================================================
-        // [חדש] מלשינון משודרג v24.0
-        // =================================================================
-        const LOG_ORIGIN = 'Admin'; 
-        const currentUser = 'Admin'; // Assuming a static admin user for now
-
+        
+        // --- MALSHINON (Logger) ---
         function logEvent(message, type = 'info', data = '') {
             const style = `color:${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'}; font-weight: bold;`;
-            
-            // 1. Log to the browser console (as before)
             console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, style, message, data);
-
-            // 2. [חדש] Send log to the server's "black box"
-            // We use a try-catch block so that a failure in logging does not crash the main application.
-            // This is a "fire and forget" operation.
+            
             try {
-                const logData = {
-                    origin: LOG_ORIGIN,
-                    level: type,
-                    message: message,
-                    data: data
-                };
-                
-                // No need to wait for the response (await), just send it.
-                apiFetch('logToServer', {}, 'POST', logData);
-
+                const logData = { origin: LOG_ORIGIN, level: type, message: message, data: data };
+                apiFetch('logToServer', {}, 'POST', logData)
+                  .catch(err => console.error("Malshנון Critical Failure: Could not send log to server.", err));
             } catch (error) {
-                console.error("Malshנון Critical Failure: Could not send log to server.", error);
+                console.error("Malshנון Submission Error:", error);
             }
         }
-        // =================================================================
-        // סוף אזור מלשינון
-        // =================================================================
-
+        
+        // --- API Communication ---
         async function apiFetch(action, params = {}, method = 'GET', body = null) {
             const url = new URL(API_URL);
             if (method === 'GET') {
@@ -208,17 +196,16 @@
                 options.body = JSON.stringify({ action, data: body });
                 options.headers['Content-Type'] = 'text/plain;charset=UTF-8';
             }
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                logEvent(`Network error for action: ${action}`, 'error', {status: response.status, statusText: response.statusText});
-                throw new Error(`Network error for action: ${action}`);
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error(result.message || 'Unknown API error');
+                return result.data;
+            } catch (error) {
+                logEvent(`API Error for action ${action}`, 'error', error.message);
+                throw error;
             }
-            const result = await response.json();
-            if (result.status !== 'success') {
-                logEvent(`API Error for action ${action}: ${result.message}`, 'error', result);
-                throw new Error(result.message);
-            }
-            return result.data;
         }
         
         function showToast(message, type = 'info') {
@@ -258,6 +245,23 @@
             }, 5000);
         }
 
+        async function checkApiVersion() {
+            try {
+                const data = await apiFetch('getVersion');
+                logEvent(`API Version confirmed: ${data.version}`, 'success');
+                 if (data.version !== EXPECTED_API_VERSION) {
+                    const msg = `Warning: Mismatched API version. Expected ${EXPECTED_API_VERSION} but found ${data.version}. Please check deployment and API_URL.`;
+                    showToast(msg, 'error');
+                    logEvent(msg, 'error');
+                }
+            } catch(error) {
+                const msg = `Could not verify API version. The backend might be running an old version or the API_URL is incorrect.`;
+                logEvent(msg, 'error', error);
+                showToast(msg, 'error');
+            }
+        }
+
+        // --- Scheduler & Map ---
         async function buildScheduler() {
             logEvent("Building scheduler...");
             document.getElementById('scheduler').innerHTML = '<p>טוען נתונים...</p>';
@@ -300,7 +304,7 @@
         async function handleDragEnd(event) {
             const internalId = event.item.dataset.internalId;
             const newDriverId = event.to.dataset.driverId === 'unassigned' ? '' : event.to.dataset.driverId;
-            logEvent(`Order dragged`, 'info', {internalId, newDriverId});
+            logEvent(`Order ${internalId} moved to driver ${newDriverId}.`);
             
             document.querySelectorAll('.scheduler-column h3').forEach(h3 => {
                 const count = h3.nextElementSibling.children.length;
@@ -308,22 +312,16 @@
             });
 
             try {
-                const order = allTodayOrders.find(o => o.internalId === internalId || o.orderId === internalId);
-                const orderIdentifier = order.orderId || order.internalId;
+                const order = allTodayOrders.find(o => o.internalId === internalId);
+                const updateId = order.orderId || order.internalId;
 
-                if (!orderIdentifier) {
-                    logEvent(`Cannot update drag-and-drop for invalid order`, 'warning', {internalId});
-                    buildScheduler(); // Refresh to fix inconsistency
-                    return;
-                }
-                
-                await apiFetch('updateOrder', {}, 'POST', { orderId: orderIdentifier, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
-                logEvent(`Update for order successful.`, 'success', {orderId: orderIdentifier, newDriver: newDriverId});
+                await apiFetch('updateOrder', {}, 'POST', { orderId: updateId, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
+                logEvent(`Update for order ${updateId} successful.`, 'success');
                 allTodayOrders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] });
                 updateMap();
             } catch (error) {
-                logEvent(`Failed to update order after drag`, "error", error.message);
-                showToast('שגיאה בעדכון השיבוץ, מרענן לוח...', 'error');
+                logEvent(`Failed to update order`, "error", error.message);
+                showToast(`שגיאה בעדכון הזמנה: ${error.message}`, 'error');
                 buildScheduler();
             }
         }
@@ -401,7 +399,7 @@
             const input = document.getElementById(`finalize-input-${internalId}`);
             const finalOrderId = input.value.trim();
             if (!finalOrderId) {
-                showToast("אנא הזן מספר הזמנה.", 'error');
+                alert("אנא הזן מספר הזמנה.");
                 return;
             }
 
@@ -411,11 +409,11 @@
 
             try {
                 await apiFetch('finalizeOrder', {}, 'POST', { internalId, finalOrderId });
-                logEvent(`Order finalized`, 'success', {internalId, finalOrderId});
+                logEvent(`Order ${internalId} finalized with ID ${finalOrderId}`, 'success');
                 showToast('מספר ההזמנה נשמר בהצלחה!', 'success');
                 await buildScheduler();
             } catch (error) {
-                logEvent(`Failed to finalize order`, 'error', {internalId, error: error.message});
+                logEvent(`Failed to finalize order ${internalId}`, 'error', error.message);
                 showToast(`שגיאה בשמירת מספר הזמנה: ${error.message}`, 'error');
                 btn.disabled = false;
                 btn.textContent = 'שמור מספר';
@@ -470,7 +468,7 @@
                 const url = await apiFetch('getOrderPDF', { orderId });
                 if (url) {
                     pdfViewer.src = url;
-                    apiFetch('logPDFView', {}, 'POST', { user: currentUser, role: LOG_ORIGIN, orderId });
+                    apiFetch('logPDFView', {}, 'POST', { user: currentUser, role: 'Administrator', orderId });
                 } else {
                     showToast('לא נמצא מסמך PDF עבור הזמנה זו.', 'info');
                     modal.style.display = 'none';
@@ -516,7 +514,7 @@
                 logEvent(`${actionName} completed successfully.`, 'success', result);
                 showToast(result.message, 'success');
                 if (action === 'syncScannedToMainOrders') {
-                    await buildScheduler(); // Refresh board if documents were linked
+                    await buildScheduler(); 
                 }
             } catch (error) {
                 logEvent(`Error during ${actionName}`, 'error', error.message);
@@ -524,21 +522,6 @@
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalHtml;
-            }
-        }
-
-        async function checkApiVersion() {
-            try {
-                const data = await apiFetch('getVersion');
-                logEvent(`API Version confirmed: ${data.version}`, 'success');
-                if (!data.version.startsWith("24")) { // Check for the major version
-                    const msg = `Warning: Mismatched API version. Expected 24.x but found ${data.version}. Please redeploy the script.`;
-                    showToast(msg, 'error');
-                    logEvent(msg, 'error');
-                }
-            } catch(error) {
-                logEvent(`Could not verify API version`, 'error', error.message);
-                showToast('Could not verify API version. The backend might be running an old version.', 'error');
             }
         }
         
@@ -573,30 +556,22 @@
         
         function populateFormWithCustomerData(customer) {
             if (!customer) return;
-            
-            logEvent(`Populating form with customer data`, 'info', customer);
-
-            document.getElementById('customerName').value = customer.name || '';
-            document.getElementById('customerId').value = customer.customerId || '';
-            document.getElementById('contactPerson').value = customer.contactPerson || '';
-            document.getElementById('customerPhone').value = customer.phone || '';
-            
-            const address = customer.address || '';
+            const lowerCaseCustomer = {};
+            for (const key in customer) { lowerCaseCustomer[key.toLowerCase()] = customer[key]; }
+            logEvent(`Populating form with customer data`, 'info', lowerCaseCustomer);
+            document.getElementById('customerName').value = lowerCaseCustomer.name || '';
+            document.getElementById('customerId').value = lowerCaseCustomer.customerid || '';
+            document.getElementById('contactPerson').value = lowerCaseCustomer.contactperson || '';
+            document.getElementById('customerPhone').value = lowerCaseCustomer.phone || '';
+            const address = lowerCaseCustomer.address || '';
             const addressParts = address.split(',');
             const city = addressParts.length > 1 ? addressParts[1].trim() : '';
             const streetAndNum = addressParts[0] || '';
-            
             const match = streetAndNum.match(/(.*?)\s*([\d/]+.*)$/);
-            let street = streetAndNum;
-            let number = '';
-            if (match) {
-                street = match[1].trim();
-                number = match[2].trim();
-            }
-
+            let street = streetAndNum; let number = '';
+            if (match) { street = match[1].trim(); number = match[2].trim(); }
             document.getElementById('street').value = street;
             document.getElementById('houseNumber').value = number;
-            
             const citySelect = document.getElementById('city');
             const cityOption = Array.from(citySelect.options).find(opt => opt.value === city);
             if (cityOption) citySelect.value = city;
@@ -605,34 +580,26 @@
         function handleCustomerSelection(event) {
             const selectedName = event.target.value;
             const selectedCustomer = customersData.find(c => c.name === selectedName);
-            if (selectedCustomer) {
-                populateFormWithCustomerData(selectedCustomer);
-            }
+            if (selectedCustomer) { populateFormWithCustomerData(selectedCustomer); }
         }
 
         function handleCustomerIdInput(event) {
             const customerId = event.target.value.trim();
             if (!customerId) return;
             const customer = customersData.find(c => String(c.customerId) === customerId);
-            if (customer) {
-                populateFormWithCustomerData(customer);
-            }
+            if (customer) { populateFormWithCustomerData(customer); }
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
             logEvent("DOM Loaded. Initializing app.", "success");
-            
             loadInitialData();
-
             document.getElementById('customerName').addEventListener('input', handleCustomerSelection);
             document.getElementById('customerId').addEventListener('blur', handleCustomerIdInput);
             document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
             document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
-            
             document.getElementById('syncEmailsBtn').addEventListener('click', (e) => handleSyncAction(e, 'processComaxEmails', 'סנכרון מיילים'));
             document.getElementById('syncDocsBtn').addEventListener('click', (e) => handleSyncAction(e, 'syncScannedToMainOrders', 'סנכרון מסמכים'));
             document.getElementById('unlinkedDocsBtn').addEventListener('click', openUnlinkedDocsModal);
-
             document.querySelectorAll('.close-button').forEach(btn => {
                 btn.onclick = () => btn.closest('.modal').style.display = 'none';
             });
@@ -645,7 +612,6 @@
             const isPlaceholder = !order.orderId && order.internalId;
             const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
             const trackingId = order.trackingId;
-            const identifier = order.orderId || order.internalId;
 
             const mainContent = `
                 <div class="card-main-content">
@@ -655,7 +621,7 @@
                         <p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p>
                     </div>
                     <div class="card-actions">
-                         <button class="action-button" onclick="openCommentsModal('${identifier}')" title="הצג הערות">
+                         <button class="action-button" onclick="openCommentsModal('${isPlaceholder ? order.internalId : order.orderId}')" title="הצג הערות">
                             <i class="fas fa-comments"></i>
                         </button>
                         <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'disabled' : ''}>
@@ -677,8 +643,9 @@
                 </div>` : '';
             
             const liClass = isPlaceholder ? 'schedule-card placeholder' : 'schedule-card';
+            const dataId = order.internalId || order.orderId;
 
-            return `<li class="${liClass}" data-internal-id="${identifier}">${mainContent}${finalizeSection}</li>`;
+            return `<li class="${liClass}" data-internal-id="${dataId}">${mainContent}${finalizeSection}</li>`;
         }
 
         function copyTrackingLink(trackingId) {
@@ -686,16 +653,13 @@
                 showToast('לא קיים לינק מעקב להזמנה זו עדיין.', 'error');
                 return;
             }
-            
-            const url = `https://sidor94.pages.dev/customer-app/?trackId=${trackingId}`;
-            
+            const url = `https://rami1125.github.io/sidor94/customer-app/?trackId=${trackingId}`;
             const tempInput = document.createElement('input');
             tempInput.value = url;
             document.body.appendChild(tempInput);
             tempInput.select();
             document.execCommand('copy');
             document.body.removeChild(tempInput);
-
             showToast('לינק המעקב הועתק!', 'success');
         }
 
@@ -750,3 +714,4 @@
     </script>
 </body>
 </html>
+
