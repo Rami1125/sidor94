@@ -160,44 +160,42 @@
         const API_URL = 'https://script.google.com/macros/s/AKfycby-nQJUJ5deCHhWCggBWWkJ_VTWPFixf_FVsZtM-DhX3UmZ6uuEIbs56-YGeue4X-Cd/exec';
         
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [], customersData = [];
-        const currentUser = 'Admin';
-        const currentRole = 'Administrator';
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
         const cities = ["תל אביב-יפו", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה", "בני ברק", "באר שבע", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה", "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "רעננה", "רמלה", "גבעתיים", "הוד השרון"];
 
-        להלן הקוד החדש עבור פונקציית logEvent. עליך להחליף את הפונקציה הקיימת בקובץ admin-app/index.html בקוד הבא.
+        // =================================================================
+        // [חדש] מלשינון משודרג v24.0
+        // =================================================================
+        const LOG_ORIGIN = 'Admin'; 
+        const currentUser = 'Admin'; // Assuming a static admin user for now
 
-// This is the new, upgraded logEvent function for admin-app/index.html
+        function logEvent(message, type = 'info', data = '') {
+            const style = `color:${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'}; font-weight: bold;`;
+            
+            // 1. Log to the browser console (as before)
+            console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, style, message, data);
 
-// Define constants for the origin of the log messages
-const LOG_ORIGIN = 'Admin'; 
-const currentUser = 'Admin'; // Assuming a static admin user for now
+            // 2. [חדש] Send log to the server's "black box"
+            // We use a try-catch block so that a failure in logging does not crash the main application.
+            // This is a "fire and forget" operation.
+            try {
+                const logData = {
+                    origin: LOG_ORIGIN,
+                    level: type,
+                    message: message,
+                    data: data
+                };
+                
+                // No need to wait for the response (await), just send it.
+                apiFetch('logToServer', {}, 'POST', logData);
 
-function logEvent(message, type = 'info', data = '') {
-    const style = `color:${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'}; font-weight: bold;`;
-    
-    // 1. Log to the browser console (as before)
-    console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, style, message, data);
-
-    // 2. [חדש] Send log to the server's "black box"
-    // We use a try-catch block so that a failure in logging does not crash the main application.
-    // This is a "fire and forget" operation.
-    try {
-        const logData = {
-            origin: LOG_ORIGIN,
-            level: type,
-            message: message,
-            data: data
-        };
-        
-        // No need to wait for the response (await), just send it.
-        apiFetch('logToServer', {}, 'POST', logData);
-
-    } catch (error) {
-        console.error("Malshנון Critical Failure: Could not send log to server.", error);
-    }
-}
-
+            } catch (error) {
+                console.error("Malshנון Critical Failure: Could not send log to server.", error);
+            }
+        }
+        // =================================================================
+        // סוף אזור מלשינון
+        // =================================================================
 
         async function apiFetch(action, params = {}, method = 'GET', body = null) {
             const url = new URL(API_URL);
@@ -211,9 +209,15 @@ function logEvent(message, type = 'info', data = '') {
                 options.headers['Content-Type'] = 'text/plain;charset=UTF-8';
             }
             const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`Network error for action: ${action}`);
+            if (!response.ok) {
+                logEvent(`Network error for action: ${action}`, 'error', {status: response.status, statusText: response.statusText});
+                throw new Error(`Network error for action: ${action}`);
+            }
             const result = await response.json();
-            if (result.status !== 'success') throw new Error(result.message);
+            if (result.status !== 'success') {
+                logEvent(`API Error for action ${action}: ${result.message}`, 'error', result);
+                throw new Error(result.message);
+            }
             return result.data;
         }
         
@@ -262,7 +266,7 @@ function logEvent(message, type = 'info', data = '') {
                     apiFetch('getDrivers'),
                     apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] })
                 ]);
-                logEvent("Driver and order data fetched.", "success", orders);
+                logEvent("Driver and order data fetched.", "success", {driverCount: drivers.length, orderCount: orders.length});
                 
                 allTodayOrders = orders;
                 const unassignedOrders = allTodayOrders.filter(o => !o.driverId);
@@ -277,7 +281,7 @@ function logEvent(message, type = 'info', data = '') {
                 initSortable();
                 logEvent("Scheduler layout built.", "success");
             } catch (error) {
-                logEvent(`Failed to build scheduler: ${error.message}`, "error");
+                logEvent(`Failed to build scheduler`, "error", error.message);
                 document.getElementById('scheduler').innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים.</p>`;
             }
         }
@@ -296,7 +300,7 @@ function logEvent(message, type = 'info', data = '') {
         async function handleDragEnd(event) {
             const internalId = event.item.dataset.internalId;
             const newDriverId = event.to.dataset.driverId === 'unassigned' ? '' : event.to.dataset.driverId;
-            logEvent(`Order ${internalId} moved to driver ${newDriverId}.`);
+            logEvent(`Order dragged`, 'info', {internalId, newDriverId});
             
             document.querySelectorAll('.scheduler-column h3').forEach(h3 => {
                 const count = h3.nextElementSibling.children.length;
@@ -304,19 +308,22 @@ function logEvent(message, type = 'info', data = '') {
             });
 
             try {
-                const order = allTodayOrders.find(o => o.internalId === internalId);
-                if (!order || !order.orderId) {
-                    logEvent(`Cannot update driver for placeholder order ${internalId}`, 'warning');
-                    buildScheduler();
+                const order = allTodayOrders.find(o => o.internalId === internalId || o.orderId === internalId);
+                const orderIdentifier = order.orderId || order.internalId;
+
+                if (!orderIdentifier) {
+                    logEvent(`Cannot update drag-and-drop for invalid order`, 'warning', {internalId});
+                    buildScheduler(); // Refresh to fix inconsistency
                     return;
                 }
                 
-                await apiFetch('updateOrder', {}, 'POST', { orderId: order.orderId, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
-                logEvent(`Update for order ${order.orderId} successful.`, 'success');
+                await apiFetch('updateOrder', {}, 'POST', { orderId: orderIdentifier, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
+                logEvent(`Update for order successful.`, 'success', {orderId: orderIdentifier, newDriver: newDriverId});
                 allTodayOrders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] });
                 updateMap();
             } catch (error) {
-                logEvent(`Failed to update order: ${error.message}`, "error");
+                logEvent(`Failed to update order after drag`, "error", error.message);
+                showToast('שגיאה בעדכון השיבוץ, מרענן לוח...', 'error');
                 buildScheduler();
             }
         }
@@ -328,7 +335,7 @@ function logEvent(message, type = 'info', data = '') {
                 orderMarkersLayer.addTo(liveMap);
                 logEvent("Map initialized.", "success");
             } catch (e) {
-                logEvent(`Map initialization failed: ${e.message}`, 'error');
+                logEvent(`Map initialization failed`, 'error', e.message);
             }
         }
         
@@ -355,7 +362,7 @@ function logEvent(message, type = 'info', data = '') {
                 });
                 logEvent("Map updated.", "success");
             } catch (error) {
-                logEvent(`Failed to update map: ${error.message}`, "error");
+                logEvent(`Failed to update map`, "error", error.message);
             }
         }
         
@@ -379,12 +386,11 @@ function logEvent(message, type = 'info', data = '') {
             try {
                  const result = await apiFetch('createOrder', {}, 'POST', orderData);
                 logEvent('New order placeholder created successfully on backend.', 'success', result);
-                logEvent("--- מלשינון: מנסה לרענן את לוח השיבוצים. אם ההזמנה לא מופיעה, יש לבדוק את תקינות הנתונים בגיליון 'Orders' ---");
                 document.getElementById('createOrderForm').reset();
                 showToast('הזמנת ביניים נוצרה בהצלחה!', 'success');
                 setTimeout(() => { buildScheduler(); updateMap(); }, 800);
             } catch(error) {
-                logEvent(`Error creating order placeholder: ${error.message}`, 'error');
+                logEvent(`Error creating order placeholder`, 'error', error.message);
                 showToast(`שגיאה ביצירת הזמנה: ${error.message}`, 'error');
             } finally {
                 btn.disabled = false; btn.textContent = 'צור הזמנת ביניים';
@@ -395,7 +401,7 @@ function logEvent(message, type = 'info', data = '') {
             const input = document.getElementById(`finalize-input-${internalId}`);
             const finalOrderId = input.value.trim();
             if (!finalOrderId) {
-                alert("אנא הזן מספר הזמנה.");
+                showToast("אנא הזן מספר הזמנה.", 'error');
                 return;
             }
 
@@ -405,11 +411,11 @@ function logEvent(message, type = 'info', data = '') {
 
             try {
                 await apiFetch('finalizeOrder', {}, 'POST', { internalId, finalOrderId });
-                logEvent(`Order ${internalId} finalized with ID ${finalOrderId}`, 'success');
+                logEvent(`Order finalized`, 'success', {internalId, finalOrderId});
                 showToast('מספר ההזמנה נשמר בהצלחה!', 'success');
                 await buildScheduler();
             } catch (error) {
-                logEvent(`Failed to finalize order ${internalId}: ${error.message}`, 'error');
+                logEvent(`Failed to finalize order`, 'error', {internalId, error: error.message});
                 showToast(`שגיאה בשמירת מספר הזמנה: ${error.message}`, 'error');
                 btn.disabled = false;
                 btn.textContent = 'שמור מספר';
@@ -454,7 +460,7 @@ function logEvent(message, type = 'info', data = '') {
         
         async function openPdfModal(orderId) {
             if (!orderId || orderId === '-') {
-                alert('אין מזהה הזמנה זמין.');
+                showToast('אין מזהה הזמנה זמין לצפייה במסמך.', 'warning');
                 return;
             }
             const { modal } = openModal('pdfModal');
@@ -464,13 +470,13 @@ function logEvent(message, type = 'info', data = '') {
                 const url = await apiFetch('getOrderPDF', { orderId });
                 if (url) {
                     pdfViewer.src = url;
-                    apiFetch('logPDFView', {}, 'POST', { user: currentUser, role: currentRole, orderId });
+                    apiFetch('logPDFView', {}, 'POST', { user: currentUser, role: LOG_ORIGIN, orderId });
                 } else {
-                    alert('לא נמצא מסמך PDF עבור הזמנה זו.');
+                    showToast('לא נמצא מסמך PDF עבור הזמנה זו.', 'info');
                     modal.style.display = 'none';
                 }
             } catch (error) {
-                alert('שגיאה בטעינת המסמך: ' + error.message);
+                showToast('שגיאה בטעינת המסמך: ' + error.message, 'error');
                 modal.style.display = 'none';
             }
         }
@@ -513,7 +519,7 @@ function logEvent(message, type = 'info', data = '') {
                     await buildScheduler(); // Refresh board if documents were linked
                 }
             } catch (error) {
-                logEvent(`Error during ${actionName}: ${error.message}`, 'error');
+                logEvent(`Error during ${actionName}`, 'error', error.message);
                 showToast(`שגיאה ב${actionName}: ${error.message}`, 'error');
             } finally {
                 btn.disabled = false;
@@ -525,14 +531,14 @@ function logEvent(message, type = 'info', data = '') {
             try {
                 const data = await apiFetch('getVersion');
                 logEvent(`API Version confirmed: ${data.version}`, 'success');
-                 if (data.version !== "22.9") {
-                    const msg = `Warning: Mismatched API version. Expected 22.9 but found ${data.version}. Please redeploy the script.`;
-                    alert(msg);
+                if (!data.version.startsWith("24")) { // Check for the major version
+                    const msg = `Warning: Mismatched API version. Expected 24.x but found ${data.version}. Please redeploy the script.`;
+                    showToast(msg, 'error');
                     logEvent(msg, 'error');
                 }
             } catch(error) {
-                logEvent(`Could not verify API version: ${error.message}`, 'error');
-                alert('Could not verify API version. The backend might be running an old version.');
+                logEvent(`Could not verify API version`, 'error', error.message);
+                showToast('Could not verify API version. The backend might be running an old version.', 'error');
             }
         }
         
@@ -568,19 +574,14 @@ function logEvent(message, type = 'info', data = '') {
         function populateFormWithCustomerData(customer) {
             if (!customer) return;
             
-            const lowerCaseCustomer = {};
-            for (const key in customer) {
-                lowerCaseCustomer[key.toLowerCase()] = customer[key];
-            }
+            logEvent(`Populating form with customer data`, 'info', customer);
 
-            logEvent(`Populating form with customer data`, 'info', lowerCaseCustomer);
-
-            document.getElementById('customerName').value = lowerCaseCustomer.name || '';
-            document.getElementById('customerId').value = lowerCaseCustomer.customerid || '';
-            document.getElementById('contactPerson').value = lowerCaseCustomer.contactperson || '';
-            document.getElementById('customerPhone').value = lowerCaseCustomer.phone || '';
+            document.getElementById('customerName').value = customer.name || '';
+            document.getElementById('customerId').value = customer.customerId || '';
+            document.getElementById('contactPerson').value = customer.contactPerson || '';
+            document.getElementById('customerPhone').value = customer.phone || '';
             
-            const address = lowerCaseCustomer.address || '';
+            const address = customer.address || '';
             const addressParts = address.split(',');
             const city = addressParts.length > 1 ? addressParts[1].trim() : '';
             const streetAndNum = addressParts[0] || '';
@@ -644,6 +645,7 @@ function logEvent(message, type = 'info', data = '') {
             const isPlaceholder = !order.orderId && order.internalId;
             const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
             const trackingId = order.trackingId;
+            const identifier = order.orderId || order.internalId;
 
             const mainContent = `
                 <div class="card-main-content">
@@ -653,7 +655,7 @@ function logEvent(message, type = 'info', data = '') {
                         <p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p>
                     </div>
                     <div class="card-actions">
-                         <button class="action-button" onclick="openCommentsModal('${isPlaceholder ? order.internalId : order.orderId}')" title="הצג הערות">
+                         <button class="action-button" onclick="openCommentsModal('${identifier}')" title="הצג הערות">
                             <i class="fas fa-comments"></i>
                         </button>
                         <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'disabled' : ''}>
@@ -675,9 +677,8 @@ function logEvent(message, type = 'info', data = '') {
                 </div>` : '';
             
             const liClass = isPlaceholder ? 'schedule-card placeholder' : 'schedule-card';
-            const dataId = order.internalId || order.orderId;
 
-            return `<li class="${liClass}" data-internal-id="${dataId}">${mainContent}${finalizeSection}</li>`;
+            return `<li class="${liClass}" data-internal-id="${identifier}">${mainContent}${finalizeSection}</li>`;
         }
 
         function copyTrackingLink(trackingId) {
@@ -686,7 +687,7 @@ function logEvent(message, type = 'info', data = '') {
                 return;
             }
             
-            const url = `${window.location.origin.replace('http:', 'https:')}//customer-app/?trackId=${trackingId}`;
+            const url = `https://sidor94.pages.dev/customer-app/?trackId=${trackingId}`;
             
             const tempInput = document.createElement('input');
             tempInput.value = url;
@@ -736,7 +737,7 @@ function logEvent(message, type = 'info', data = '') {
                 input.value = '';
                 await openCommentsModal(orderId);
             } catch (error) {
-                alert('שגיאה בשליחת הערה: ' + error.message);
+                showToast('שגיאה בשליחת הערה: ' + error.message, 'error');
             } finally {
                 button.disabled = false;
                 button.innerHTML = 'שלח';
@@ -749,4 +750,3 @@ function logEvent(message, type = 'info', data = '') {
     </script>
 </body>
 </html>
-
