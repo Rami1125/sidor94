@@ -1,0 +1,25 @@
+{
+  "short_name": "DM Admin",
+  "name": "DeliveryMaster - מרכז בקרה",
+  "lang": "he-IL",
+  "description": "לוח בקרה מתקדם לניהול משלוחים, נהגים ושיבוצים.",
+  "icons": [
+    {
+      "src": "https://i.postimg.cc/ryPT3r29/image.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.postimg.cc/ryPT3r29/image.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#E9EEF4",
+  "theme_color": "#0078D7"
+}
