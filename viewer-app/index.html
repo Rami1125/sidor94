@@ -83,9 +83,18 @@
     </div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyQf83sckyrgQlzSA8FFS3tUQAGTbBSACqiFIq21Yd5c-kquudOvPHPk1aSweKzT1VW/exec';
+        // --- v27.9 Maintenance Start ---
+
+        // =================================================================
+        // DeliveryMaster Viewer App - v27.9 (Synced)
+        // =================================================================
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzPl-UH4hgX47FJZ-O2y7CTDU026hIzEntVDuGnSviWV1mY33as18nWyMxj7znCQA/exec';
         
-        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), currentOrders = [], userName = '';
+        let liveMap;
+        let driverMarkers = {};
+        let orderMarkersLayer = L.layerGroup();
+        let currentOrders = [];
+        let userName = '';
         const currentRole = 'Viewer';
 
         async function apiFetch(action, params = {}, method = 'GET', body = null) {
@@ -94,25 +103,34 @@
                 url.searchParams.append('action', action);
                 Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
             }
-            const options = { method };
+            const options = { method, mode: 'cors', headers: {} };
             if (method === 'POST') {
                 options.body = JSON.stringify({ action, data: body });
-                options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
+                options.headers['Content-Type'] = 'text/plain;charset=UTF-8';
             }
-            const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`Network error for action: ${action}`);
-            const result = await response.json();
-            if (result.status !== 'success') throw new Error(result.message);
-            return result.data;
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) throw new Error(`Network error (${response.status})`);
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error(result.message || 'Unknown API Error');
+                return result.data;
+            } catch (error) {
+                console.error(`API Fetch Error (${action}):`, error.message);
+                // Optionally display a user-friendly message
+                return null; // Return null to handle gracefully in calling functions
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             userName = localStorage.getItem('deliveryMasterViewerName') || prompt("נא להזין את שמך:") || 'אורח';
             localStorage.setItem('deliveryMasterViewerName', userName);
+            
             document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
+            
             initializeMap();
             fetchInitialData();
-            setInterval(fetchInitialData, 30000);
+            setInterval(fetchInitialData, 30000); // Auto-refresh data
+            
             document.getElementById('orderSearch').addEventListener('input', () => renderOrderList(currentOrders));
             document.getElementById('dateFilter').addEventListener('change', fetchInitialData);
         });
@@ -123,19 +141,24 @@
                     apiFetch('getOrders', { date: document.getElementById('dateFilter').value }),
                     apiFetch('getLiveMapData')
                 ]);
-                currentOrders = orders;
-                updateKPIs(orders);
-                renderOrderList(orders);
-                updateMap(mapData);
+
+                if (orders) {
+                    currentOrders = orders;
+                    updateKPIs(orders);
+                    renderOrderList(orders);
+                }
+                if (mapData) {
+                    updateMap(mapData);
+                }
             } catch (error) {
-                console.error("Error fetching data:", error);
+                 // Errors are logged in apiFetch, no need to repeat here
             }
         }
         
         function updateKPIs(orders) {
             const total = orders.length;
             const completed = orders.filter(o => o.status === 'הושלם').length;
-            const inProgress = orders.filter(o => ['בדרך', 'באיסוף'].includes(o.status)).length;
+            const inProgress = orders.filter(o => ['בדרך', 'באיסוף', 'טעון'].includes(o.status)).length;
             const pending = total - completed - inProgress;
             
             document.getElementById('kpi-total').innerHTML = `<div class="text-3xl font-bold text-blue-500">${total}</div><p class="text-gray-500">סה"כ הזמנות</p>`;
@@ -148,23 +171,27 @@
              const searchTerm = document.getElementById('orderSearch').value.toLowerCase();
              const list = document.getElementById('orderList');
              const filteredOrders = orders.filter(o => 
-                 (o.customerName && o.customerName.toLowerCase().includes(searchTerm)) ||
-                 (o.address && o.address.toLowerCase().includes(searchTerm)) ||
-                 (o.driverId && o.driverId.toLowerCase().includes(searchTerm))
+                 (o.customerName && String(o.customerName).toLowerCase().includes(searchTerm)) ||
+                 (o.address && String(o.address).toLowerCase().includes(searchTerm)) ||
+                 (o.driverId && String(o.driverId).toLowerCase().includes(searchTerm))
              );
+
              if (filteredOrders.length === 0) {
                  list.innerHTML = '<p class="text-center text-gray-500">לא נמצאו הזמנות.</p>';
                  return;
              }
+             
              list.innerHTML = filteredOrders
                  .sort((a,b) => (a.orderTime || "00:00").localeCompare(b.orderTime || "00:00"))
-                 .map(o => `
-                 <div class="order-item-clickable p-3 border-b cursor-pointer" onclick="openOrderModal('${o.orderId}')">
-                     <p class="font-semibold">${o.customerName}</p>
-                     <p class="text-sm text-gray-600">${o.address}</p>
-                     <p class="text-sm text-gray-500">נהג: ${o.driverId || 'טרם שויך'}</p>
-                 </div>
-             `).join('');
+                 .map(o => {
+                    const orderIdentifier = o.orderId || o.internalId;
+                    return `
+                     <div class="order-item-clickable p-3 border-b cursor-pointer" onclick="openOrderModal('${orderIdentifier}')">
+                         <p class="font-semibold">${o.customerName}</p>
+                         <p class="text-sm text-gray-600">${o.address}</p>
+                         <p class="text-sm text-gray-500">נהג: ${o.driverId || 'טרם שויך'}</p>
+                     </div>
+                 `}).join('');
         }
         
         function initializeMap() {
@@ -186,7 +213,9 @@
                     driverList.innerHTML += `<div class="p-2 border-b">${d.name}</div>`;
                 }
             });
-             if (driverList.innerHTML === '') driverList.innerHTML = '<p class="text-gray-500">אין נהגים פעילים כרגע.</p>';
+             if (driverList.innerHTML === '') {
+                 driverList.innerHTML = '<p class="text-gray-500">אין נהגים פעילים כרגע.</p>';
+             }
 
             orders.forEach(o => {
                 if (o.latitude && o.status !== 'הושלם') {
@@ -201,11 +230,15 @@
             const modal = document.getElementById('orderDetailsModal');
             const content = document.getElementById('modalContent');
             content.innerHTML = '<p class="p-8 text-center">טוען פרטי הזמנה...</p>';
-            modal.classList.remove('hidden');
-            setTimeout(() => modal.classList.add('opacity-100'), 10);
+            openModal('orderDetailsModal');
             
             try {
                 const order = await apiFetch('getOrderDetails', { orderId });
+                if (!order) {
+                    throw new Error("לא ניתן היה לטעון את פרטי ההזמנה.");
+                }
+
+                const orderIdentifier = order.orderId || order.internalId;
                 const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
 
                 content.innerHTML = `
@@ -217,11 +250,11 @@
                         <p><strong>סטטוס:</strong> <span class="font-semibold">${order.status}</span></p>
                         <p><strong>כתובת:</strong> ${order.address}</p>
                         <p><strong>נהג:</strong> ${order.driverId || 'לא שויך'}</p>
-                        ${hasPdf ? `<a href="#" class="pdf-link" onclick="event.preventDefault(); openPdfModal('${order.orderId}')"><i class="fas fa-file-pdf"></i> הצג מסמך הזמנה</a>` : ''}
+                        ${hasPdf ? `<a href="#" class="pdf-link" onclick="event.preventDefault(); openPdfModal('${orderIdentifier}')"><i class="fas fa-file-pdf"></i> הצג מסמך הזמנה</a>` : ''}
                         <div class="mt-4">
                             <h3 class="font-bold mb-2">הערות:</h3>
                             <div id="commentsContainer" class="space-y-2 max-h-48 overflow-y-auto">
-                                ${(order.comments || []).map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author || ''}</p><p>${c.text || ''}</p></div>`).join('') || '<p class="text-gray-500">אין הערות</p>'}
+                                ${(order.comments && order.comments.length > 0) ? order.comments.map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author || ''}</p><p>${c.message || ''}</p></div>`).join('') : '<p class="text-gray-500">אין הערות</p>'}
                             </div>
                             <form id="commentForm" class="mt-4 flex gap-2">
                                 <input type="text" placeholder="הוסף הערה..." class="flex-grow p-2 border rounded">
@@ -229,19 +262,16 @@
                             </form>
                         </div>
                     </div>`;
-                document.getElementById('commentForm').addEventListener('submit', (e) => handleCommentSubmit(e, orderId));
+                document.getElementById('commentForm').addEventListener('submit', (e) => handleCommentSubmit(e, orderIdentifier));
             } catch (error) {
                 content.innerHTML = `<div class="p-8 text-center text-red-500">${error.message} <button onclick="closeModal('orderDetailsModal')">סגור</button></div>`;
             }
         }
 
         async function openPdfModal(orderId) {
-            const pdfModal = document.getElementById('pdfModal');
+            openModal('pdfModal');
             const pdfViewer = document.getElementById('pdfViewer');
             pdfViewer.src = '';
-            pdfModal.classList.remove('hidden');
-             setTimeout(() => pdfModal.classList.add('opacity-100'), 10);
-
             try {
                 const url = await apiFetch('getOrderPDF', { orderId });
                 if (url) {
@@ -269,7 +299,7 @@
             button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             try {
                 await apiFetch('postComment', {}, 'POST', {orderId, author: userName, text});
-                openOrderModal(orderId);
+                openOrderModal(orderId); // Refresh the modal with the new comment
             } catch (error) {
                 alert('שגיאה בשליחת הערה: ' + error.message);
                 button.disabled = false;
@@ -277,11 +307,19 @@
             }
         }
 
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.add('opacity-100'), 10);
+        }
+
         function closeModal(modalId) {
             const modal = document.getElementById(modalId);
             modal.classList.remove('opacity-100');
             setTimeout(() => modal.classList.add('hidden'), 300);
         }
+
+        // --- v27.9 Maintenance End ---
     </script>
 </body>
 </html>
