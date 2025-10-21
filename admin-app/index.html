@@ -165,10 +165,39 @@
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
         const cities = ["תל אביב-יפו", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה", "בני ברק", "באר שבע", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה", "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "רעננה", "רמלה", "גבעתיים", "הוד השרון"];
 
-        function logEvent(message, type = 'info', data = '') {
-             const style = `color:${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'}; font-weight: bold;`;
-             console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, style, message, data);
-        }
+        להלן הקוד החדש עבור פונקציית logEvent. עליך להחליף את הפונקציה הקיימת בקובץ admin-app/index.html בקוד הבא.
+
+// This is the new, upgraded logEvent function for admin-app/index.html
+
+// Define constants for the origin of the log messages
+const LOG_ORIGIN = 'Admin'; 
+const currentUser = 'Admin'; // Assuming a static admin user for now
+
+function logEvent(message, type = 'info', data = '') {
+    const style = `color:${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'}; font-weight: bold;`;
+    
+    // 1. Log to the browser console (as before)
+    console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, style, message, data);
+
+    // 2. [חדש] Send log to the server's "black box"
+    // We use a try-catch block so that a failure in logging does not crash the main application.
+    // This is a "fire and forget" operation.
+    try {
+        const logData = {
+            origin: LOG_ORIGIN,
+            level: type,
+            message: message,
+            data: data
+        };
+        
+        // No need to wait for the response (await), just send it.
+        apiFetch('logToServer', {}, 'POST', logData);
+
+    } catch (error) {
+        console.error("Malshנון Critical Failure: Could not send log to server.", error);
+    }
+}
+
 
         async function apiFetch(action, params = {}, method = 'GET', body = null) {
             const url = new URL(API_URL);
