@@ -81,6 +81,11 @@
         #commentForm { display: flex; gap: 10px; }
         #commentForm input { flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; }
         #commentForm button { width: auto; }
+        
+        /* v27.0 Sync Hub styles */
+        .sync-hub p { margin: 0 0 8px 0; font-size: 0.95em; color: #4a5568;}
+        .sync-hub .status-value { font-weight: 500; color: var(--text-color); }
+        .sync-hub .status-value.error { color: var(--danger); }
     </style>
 </head>
 <body>
@@ -125,6 +130,15 @@
                         <button type="submit">צור הזמנת ביניים</button>
                     </form>
                 </div>
+                 
+                 <!-- v27.0 Sync Hub Start -->
+                <div class="card sync-hub">
+                    <h2><i class="fas fa-broadcast-tower"></i> מרכז סנכרון</h2>
+                    <p>סנכרון מיילים אחרון: <span id="lastEmailSync" class="status-value">טוען...</span></p>
+                    <p>מיילים שגויים: <span id="erroredEmails" class="status-value">טוען...</span></p>
+                </div>
+                <!-- v27.0 Sync Hub End -->
+
                  <div class="card">
                     <h2><i class="fas fa-sync-alt"></i> סנכרון מערכת</h2>
                     <div class="sync-buttons">
@@ -158,23 +172,20 @@
 
     <script>
         // =================================================================
-        // DeliveryMaster Admin App - v25.0
+        // DeliveryMaster Admin App - v27.0
         // =================================================================
 
-        // ⚠️ עדכון קריטי: הדבק כאן את כתובת ה-URL החדשה שקיבלת מהפריסה
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyQf83sckyrgQlzSA8FFS3tUQAGTbBSACqiFIq21Yd5c-kquudOvPHPk1aSweKzT1VW/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzPl-UH4hgX47FJZ-O2y7CTDU026hIzEntVDuGnSviWV1mY33as18nWyMxj7znCQA/exec';
         
-        const EXPECTED_API_VERSION = "25.0";
+        const EXPECTED_API_VERSION = "27.0";
         const LOG_ORIGIN = 'Admin';
         const currentUser = 'Admin'; 
-
-        // [תיקון] החזרת המשתנים החסרים שהפילו את האפליקציה
+        
         const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
         const cities = ["תל אביב-יפו", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה", "בני ברק", "באר שבע", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה", "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "רעננה", "רמלה", "גבעתיים", "הוד השרון"];
         
         let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [], customersData = [];
         
-        // --- MALSHINON (Logger) ---
         function logEvent(message, type = 'info', data = '') {
             const style = `color:${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'}; font-weight: bold;`;
             console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, style, message, data);
@@ -182,13 +193,12 @@
             try {
                 const logData = { origin: LOG_ORIGIN, level: type, message: message, data: data };
                 apiFetch('logToServer', {}, 'POST', logData)
-                  .catch(err => console.error("Malshנון Critical Failure: Could not send log to server.", err));
+                  .catch(err => console.error("Logger Critical Failure: Could not send log to server.", err));
             } catch (error) {
-                console.error("Malshנון Submission Error:", error);
+                console.error("Logger Submission Error:", error);
             }
         }
         
-        // --- API Communication ---
         async function apiFetch(action, params = {}, method = 'GET', body = null) {
             const url = new URL(API_URL);
             if (method === 'GET') {
@@ -265,7 +275,6 @@
             }
         }
 
-        // --- Scheduler & Map ---
         async function buildScheduler() {
             logEvent("Building scheduler...");
             document.getElementById('scheduler').innerHTML = '<p>טוען נתונים...</p>';
@@ -297,7 +306,7 @@
         function initSortable() {
             document.querySelectorAll('.order-pool, .driver-lane').forEach(lane => {
                 new Sortable(lane, { 
-                    group: { name: 'shared', pull: (sortable, store, dragEl) => !dragEl.classList.contains('placeholder') }, 
+                    group: { name: 'shared', pull: true }, 
                     animation: 150, 
                     ghostClass: 'ghost-card', 
                     onEnd: handleDragEnd 
@@ -306,9 +315,9 @@
         }
         
         async function handleDragEnd(event) {
-            const internalId = event.item.dataset.internalId;
+            const orderIdentifier = event.item.dataset.internalId;
             const newDriverId = event.to.dataset.driverId === 'unassigned' ? '' : event.to.dataset.driverId;
-            logEvent(`Order ${internalId} moved to driver ${newDriverId}.`);
+            logEvent(`Order ${orderIdentifier} moved to driver ${newDriverId}.`);
             
             document.querySelectorAll('.scheduler-column h3').forEach(h3 => {
                 const count = h3.nextElementSibling.children.length;
@@ -316,11 +325,9 @@
             });
 
             try {
-                const order = allTodayOrders.find(o => o.internalId === internalId);
-                const updateId = order.orderId || order.internalId;
-
-                await apiFetch('updateOrder', {}, 'POST', { orderId: updateId, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
-                logEvent(`Update for order ${updateId} successful.`, 'success');
+                const order = allTodayOrders.find(o => o.internalId === orderIdentifier || o.orderId === orderIdentifier);
+                await apiFetch('updateOrder', {}, 'POST', { orderId: orderIdentifier, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
+                logEvent(`Update for order ${orderIdentifier} successful.`, 'success');
                 allTodayOrders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] });
                 updateMap();
             } catch (error) {
@@ -517,9 +524,9 @@
                 const result = await apiFetch(action, {}, 'POST', {});
                 logEvent(`${actionName} completed successfully.`, 'success', result);
                 showToast(result.message, 'success');
-                if (action === 'syncScannedToMainOrders') {
-                    await buildScheduler(); 
-                }
+                // Refresh data after sync
+                await buildScheduler(); 
+                await updateSyncStatus();
             } catch (error) {
                 logEvent(`Error during ${actionName}`, 'error', error.message);
                 showToast(`שגיאה ב${actionName}: ${error.message}`, 'error');
@@ -533,6 +540,7 @@
             await checkApiVersion();
             initializeMap();
             populateDropdowns();
+            updateSyncStatus();
             try {
                 customersData = await apiFetch('getCustomers');
                 populateCustomerDatalist(customersData);
@@ -543,7 +551,7 @@
             }
             await buildScheduler();
             await updateMap(); 
-            setInterval(() => { buildScheduler(); updateMap(); }, 30000);
+            setInterval(() => { buildScheduler(); updateMap(); updateSyncStatus(); }, 30000);
         }
 
         function populateCustomerDatalist(customers) {
@@ -593,6 +601,26 @@
             const customer = customersData.find(c => String(c.customerId) === customerId);
             if (customer) { populateFormWithCustomerData(customer); }
         }
+        
+        // v27.0 - Fetch and display sync status
+        async function updateSyncStatus() {
+            try {
+                const status = await apiFetch('getSyncStatus');
+                const lastSyncSpan = document.getElementById('lastEmailSync');
+                const errorSpan = document.getElementById('erroredEmails');
+                
+                lastSyncSpan.textContent = status.lastEmailSync || 'N/A';
+                errorSpan.textContent = status.errorCount || 0;
+                
+                errorSpan.classList.toggle('error', status.errorCount > 0);
+
+            } catch (error) {
+                logEvent('Failed to get sync status', 'error', error);
+                document.getElementById('lastEmailSync').textContent = 'שגיאה';
+                document.getElementById('erroredEmails').textContent = 'שגיאה';
+            }
+        }
+
 
         document.addEventListener('DOMContentLoaded', async () => {
             logEvent("DOM Loaded. Initializing app.", "success");
@@ -602,7 +630,8 @@
             document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
             document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
             document.getElementById('syncEmailsBtn').addEventListener('click', (e) => handleSyncAction(e, 'processComaxEmails', 'סנכרון מיילים'));
-            document.getElementById('syncDocsBtn').addEventListener('click', (e) => handleSyncAction(e, 'syncScannedToMainOrders', 'סנכרון מסמכים'));
+            // Note: The 'syncDocsBtn' might be redundant now, but kept for legacy purposes or future use.
+            document.getElementById('syncDocsBtn').addEventListener('click', (e) => showToast('פעולה זו מתבצעת אוטומטית עם סנכרון המיילים.', 'info'));
             document.getElementById('unlinkedDocsBtn').addEventListener('click', openUnlinkedDocsModal);
             document.querySelectorAll('.close-button').forEach(btn => {
                 btn.onclick = () => btn.closest('.modal').style.display = 'none';
@@ -625,10 +654,10 @@
                         <p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p>
                     </div>
                     <div class="card-actions">
-                         <button class="action-button" onclick="openCommentsModal('${isPlaceholder ? order.internalId : order.orderId}')" title="הצג הערות">
+                         <button class="action-button" onclick="openCommentsModal('${order.internalId || order.orderId}')" title="הצג הערות">
                             <i class="fas fa-comments"></i>
                         </button>
-                        <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'disabled' : ''}>
+                        <button class="action-button" onclick="openPdfModal('${order.internalId || order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'disabled' : ''}>
                             <i class="fas fa-paperclip" ${hasPdf ? 'style="color: var(--primary-color);"' : ''}></i>
                         </button>
                         <button class="action-button share-link" onclick="copyTrackingLink('${trackingId}')" title="שתף לינק מעקב" ${!trackingId ? 'disabled' : ''}>
@@ -676,7 +705,7 @@
                         ${(comments && comments.length > 0) ? comments.map(c => `
                             <div class="comment">
                                 <p class="author">${c.author || 'לא ידוע'}</p>
-                                <p>${c.text || ''}</p>
+                                <p>${c.message || ''}</p>
                             </div>`).join('') : '<p>אין הערות להזמנה זו.</p>'}
                     </div>
                     <form id="commentForm">
@@ -718,4 +747,3 @@
     </script>
 </body>
 </html>
-
