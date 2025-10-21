@@ -2,272 +2,716 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DeliveryMaster - טרמינל מחסן</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - מרכז בקרה</title>
     
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#ffffff">
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root {
-            --primary-color: #007bff; --success: #28a745; --warning: #ffc107;
-            --shadow-light: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+            --primary-color: #007bff;
             --secondary-color: #6c757d;
+            --background-color: #f8f9fa;
+            --text-color: #343a40;
+            --white: #ffffff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
         }
-        html, body { height: 100%; overflow: hidden; }
-        body { font-family: 'Rubik', sans-serif; margin: 0; background: linear-gradient(135deg, #f5f7fa, #c3cfe2); }
-        .view { display: none !important; height: 100vh; }
-        .view.active { display: flex !important; flex-direction: column; }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.4); box-shadow: var(--shadow-light); backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.6);
+        body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 20px; color: var(--text-color); }
+        .container { max-width: 1800px; margin: 0 auto; }
+        .header-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { text-align: center; color: var(--primary-color); flex-grow: 1; }
+        h2 { text-align: center; margin-bottom: 20px; color: var(--primary-color); }
+        .main-layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
+        .card { background: var(--white); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 20px; }
+        #liveMap { height: 400px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; z-index: 5; }
+        .scheduler-container { display: grid; grid-template-columns: 250px repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; min-height: 400px; }
+        .scheduler-column { background-color: #f0f3f5; border-radius: var(--border-radius); padding: 15px; display: flex; flex-direction: column; }
+        .scheduler-column h3 { text-align: center; padding-bottom: 10px; border-bottom: 2px solid var(--primary-color); margin-bottom: 15px; position: sticky; top: 0; background-color: #f0f3f5; z-index: 10;}
+        .order-pool, .driver-lane { min-height: 300px; list-style-type: none; padding: 0; flex-grow: 1; overflow-y: auto; max-height: 60vh; }
+        .schedule-card { 
+            background: var(--white); padding: 10px 15px; border-radius: 5px; 
+            margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            cursor: grab; border-right: 4px solid var(--secondary-color);
+            display: flex; flex-direction: column; gap: 8px;
         }
-        #loginView { justify-content: center; align-items: center; }
-        .login-card { padding: 40px; text-align: center; width: 90%; max-width: 400px; }
-        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: none; border-radius: 12px; font-size: 1.2rem; text-align: center; }
-        .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color:white; border:none; border-radius: 12px; font-size: 1.2rem; cursor: pointer; }
-        .app-header { padding: 15px 20px; z-index: 10; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        main { flex-grow: 1; overflow-y: auto; padding: 0 15px; }
-        .order-section { margin-bottom: 30px; }
-        .order-card { margin: 10px 0; padding: 20px; }
-        .order-card button { width: 100%; padding: 12px; border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 1em; margin-top: 15px; }
-        .btn-acknowledge { background-color: var(--success); }
-        .btn-load { background-color: var(--warning); }
-        .btn-pdf { background-color: var(--secondary-color); }
-        button:disabled { background-color: #999; cursor: not-allowed; }
-
-        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: #fff; margin: 5% auto; padding: 15px; border-radius: 15px; width: 90%; max-width: 800px; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px; }
-        .modal-header h2 { margin: 0; }
-        .close-button { font-size: 1.5rem; cursor: pointer; }
-        #pdfViewer { width: 100%; height: 70vh; border: none; }
+        .schedule-card.placeholder { border-right-color: var(--warning); background-color: #fffaf0; }
+        .card-main-content { display: flex; justify-content: space-between; align-items: center; width: 100%;}
+        .schedule-card-details p { margin: 2px 0; font-size: 0.9em; }
+        .schedule-card-details .card-customer { font-weight: 500; font-size: 1em; }
+        .card-actions { display: flex; align-items: center; gap: 5px; }
+        .action-button { background: none; border: none; font-size: 1.2rem; color: var(--secondary-color); cursor: pointer; padding: 5px;}
+        .action-button:hover { color: var(--primary-color); }
+        .action-button.share-link:hover { color: #28a745; }
+        .ghost-card { background: #cce5ff; opacity: 0.7; border: 2px dashed var(--primary-color); }
+        .form-group { margin-bottom: 15px; position: relative; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; box-sizing: border-box; }
+        .address-group { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); max-height: 80vh; display: flex; flex-direction: column;}
+        .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+        .table-container { overflow-y: auto; flex-grow: 1; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; }
+        th { background-color: #f2f2f2; }
+        .sync-buttons button { margin-bottom: 10px; }
+        .finalize-section { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; }
+        .finalize-section h4 { margin: 0; font-size: 0.95em; color: var(--warning); text-align: center; font-weight: bold;}
+        .finalize-input-group { display: flex; gap: 10px; }
+        .finalize-input-group input { flex-grow: 1; }
+        .finalize-input-group button { width: auto; font-size: 0.9em; padding: 8px 12px; }
+        #commentsContainer { max-height: 45vh; overflow-y: auto; background-color: #f1f5f9; border-radius: 8px; padding: 10px; margin-bottom: 15px;}
+        .comment { background-color: var(--white); border-radius: 12px; padding: 10px 15px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .comment p { margin: 0; }
+        .comment .author { font-weight: 500; font-size: 0.9rem; color: var(--primary-color); margin-bottom: 4px; }
+        #commentForm { display: flex; gap: 10px; }
+        #commentForm input { flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; }
+        #commentForm button { width: auto; }
     </style>
 </head>
 <body>
-
-    <div id="loginView" class="view active">
-        <div class="login-card glass-card">
-            <h2>כניסת מנהל מחסן</h2>
-            <input type="text" id="managerIdInput" placeholder="הזן קוד מנהל (OREN/TAMIR)">
-            <button id="loginBtn">כניסה</button>
+    <div class="container">
+         <div class="header-title">
+             <h1><i class="fas fa-tachometer-alt"></i> DeliveryMaster - מרכז בקרה</h1>
+        </div>
+        <div class="main-layout">
+            <div class="left-panel">
+                <div class="card">
+                    <h2><i class="fas fa-calendar-alt"></i> לוח שיבוצים חי</h2>
+                    <div id="scheduler" class="scheduler-container"></div>
+                </div>
+                <div class="card">
+                    <h2><i class="fas fa-map-marked-alt"></i> מפה טקטית חיה</h2>
+                    <div id="liveMap"></div>
+                </div>
+            </div>
+            <div class="right-panel">
+                <div class="card">
+                    <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
+                    <form id="createOrderForm" autocomplete="off">
+                        <div class="form-group">
+                            <label for="customerName">שם לקוח (התחל להקליד)</label>
+                            <input type="text" id="customerName" list="customers-list" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="customerId">מספר לקוח (מ-COMAX)</label>
+                            <input type="text" id="customerId">
+                        </div>
+                        <div class="form-group">
+                            <label for="contactPerson">איש קשר</label>
+                            <input type="text" id="contactPerson">
+                        </div>
+                        <div class="form-group"><label for="customerPhone">טלפון</label><input type="tel" id="customerPhone" required></div>
+                        <div class="form-group"><label for="city">עיר</label><select id="city" required></select></div>
+                        <div class="form-group address-group">
+                            <div><label for="street">רחוב</label><input type="text" id="street" required></div>
+                            <div><label for="houseNumber">מספר</label><input type="text" id="houseNumber" required></div>
+                        </div>
+                        <div class="form-group"><label for="deliveryType">סוג הובלה</label><select id="deliveryType"></select></div>
+                        <button type="submit">צור הזמנת ביניים</button>
+                    </form>
+                </div>
+                 <div class="card">
+                    <h2><i class="fas fa-sync-alt"></i> סנכרון מערכת</h2>
+                    <div class="sync-buttons">
+                        <button id="syncEmailsBtn"><i class="fas fa-envelope"></i> סנכרון מיילים מקומקס</button>
+                        <button id="syncDocsBtn"><i class="fas fa-file-import"></i> סנכרון מסמכים להזמנות</button>
+                        <button id="unlinkedDocsBtn" style="background-color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> דוח מסמכים ללא שיוך</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2><i class="fas fa-chart-line"></i> דוחות וביצועים</h2>
+                    <button id="showAnalyticsBtn" style="width: 100%; background-color: var(--success);"><i class="fas fa-chart-bar"></i> הצג דאשבורד</button>
+                </div>
+                <div class="card">
+                    <h2><i class="fas fa-history"></i> ארכיון</h2>
+                    <button id="showHistoryBtn" style="width: 100%; margin-bottom: 10px;"><i class="fas fa-history"></i> היסטוריית הזמנות</button>
+                    <button id="showLogsBtn" style="width: 100%; background-color: var(--info);"><i class="fas fa-clipboard-list"></i> תיעוד צפיות</button>
+                </div>
+            </div>
         </div>
     </div>
+    
+    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>היסטוריית הזמנות</h2><div id="historyContent" class="table-container"></div></div></div>
+    <div id="analyticsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוחות וביצועים</h2><div id="analyticsContent"></div></div></div>
+    <div id="logsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תיעוד צפיות במסמכים</h2><div id="logsContent" class="table-container"></div></div></div>
+    <div id="pdfModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תצוגת מסמך</h2><iframe id="pdfViewer" style="width:100%; height: 70vh; border:none;"></iframe></div></div>
+    <div id="commentsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>הערות להזמנה</h2><div id="commentsContent"></div></div></div>
+    <div id="unlinkedDocsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוח מסמכים ללא שיוך</h2><div id="unlinkedDocsContent" class="table-container"></div></div></div>
 
-    <div id="mainView" class="view">
-        <header class="app-header glass-card" style="margin: 15px; height: 70px;">
-            <h1 id="welcomeMessage"></h1>
-            <button id="logoutBtn" style="background:none; border:none; color:#333; font-size: 1.5em;"><i class="fas fa-sign-out-alt"></i></button>
-        </header>
-        <main>
-            <div id="newOrders" class="order-section">
-                <h2><i class="fas fa-inbox"></i> הזמנות חדשות לאישור</h2>
-                <div id="newOrdersList"></div>
-            </div>
-            <div id="inProgressOrders" class="order-section">
-                <h2><i class="fas fa-tasks"></i> הזמנות בתהליך</h2>
-                <div id="inProgressOrdersList"></div>
-            </div>
-        </main>
-    </div>
-
-    <div id="pdfModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>תצוגת מסמך</h2>
-                <span class="close-button" onclick="closePdfModal()">&times;</span>
-            </div>
-            <iframe id="pdfViewer"></iframe>
-        </div>
-    </div>
+    <div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+    <datalist id="customers-list"></datalist>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxf5YoSMI73L2spScp5S0teLQ47SuwGKC6xNpC5vWBmv51_GPEFr5OjOZEaMrD86q6QYQ/exec
-        const loginView = document.getElementById('loginView');
-        const mainView = document.getElementById('mainView');
+        // =================================================================
+        // DeliveryMaster Admin App - v24.3
+        // =================================================================
+
+        // ⚠️ עדכון קריטי: הדבק כאן את כתובת ה-URL החדשה שקיבלת מהפריסה
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzIDt9Zz-tTL1-OtT0GW_IqKR0P6D9kBpKkIwn7301eFr2ggLDMnggtFUd59r6Qdte3kg/exec';
         
-        let currentManager = null, refreshInterval, knownOrderIds = new Set();
-        const currentRole = 'Warehouse';
+        const EXPECTED_API_VERSION = "25.0";
+        const LOG_ORIGIN = 'Admin';
+        const currentUser = 'Admin'; 
         
+        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [], customersData = [];
+        
+        // --- MALSHINON (Logger) ---
+        function logEvent(message, type = 'info', data = '') {
+            const style = `color:${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'}; font-weight: bold;`;
+            console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, style, message, data);
+            
+            try {
+                const logData = { origin: LOG_ORIGIN, level: type, message: message, data: data };
+                apiFetch('logToServer', {}, 'POST', logData)
+                  .catch(err => console.error("Malshנון Critical Failure: Could not send log to server.", err));
+            } catch (error) {
+                console.error("Malshנון Submission Error:", error);
+            }
+        }
+        
+        // --- API Communication ---
         async function apiFetch(action, params = {}, method = 'GET', body = null) {
             const url = new URL(API_URL);
-            url.searchParams.append('action', action);
-            if(method === 'GET') {
+            if (method === 'GET') {
+                url.searchParams.append('action', action);
                 Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
             }
-            
-            const options = { method, mode: 'cors' };
+            const options = { method, mode: 'cors', headers: {} };
             if (method === 'POST') {
                 options.body = JSON.stringify({ action, data: body });
-                options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
+                options.headers['Content-Type'] = 'text/plain;charset=UTF-8';
             }
-
-            const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const result = await response.json();
-            if (result.status !== 'success') throw new Error(result.message);
-            return result.data;
-        }
-
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        OneSignalDeferred.push(async (OneSignal) => {
-            await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
-            initializeApp();
-        });
-
-        function initializeApp() {
-            document.getElementById('loginBtn').addEventListener('click', onLogin);
-            document.getElementById('logoutBtn').addEventListener('click', onLogout);
-            const loggedInManager = JSON.parse(sessionStorage.getItem('warehouseManager'));
-            if (loggedInManager) initApp(loggedInManager);
-        }
-        
-        function onLogin() {
-            const managerId = document.getElementById('managerIdInput').value.trim().toUpperCase();
-            if(!managerId) return;
-            const managerData = { id: managerId, name: managerId, warehouse: managerId === 'OREN' ? 'החרש' : 'התלמיד' };
-            sessionStorage.setItem('warehouseManager', JSON.stringify(managerData));
-            initApp(managerData);
-        }
-
-        function onLogout() {
-            sessionStorage.removeItem('warehouseManager');
-            if(refreshInterval) clearInterval(refreshInterval);
-            if(window.OneSignal) OneSignal.logout();
-            switchView('loginView');
-        }
-
-        function initApp(manager) {
-            currentManager = manager;
-            document.getElementById('welcomeMessage').textContent = `מחסן ${manager.warehouse} | ${manager.name}`;
-            switchView('mainView');
-            initializeNotifications(manager.id);
-            startPolling();
-        }
-        
-        function startPolling() {
-            if (refreshInterval) clearInterval(refreshInterval);
-            const poll = async () => { await fetchWarehouseOrders(); };
-            poll();
-            refreshInterval = setInterval(poll, 20000);
-        }
-
-        async function fetchWarehouseOrders() {
-            if (!currentManager) return;
             try {
-                const orders = await apiFetch('getWarehouseOrders', { warehouse: currentManager.warehouse });
-                renderOrders(orders);
+                const response = await fetch(url, options);
+                if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
+                const result = await response.json();
+                if (result.status !== 'success') throw new Error(result.message || 'Unknown API error');
+                return result.data;
             } catch (error) {
-                document.getElementById('newOrdersList').innerHTML = `<p style="color:red;">שגיאת תקשורת עם השרת: ${error.message}</p>`;
+                logEvent(`API Error for action ${action}`, 'error', error.message);
+                throw error;
             }
-        }
-
-        function renderOrders(orders) {
-            const newOrdersList = document.getElementById('newOrdersList');
-            const inProgressOrdersList = document.getElementById('inProgressOrdersList');
-            newOrdersList.innerHTML = '';
-            inProgressOrdersList.innerHTML = '';
-            
-            const newOrders = orders.filter(o => ['חדש', 'שויך'].includes(o.status));
-            const inProgress = orders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
-            
-            const newIncomingIds = new Set(newOrders.map(o => o.orderId));
-            if (knownOrderIds.size > 0 && [...newIncomingIds].some(id => !knownOrderIds.has(id))) {
-                playNotificationSound();
-            }
-            knownOrderIds = new Set(orders.map(o => o.orderId));
-
-            if (newOrders.length === 0) newOrdersList.innerHTML = '<p>אין הזמנות חדשות.</p>';
-            newOrders.forEach(order => newOrdersList.innerHTML += createOrderCard(order, 'acknowledge'));
-
-            if (inProgress.length === 0) inProgressOrdersList.innerHTML = '<p>אין הזמנות בתהליך.</p>';
-            inProgress.forEach(order => inProgressOrdersList.innerHTML += createOrderCard(order, 'load'));
-        }
-
-        function createOrderCard(order, type) {
-            let actionButtonHtml = '';
-            if (type === 'acknowledge') {
-                actionButtonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.orderId}', 'באיסוף')">אשר קבלה</button>`;
-            } else if (order.status === 'באיסוף') {
-                actionButtonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.orderId}', 'טעון')">סמן כטעון</button>`;
-            } else {
-                 actionButtonHtml = `<p style="color:var(--success); font-weight:bold; text-align:center;">הועמס ✔️</p>`;
-            }
-            const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
-
-            return `
-                <div class="order-card glass-card">
-                    <h4>${order.customerName} (${order.orderId ? String(order.orderId).substring(0,6) : 'N/A'})</h4>
-                    <p><strong>נהג:</strong> ${order.driverId || 'טרם שויך'}</p>
-                    <p><strong>שעה:</strong> ${order.orderTime || 'לא צוינה'}</p>
-                    <button class="btn-pdf" onclick="openPdfModal('${order.orderId}')" ${!hasPdf ? 'disabled' : ''}>הצג מסמך</button>
-                    ${actionButtonHtml}
-                </div>`;
         }
         
-        async function updateOrderStatus(event, orderId, newStatus) {
-            const btn = event.target;
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            let bgColor, iconClass;
+
+            switch(type) {
+                case 'success': bgColor = 'var(--success)'; iconClass = 'fas fa-check-circle'; break;
+                case 'error': bgColor = 'var(--danger)'; iconClass = 'fas fa-exclamation-triangle'; break;
+                default: bgColor = 'var(--info)'; iconClass = 'fas fa-info-circle'; break;
+            }
+
+            toast.style.backgroundColor = bgColor;
+            toast.style.color = 'white';
+            toast.style.padding = '15px 20px';
+            toast.style.borderRadius = '8px';
+            toast.style.marginBottom = '10px';
+            toast.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.5s, transform 0.5s';
+            toast.style.transform = 'translateX(100%)';
+            toast.innerHTML = `<i class="${iconClass}" style="margin-left: 10px;"></i> ${message}`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateX(0)';
+            }, 100);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 500);
+            }, 5000);
+        }
+
+        async function checkApiVersion() {
+            try {
+                const data = await apiFetch('getVersion');
+                logEvent(`API Version confirmed: ${data.version}`, 'success');
+                 if (data.version !== EXPECTED_API_VERSION) {
+                    const msg = `Warning: Mismatched API version. Expected ${EXPECTED_API_VERSION} but found ${data.version}. Please check deployment and API_URL.`;
+                    showToast(msg, 'error');
+                    logEvent(msg, 'error');
+                }
+            } catch(error) {
+                const msg = `Could not verify API version. The backend might be running an old version or the API_URL is incorrect.`;
+                logEvent(msg, 'error', error);
+                showToast(msg, 'error');
+            }
+        }
+
+        // --- Scheduler & Map ---
+        async function buildScheduler() {
+            logEvent("Building scheduler...");
+            document.getElementById('scheduler').innerHTML = '<p>טוען נתונים...</p>';
+            try {
+                const [drivers, orders] = await Promise.all([
+                    apiFetch('getDrivers'),
+                    apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] })
+                ]);
+                logEvent("Driver and order data fetched.", "success", {driverCount: drivers.length, orderCount: orders.length});
+                
+                allTodayOrders = orders;
+                const unassignedOrders = allTodayOrders.filter(o => !o.driverId);
+                let schedulerHTML = `<div class="scheduler-column"><h3>ממתינות (${unassignedOrders.length})</h3><ul class="order-pool" data-driver-id="unassigned">${unassignedOrders.map(createScheduleCard).join('')}</ul></div>`;
+                
+                drivers.filter(d => d.status === 'פעיל').forEach(driver => {
+                    const driverOrders = allTodayOrders.filter(o => o.driverId === driver.driverId);
+                    schedulerHTML += `<div class="scheduler-column"><h3>${driver.name} (${driverOrders.length})</h3><ul class="driver-lane" data-driver-id="${driver.driverId}">${driverOrders.map(createScheduleCard).join('')}</ul></div>`;
+                });
+                
+                document.getElementById('scheduler').innerHTML = schedulerHTML;
+                initSortable();
+                logEvent("Scheduler layout built.", "success");
+            } catch (error) {
+                logEvent(`Failed to build scheduler`, "error", error.message);
+                document.getElementById('scheduler').innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים.</p>`;
+            }
+        }
+
+        function initSortable() {
+            document.querySelectorAll('.order-pool, .driver-lane').forEach(lane => {
+                new Sortable(lane, { 
+                    group: { name: 'shared', pull: (sortable, store, dragEl) => !dragEl.classList.contains('placeholder') }, 
+                    animation: 150, 
+                    ghostClass: 'ghost-card', 
+                    onEnd: handleDragEnd 
+                });
+            });
+        }
+        
+        async function handleDragEnd(event) {
+            const internalId = event.item.dataset.internalId;
+            const newDriverId = event.to.dataset.driverId === 'unassigned' ? '' : event.to.dataset.driverId;
+            logEvent(`Order ${internalId} moved to driver ${newDriverId}.`);
+            
+            document.querySelectorAll('.scheduler-column h3').forEach(h3 => {
+                const count = h3.nextElementSibling.children.length;
+                h3.textContent = `${h3.textContent.split('(')[0].trim()} (${count})`;
+            });
+
+            try {
+                const order = allTodayOrders.find(o => o.internalId === internalId);
+                const updateId = order.orderId || order.internalId;
+
+                await apiFetch('updateOrder', {}, 'POST', { orderId: updateId, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
+                logEvent(`Update for order ${updateId} successful.`, 'success');
+                allTodayOrders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] });
+                updateMap();
+            } catch (error) {
+                logEvent(`Failed to update order`, "error", error.message);
+                showToast(`שגיאה בעדכון הזמנה: ${error.message}`, 'error');
+                buildScheduler();
+            }
+        }
+
+        function initializeMap() {
+            try {
+                liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
+                orderMarkersLayer.addTo(liveMap);
+                logEvent("Map initialized.", "success");
+            } catch (e) {
+                logEvent(`Map initialization failed`, 'error', e.message);
+            }
+        }
+        
+        async function updateMap() {
+            logEvent("Updating map...");
+            if (!liveMap) return;
+            try {
+                const { drivers, orders } = await apiFetch('getLiveMapData');
+                Object.values(driverMarkers).forEach(m => m.remove());
+                orderMarkersLayer.clearLayers();
+                drivers.forEach(d => {
+                    if (d.location?.latitude) {
+                        driverMarkers[d.driverId] = L.marker([d.location.latitude, d.location.longitude]).addTo(liveMap).bindPopup(`<b>${d.name}</b>`);
+                    }
+                });
+                orders.forEach(o => {
+                    if (o.latitude && o.status !== 'הושלם') {
+                       const iconUrl = (!o.driverId) 
+                           ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png'
+                           : 'https://cdn-icons-png.flaticon.com/512/3405/3405255.png';
+                       L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl, iconSize: [32, 32] }) })
+                           .addTo(orderMarkersLayer).bindPopup(`<b>${o.customerName}</b><br>שויך ל: ${o.driverId || 'טרם'}`);
+                    }
+                });
+                logEvent("Map updated.", "success");
+            } catch (error) {
+                logEvent(`Failed to update map`, "error", error.message);
+            }
+        }
+        
+        async function handleCreateOrder(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true; btn.textContent = 'יוצר...';
+            
+            const orderData = {
+                customerId: document.getElementById('customerId').value,
+                customerName: document.getElementById('customerName').value,
+                contactPerson: document.getElementById('contactPerson').value,
+                customerPhone: document.getElementById('customerPhone').value,
+                city: document.getElementById('city').value,
+                street: document.getElementById('street').value,
+                houseNumber: document.getElementById('houseNumber').value,
+                deliveryType: document.getElementById('deliveryType').value
+            };
+            logEvent(`Creating order placeholder...`, 'info', orderData);
+
+            try {
+                 const result = await apiFetch('createOrder', {}, 'POST', orderData);
+                logEvent('New order placeholder created successfully on backend.', 'success', result);
+                document.getElementById('createOrderForm').reset();
+                showToast('הזמנת ביניים נוצרה בהצלחה!', 'success');
+                setTimeout(() => { buildScheduler(); updateMap(); }, 800);
+            } catch(error) {
+                logEvent(`Error creating order placeholder`, 'error', error.message);
+                showToast(`שגיאה ביצירת הזמנה: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'צור הזמנת ביניים';
+            }
+        }
+        
+        async function handleSaveOrderId(internalId) {
+            const input = document.getElementById(`finalize-input-${internalId}`);
+            const finalOrderId = input.value.trim();
+            if (!finalOrderId) {
+                alert("אנא הזן מספר הזמנה.");
+                return;
+            }
+
+            const btn = input.nextElementSibling;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-             try {
-                await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { status: newStatus } });
-                setTimeout(fetchWarehouseOrders, 500);
+
+            try {
+                await apiFetch('finalizeOrder', {}, 'POST', { internalId, finalOrderId });
+                logEvent(`Order ${internalId} finalized with ID ${finalOrderId}`, 'success');
+                showToast('מספר ההזמנה נשמר בהצלחה!', 'success');
+                await buildScheduler();
             } catch (error) {
+                logEvent(`Failed to finalize order ${internalId}`, 'error', error.message);
+                showToast(`שגיאה בשמירת מספר הזמנה: ${error.message}`, 'error');
                 btn.disabled = false;
-                btn.innerHTML = 'שגיאה!';
+                btn.textContent = 'שמור מספר';
+            }
+        }
+        
+        function populateDropdowns() {
+            const deliveryTypeSelect = document.getElementById('deliveryType');
+            deliveryTypes.forEach(type => { deliveryTypeSelect.innerHTML += `<option value="${type}">${type}</option>`; });
+            const citySelect = document.getElementById('city');
+            cities.sort().forEach(city => { citySelect.innerHTML += `<option value="${city}">${city}</option>`; });
+        }
+        
+        function openModal(modalId, contentId, loadingMessage) {
+            const modal = document.getElementById(modalId);
+            const content = document.getElementById(contentId || modalId + 'Content');
+            modal.style.display = 'block';
+            if (content && loadingMessage) content.innerHTML = `<p>${loadingMessage}</p>`;
+            return {modal, content};
+        }
+        
+        async function openHistoryModal() {
+            const { content } = openModal('historyModal', 'historyContent', 'טוען היסטוריה...');
+            try {
+                const historyData = await apiFetch('getHistory');
+                if (!historyData.length) { content.innerHTML = '<p>לא נמצאו נתוני היסטוריה.</p>'; return; }
+                let tableHTML = `<table><thead><tr><th>תאריך</th><th>לקוח</th><th>סטטוס</th><th>נהג</th></tr></thead><tbody>`;
+                historyData.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate))
+                           .forEach(record => {
+                    tableHTML += `<tr>
+                        <td>${record.orderDate ? new Date(record.orderDate).toLocaleDateString('he-IL') : 'N/A'}</td>
+                        <td>${record.customerName || 'N/A'}</td>
+                        <td>${record.status || 'N/A'}</td>
+                        <td>${record.driverId || '-'}</td>
+                    </tr>`;
+                });
+                content.innerHTML = tableHTML + `</tbody></table>`;
+            } catch (error) {
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת ההיסטוריה: ${error.message}</p>`;
             }
         }
         
         async function openPdfModal(orderId) {
-            const pdfModal = document.getElementById('pdfModal');
+            if (!orderId || orderId === '-') {
+                showToast('אין מזהה הזמנה זמין לצפייה במסמך.', 'warning');
+                return;
+            }
+            const { modal } = openModal('pdfModal');
             const pdfViewer = document.getElementById('pdfViewer');
             pdfViewer.src = 'about:blank';
-            pdfModal.style.display = 'block';
-
             try {
                 const url = await apiFetch('getOrderPDF', { orderId });
                 if (url) {
                     pdfViewer.src = url;
-                    await apiFetch('logPDFView', {}, 'POST', { user: currentManager.id, role: currentRole, orderId });
+                    apiFetch('logPDFView', {}, 'POST', { user: currentUser, role: 'Administrator', orderId });
                 } else {
-                    alert('לא נמצא מסמך PDF עבור הזמנה זו.');
-                    closePdfModal();
+                    showToast('לא נמצא מסמך PDF עבור הזמנה זו.', 'info');
+                    modal.style.display = 'none';
                 }
             } catch (error) {
-                alert('שגיאה בטעינת המסמך: ' + error.message);
-                closePdfModal();
+                showToast('שגיאה בטעינת המסמך: ' + error.message, 'error');
+                modal.style.display = 'none';
+            }
+        }
+        
+        async function openUnlinkedDocsModal() {
+            const { content } = openModal('unlinkedDocsModal', 'unlinkedDocsContent', 'טוען דוח...');
+            try {
+                const docs = await apiFetch('getUnlinkedDocuments');
+                if (!docs || !docs.length) {
+                    content.innerHTML = '<p>כל המסמכים שנסרקו שויכו בהצלחה.</p>';
+                    return;
+                }
+                let tableHTML = `<table><thead><tr><th>תאריך סריקה</th><th>מספר הזמנה</th><th>קישור למסמך</th></tr></thead><tbody>`;
+                docs.forEach(doc => {
+                    tableHTML += `<tr>
+                        <td>${doc.scanTimestamp ? new Date(doc.scanTimestamp).toLocaleString('he-IL') : 'N/A'}</td>
+                        <td>${doc.extractedOrderNumber || 'לא זוהה'}</td>
+                        <td><a href="${doc.pdfLink}" target="_blank">פתח מסמך</a></td>
+                    </tr>`;
+                });
+                content.innerHTML = tableHTML + `</tbody></table>`;
+            } catch (error) {
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת הדוח: ${error.message}</p>`;
             }
         }
 
-        function closePdfModal() {
-            document.getElementById('pdfModal').style.display = 'none';
-        }
-        
-        async function playNotificationSound() {
+        async function handleSyncAction(event, action, actionName) {
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מבצע...';
+            showToast(`מתחיל ${actionName}...`, 'info');
+
             try {
-                await Tone.start();
-                new Tone.Synth().toDestination().triggerAttackRelease("C5", "8n");
-            } catch(e) { console.error('Could not play sound', e); }
+                const result = await apiFetch(action, {}, 'POST', {});
+                logEvent(`${actionName} completed successfully.`, 'success', result);
+                showToast(result.message, 'success');
+                if (action === 'syncScannedToMainOrders') {
+                    await buildScheduler(); 
+                }
+            } catch (error) {
+                logEvent(`Error during ${actionName}`, 'error', error.message);
+                showToast(`שגיאה ב${actionName}: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
         }
         
-        function switchView(viewId) {
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.getElementById(viewId).classList.add('active');
+        async function loadInitialData() {
+            await checkApiVersion();
+            initializeMap();
+            populateDropdowns();
+            try {
+                customersData = await apiFetch('getCustomers');
+                populateCustomerDatalist(customersData);
+                logEvent("Customer data loaded.", 'success');
+            } catch (error) {
+                logEvent("Failed to load customer data", 'error', error);
+                showToast('שגיאה בטעינת רשימת הלקוחות', 'error');
+            }
+            await buildScheduler();
+            await updateMap(); 
+            setInterval(() => { buildScheduler(); updateMap(); }, 30000);
         }
 
-        async function initializeNotifications(managerId) {
-            try {
-                await OneSignal.Notifications.requestPermission();
-                await OneSignal.login(managerId);
-                const playerId = OneSignal.User.onesignalId;
-                if (playerId) await apiFetch('registerWarehouseDevice', {}, 'POST', { managerId, deviceId: playerId });
-             } catch (e) { console.error("Error initializing notifications", e); }
+        function populateCustomerDatalist(customers) {
+            const dataList = document.getElementById('customers-list');
+            dataList.innerHTML = '';
+            customers.forEach(customer => {
+                if (customer.name) {
+                    const option = document.createElement('option');
+                    option.value = customer.name;
+                    dataList.appendChild(option);
+                }
+            });
         }
+        
+        function populateFormWithCustomerData(customer) {
+            if (!customer) return;
+            const lowerCaseCustomer = {};
+            for (const key in customer) { lowerCaseCustomer[key.toLowerCase()] = customer[key]; }
+            logEvent(`Populating form with customer data`, 'info', lowerCaseCustomer);
+            document.getElementById('customerName').value = lowerCaseCustomer.name || '';
+            document.getElementById('customerId').value = lowerCaseCustomer.customerid || '';
+            document.getElementById('contactPerson').value = lowerCaseCustomer.contactperson || '';
+            document.getElementById('customerPhone').value = lowerCaseCustomer.phone || '';
+            const address = lowerCaseCustomer.address || '';
+            const addressParts = address.split(',');
+            const city = addressParts.length > 1 ? addressParts[1].trim() : '';
+            const streetAndNum = addressParts[0] || '';
+            const match = streetAndNum.match(/(.*?)\s*([\d/]+.*)$/);
+            let street = streetAndNum; let number = '';
+            if (match) { street = match[1].trim(); number = match[2].trim(); }
+            document.getElementById('street').value = street;
+            document.getElementById('houseNumber').value = number;
+            const citySelect = document.getElementById('city');
+            const cityOption = Array.from(citySelect.options).find(opt => opt.value === city);
+            if (cityOption) citySelect.value = city;
+        }
+
+        function handleCustomerSelection(event) {
+            const selectedName = event.target.value;
+            const selectedCustomer = customersData.find(c => c.name === selectedName);
+            if (selectedCustomer) { populateFormWithCustomerData(selectedCustomer); }
+        }
+
+        function handleCustomerIdInput(event) {
+            const customerId = event.target.value.trim();
+            if (!customerId) return;
+            const customer = customersData.find(c => String(c.customerId) === customerId);
+            if (customer) { populateFormWithCustomerData(customer); }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            logEvent("DOM Loaded. Initializing app.", "success");
+            loadInitialData();
+            document.getElementById('customerName').addEventListener('input', handleCustomerSelection);
+            document.getElementById('customerId').addEventListener('blur', handleCustomerIdInput);
+            document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
+            document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
+            document.getElementById('syncEmailsBtn').addEventListener('click', (e) => handleSyncAction(e, 'processComaxEmails', 'סנכרון מיילים'));
+            document.getElementById('syncDocsBtn').addEventListener('click', (e) => handleSyncAction(e, 'syncScannedToMainOrders', 'סנכרון מסמכים'));
+            document.getElementById('unlinkedDocsBtn').addEventListener('click', openUnlinkedDocsModal);
+            document.querySelectorAll('.close-button').forEach(btn => {
+                btn.onclick = () => btn.closest('.modal').style.display = 'none';
+            });
+            window.onclick = (event) => {
+                if (event.target.classList.contains('modal')) event.target.style.display = 'none';
+            };
+        });
+
+        function createScheduleCard(order) {
+            const isPlaceholder = !order.orderId && order.internalId;
+            const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
+            const trackingId = order.trackingId;
+
+            const mainContent = `
+                <div class="card-main-content">
+                    <div class="schedule-card-details">
+                        <p class="card-customer">${order.customerName || 'N/A'}</p>
+                        <p><i class="fas fa-map-marker-alt"></i> ${order.address || 'N/A'}</p>
+                        <p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p>
+                    </div>
+                    <div class="card-actions">
+                         <button class="action-button" onclick="openCommentsModal('${isPlaceholder ? order.internalId : order.orderId}')" title="הצג הערות">
+                            <i class="fas fa-comments"></i>
+                        </button>
+                        <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'disabled' : ''}>
+                            <i class="fas fa-paperclip" ${hasPdf ? 'style="color: var(--primary-color);"' : ''}></i>
+                        </button>
+                        <button class="action-button share-link" onclick="copyTrackingLink('${trackingId}')" title="שתף לינק מעקב" ${!trackingId ? 'disabled' : ''}>
+                            <i class="fas fa-share-alt"></i>
+                        </button>
+                    </div>
+                </div>`;
+
+            const finalizeSection = isPlaceholder ? `
+                <div class="finalize-section">
+                    <h4><i class="fas fa-exclamation-circle"></i> ממתין למספר הזמנה מקומקס</h4>
+                    <div class="finalize-input-group">
+                        <input type="text" id="finalize-input-${order.internalId}" placeholder="הזן מספר הזמנה..." required onkeydown="if(event.key==='Enter'){handleSaveOrderId('${order.internalId}'); event.preventDefault();}">
+                        <button onclick="handleSaveOrderId('${order.internalId}')">שמור</button>
+                    </div>
+                </div>` : '';
+            
+            const liClass = isPlaceholder ? 'schedule-card placeholder' : 'schedule-card';
+            const dataId = order.internalId || order.orderId;
+
+            return `<li class="${liClass}" data-internal-id="${dataId}">${mainContent}${finalizeSection}</li>`;
+        }
+
+        function copyTrackingLink(trackingId) {
+            if (!trackingId) {
+                showToast('לא קיים לינק מעקב להזמנה זו עדיין.', 'error');
+                return;
+            }
+            const url = `https://rami1125.github.io/sidor94/customer-app/?trackId=${trackingId}`;
+            const tempInput = document.createElement('input');
+            tempInput.value = url;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast('לינק המעקב הועתק!', 'success');
+        }
+
+        async function openCommentsModal(orderId) {
+            const { content } = openModal('commentsModal', 'commentsContent', 'טוען הערות...');
+            try {
+                const comments = await apiFetch('getComments', { orderId });
+                content.innerHTML = `
+                    <div id="commentsContainer">
+                        ${(comments && comments.length > 0) ? comments.map(c => `
+                            <div class="comment">
+                                <p class="author">${c.author || 'לא ידוע'}</p>
+                                <p>${c.text || ''}</p>
+                            </div>`).join('') : '<p>אין הערות להזמנה זו.</p>'}
+                    </div>
+                    <form id="commentForm">
+                        <input type="text" id="commentInput" placeholder="הקלד הערה..." required>
+                        <button type="submit">שלח</button>
+                    </form>
+                `;
+                document.getElementById('commentForm').addEventListener('submit', (e) => handleCommentSubmit(e, orderId));
+            } catch (error) {
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת הערות: ${error.message}</p>`;
+            }
+        }
+        
+        async function handleCommentSubmit(event, orderId) {
+            event.preventDefault();
+            const input = document.getElementById('commentInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const button = event.target.querySelector('button');
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                await apiFetch('postComment', {}, 'POST', { orderId, author: currentUser, text });
+                input.value = '';
+                await openCommentsModal(orderId);
+            } catch (error) {
+                showToast('שגיאה בשליחת הערה: ' + error.message, 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'שלח';
+            }
+        }
+        
+        async function openAnalyticsModal() { alert('Analytics modal'); }
+        async function openLogsModal() { alert('Logs modal'); }
+
     </script>
 </body>
 </html>
+
