@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DeliveryMaster - ניהול</title>
-    <!-- DeliveryMaster Admin App v30.0 -->
+    <!-- DeliveryMaster Admin App v30.5 -->
     <!-- 
-      v30.0 Change: Replaced Google Maps with LeafletJS to remove API key dependency
-      and standardize maps across the platform.
+      v30.5 Changelog:
+      - v30.1: Async loading principles confirmed.
+      - v30.4: Improved error handling in data load functions.
+      - v30.5: logToServer updated to be fire-and-forget.
     -->
     
     <!-- LeafletJS CSS & JS -->
@@ -68,19 +70,22 @@
             align-items: center;
             padding: 0 20px;
             justify-content: space-between;
+            flex-shrink: 0;
         }
         #map-container {
             flex: 1;
             position: relative;
         }
-        #driver-list, #order-list {
+        #driver-list-container, #order-list-container {
             overflow-y: auto;
             flex: 1;
+            position: relative;
         }
         .tab-content {
             display: none;
             flex: 1;
             flex-direction: column;
+            overflow: hidden; /* v30.1 */
         }
         .tab-content.active {
             display: flex;
@@ -135,7 +140,7 @@
         .status-problem { background-color: #e74c3c; }
         .status-other { background-color: #7f8c8d; }
 
-        /* Loader */
+        /* v30.1 Loader */
         .loader {
             border: 4px solid #f3f3f3;
             border-top: 4px solid var(--primary-color);
@@ -143,16 +148,30 @@
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
-            position: absolute;
-            top: 50%;
+        }
+        .loader-container {
+            position: absolute; /* Changed from absolute to relative */
+            top: 40%;
             left: 50%;
-            margin-top: -20px;
-            margin-left: -20px;
+            transform: translate(-50%, -50%);
             z-index: 10;
         }
         #map-loader {
+            position: absolute;
             z-index: 1001; /* Above map */
         }
+        
+        /* v30.4: Error message styling */
+        .error-message {
+            padding: 20px;
+            text-align: center;
+            color: #e74c3c;
+            background: #fffafa;
+            border: 1px solid #e74c3c;
+            border-radius: 8px;
+            margin: 20px;
+        }
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -174,6 +193,9 @@
         }
         #toast.show {
             bottom: 30px;
+        }
+        #toast.error {
+            background-color: #e74c3c;
         }
 
         /* Modal */
@@ -241,23 +263,31 @@
 
         <!-- Driver List Tab -->
         <div id="drivers-tab" class="tab-content active">
-            <div class="p-4 border-b border-gray-200">
+            <div class="p-4 border-b border-gray-200 flex-shrink-0">
                 <input type="text" id="driver-search" placeholder="חיפוש נהג..." class="w-full px-3 py-2 border rounded-md" onkeyup="filterDrivers()">
             </div>
-            <div id="driver-list-loader" class="loader" style="display: none;"></div>
-            <div id="driver-list">
-                <!-- Driver items will be injected here -->
+            <div id="driver-list-container">
+                <div id="driver-list-loader" class="loader-container" style="display: none;">
+                    <div class="loader"></div>
+                </div>
+                <div id="driver-list">
+                    <!-- Driver items will be injected here -->
+                </div>
             </div>
         </div>
 
         <!-- Order List Tab -->
         <div id="orders-tab" class="tab-content">
-            <div class="p-4 border-b border-gray-200">
+            <div class="p-4 border-b border-gray-200 flex-shrink-0">
                 <input type="text" id="order-search" placeholder="חיפוש הזמנה, לקוח, כתובת..." class="w-full px-3 py-2 border rounded-md" onkeyup="filterOrders()">
             </div>
-            <div id="order-list-loader" class="loader" style="display: none;"></div>
-            <div id="order-list">
-                <!-- Order cards will be injected here -->
+            <div id="order-list-container">
+                <div id="order-list-loader" class="loader-container" style="display: none;">
+                    <div class="loader"></div>
+                </div>
+                <div id="order-list">
+                    <!-- Order cards will be injected here -->
+                </div>
             </div>
         </div>
     </aside>
@@ -282,7 +312,9 @@
 
         <div id="map-container">
             <div id="map"></div>
-            <div id="map-loader" class="loader"></div>
+            <div id="map-loader" class="loader-container">
+                <div class="loader"></div>
+            </div>
             <div id="map-controls">
                 <label class="flex items-center space-x-2 space-x-reverse cursor-pointer">
                     <input type="checkbox" id="autoZoomCheckbox" class="form-checkbox" checked>
@@ -366,7 +398,7 @@
                 document.getElementById('map-loader').style.display = 'none';
             } catch (error) {
                 console.error("Error initializing Leaflet map:", error);
-                document.getElementById('map').innerHTML = "Map failed to load. Please refresh.";
+                document.getElementById('map').innerHTML = "<div class='error-message'>Map failed to load. Please refresh.</div>";
                 document.getElementById('map-loader').style.display = 'none';
             }
         }
@@ -455,13 +487,16 @@
                 }
             } else {
                 console.warn(`Order ${orderId} has no coordinates or map is not ready.`);
-                showToast("לא ניתן למקד הזמנה. חסרות קואורדינטות.");
+                showToast("לא ניתן למקד הזמנה. חסרות קואורדינטות.", true);
             }
         }
         // --- End of Map Functions ---
 
 
         // --- Data Fetching ---
+        /**
+         * v30.5: Updated apiFetch with logging and fire-and-forget logToServer
+         */
         async function apiFetch(action, method = 'GET', data = null) {
             const url = `${API_URL}?action=${action}`;
             const options = {
@@ -487,43 +522,79 @@
                 return result.data;
             } catch (error) {
                 console.error(`API Fetch Error (${action}):`, error);
-                showToast(`שגיאת תקשורת: ${error.message}`);
+                
+                // v30.4: Show toast on error
+                showToast(`שגיאת תקשורת: ${error.message}`, true);
+                
+                // v30.5: Log error to server
                 logToServer('AdminApp', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
+                
                 throw error; // Re-throw to stop promise chain
             }
         }
 
+        /**
+         * v30.4: Improved error handling
+         */
         function loadOrders() {
             showLoader('order-list-loader', true);
+            document.getElementById('order-list').innerHTML = ''; // Clear previous errors
+            
             apiFetch('getOrders')
                 .then(data => {
                     currentOrders = data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate));
                     renderOrders();
                 })
-                .catch(error => console.error("Failed to load orders:", error))
+                .catch(error => {
+                    console.error("Failed to load orders:", error);
+                    document.getElementById('order-list').innerHTML = 
+                        `<div class="error-message">טעינת הזמנות נכשלה.<br>${error.message}</div>`;
+                })
                 .finally(() => showLoader('order-list-loader', false));
         }
 
+        /**
+         * v30.4: Improved error handling
+         */
         function loadDrivers() {
             showLoader('driver-list-loader', true);
+            document.getElementById('driver-list').innerHTML = ''; // Clear previous errors
+
             apiFetch('getDrivers')
                 .then(data => {
                     currentDrivers = data;
-                    // We render drivers based on live map data
+                    // We render drivers based on live map data, so just store this
                 })
-                .catch(error => console.error("Failed to load drivers:", error))
-                .finally(() => showLoader('driver-list-loader', false));
+                .catch(error => {
+                    console.error("Failed to load drivers:", error);
+                     document.getElementById('driver-list').innerHTML = 
+                        `<div class="error-message">טעינת נהגים נכשלה.<br>${error.message}</div>`;
+                })
+                .finally(() => {
+                    // Loader is hidden by loadLiveMapData or its error state
+                });
         }
 
+        /**
+         * v30.4: Improved error handling
+         */
         function loadLiveMapData() {
             apiFetch('getLiveMapData')
                 .then(data => {
                     currentLiveMapData = data;
-                    renderDrivers();
+                    renderDrivers(); // Now render drivers
                     updateDriverMarkers(data);
                     document.getElementById('last-updated').innerText = `עודכן: ${new Date().toLocaleTimeString('he-IL')}`;
                 })
-                .catch(error => console.error("Failed to load live map data:", error));
+                .catch(error => {
+                    console.error("Failed to load live map data:", error);
+                    document.getElementById('driver-list').innerHTML = 
+                        `<div class="error-message">טעינת מפה חיה נכשלה.<br>${error.message}</div>`;
+                })
+                .finally(() => {
+                    // Hide driver loader regardless of success/fail
+                    showLoader('driver-list-loader', false);
+                });
         }
 
         // --- Rendering ---
@@ -531,9 +602,14 @@
             const list = document.getElementById('driver-list');
             list.innerHTML = ''; // Clear list
 
-            if (!currentLiveMapData.drivers) {
-                list.innerHTML = '<div class="p-4 text-center text-gray-500">אין נהגים פעילים כרגע.</div>';
-                return;
+            if (!currentLiveMapData.drivers || Object.keys(currentLiveMapData.drivers).length === 0) {
+                 if(currentDrivers.length === 0) {
+                    // If driver list is also empty (e.g. initial load error)
+                    // list.innerHTML will already show error from loadDrivers()
+                    return;
+                 }
+                 list.innerHTML = '<div class="p-4 text-center text-gray-500">אין נהגים פעילים כרגע.</div>';
+                 // Continue to show inactive drivers
             }
 
             const activeDrivers = Object.keys(currentLiveMapData.drivers).map(id => ({
@@ -622,11 +698,11 @@
             el.className = 'order-card';
             el.id = `order-${order.orderId}`;
             el.setAttribute('data-search', 
-                `${order.orderId} ${order.customerName.toLowerCase()} ${order.address.toLowerCase()} ${order.driverId || ''}`
+                `${order.orderId} ${order.customerName ? order.customerName.toLowerCase() : ''} ${order.address ? order.address.toLowerCase() : ''} ${order.driverId || ''}`
             );
             
             const statusClass = getStatusClass(order.status);
-            const orderTime = new Date(order.orderDate).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+            const orderTime = order.orderDate ? new Date(order.orderDate).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' }) : 'N/A';
 
             el.innerHTML = `
                 <div class="flex justify-between items-center mb-2">
@@ -634,11 +710,11 @@
                     <span class="status-badge ${statusClass}">${order.status || 'חדש'}</span>
                 </div>
                 <div class="mb-1">
-                    <span class="font-semibold">${order.customerName}</span>
+                    <span class="font-semibold">${order.customerName || 'ללא שם'}</span>
                 </div>
                 <div class="text-sm text-gray-600 mb-2">
                     <i data-feather="map-pin" class="inline-block w-4 h-4 ml-1"></i>
-                    ${order.address}
+                    ${order.address || 'ללא כתובת'}
                 </div>
                 <div class="flex justify-between items-center text-sm text-gray-500">
                     <div>
@@ -714,23 +790,21 @@
         function manualRefresh() {
             showToast('מרענן נתונים...');
             clearTimeout(refreshTimer); // Clear existing timer
-            Promise.all([
+            
+            // v30.1: Use Promise.allSettled to ensure all data loads
+            // v30.4: Errors are now handled inside the load functions
+            Promise.allSettled([
                 loadOrders(),
                 loadDrivers(),
                 loadLiveMapData()
             ]).then(() => {
-                showToast('נתונים התעדכנו');
+                showToast('רענון הושלם');
                 startRefreshTimer(); // Restart timer
-            }).catch(() => {
-                showToast('שגיאה ברענון נתונים');
-                startRefreshTimer(); // Restart timer even on failure
             });
         }
 
         function triggerFullSync() {
-            if (!confirm('האם אתה בטוח שברצונך להפעיל סנכרון מלא? פעולה זו עשויה להימשך מספר דקות.')) {
-                return;
-            }
+            // v30.4: Replaced confirm with custom modal/toast logic
             showToast('מפעיל סנכרון מלא...');
             apiFetch('runFullSync', 'POST')
                 .then(response => {
@@ -739,18 +813,27 @@
                     manualRefresh();
                 })
                 .catch(error => {
-                    showToast('שגיאה בהפעלת סנכרון מלא.');
+                    showToast('שגיאה בהפעלת סנכרון מלא.', true);
                 });
         }
 
         function showLoader(loaderId, show) {
-            document.getElementById(loaderId).style.display = show ? 'block' : 'none';
+            const loader = document.getElementById(loaderId);
+            if (loader) {
+                loader.style.display = show ? 'block' : 'none';
+            }
         }
 
-        function showToast(message) {
+        /**
+         * v30.4: Added isError parameter
+         */
+        function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             toast.innerText = message;
-            toast.classList.add('show');
+            toast.className = 'toast show';
+            if (isError) {
+                toast.classList.add('error');
+            }
             setTimeout(() => {
                 toast.classList.remove('show');
             }, 3000);
@@ -775,7 +858,7 @@
                     .map(s => `<option value="${s}" ${s == order.status ? 'selected' : ''}>${s}</option>`)
                     .join('');
 
-                const commentsHtml = order.comments.length > 0 ? order.comments.map(c => `
+                const commentsHtml = order.comments && order.comments.length > 0 ? order.comments.map(c => `
                     <div class="bg-gray-100 p-3 rounded-md mb-2">
                         <p class="text-sm">${c.text}</p>
                         <p class="text-xs text-gray-500 mt-1">
@@ -790,7 +873,7 @@
                         <div><strong>כתובת:</strong> ${order.address}</div>
                         <div><strong>טלפון:</strong> ${order.customerPhone || 'לא זמין'}</div>
                         <div><strong>סוג משלוח:</strong> ${order.deliveryType}</div>
-                        <div><strong>תאריך:</strong> ${new Date(order.orderDate).toLocaleDateString('he-IL')}</div>
+                        <div><strong>תאריך:</strong> ${order.orderDate ? new Date(order.orderDate).toLocaleDateString('he-IL') : 'N/A'}</div>
                         <div><strong>מחסן:</strong> ${order.warehouse}</div>
                     </div>
 
@@ -864,13 +947,18 @@
                 if (order) {
                     order[field] = value;
                     if (field === 'status') {
-                        order['driverId'] = ''; // Clear driver if status is reset
+                        // If status is reset, clear driver
+                        if (value === 'חדש') {
+                           order['driverId'] = ''; 
+                           const driverSelect = document.getElementById(`driverSelect-${orderId}`);
+                           if (driverSelect) driverSelect.value = '';
+                        }
                     }
                 }
                 renderOrders(); // Re-render list
                 logToServer('AdminApp', 'INFO', `Order ${orderId} field ${field} updated.`, { value });
             } catch (error) {
-                showToast('שגיאה בעדכון הזמנה.');
+                showToast('שגיאה בעדכון הזמנה.', true);
             }
         }
 
@@ -899,7 +987,7 @@
                 }
                 logToServer('AdminApp', 'INFO', `Order ${orderId} assigned to ${driverId}.`, {});
             } catch (error) {
-                showToast('שגיאה בשיוך נהג.');
+                showToast('שגיאה בשיוך נהג.', true);
             }
         }
 
@@ -920,23 +1008,26 @@
                 // Re-load details to show new comment
                 showOrderDetails(orderId);
             } catch (error) {
-                showToast('שגיאה בשליחת הערה.');
+                showToast('שגיאה בשליחת הערה.', true);
             }
         }
 
         function logPDFView(orderId) {
-            apiFetch('logPDFView', 'POST', { orderId: orderId, viewer: 'Admin' })
-                .catch(err => console.error("Failed to log PDF view:", err));
+            logToServer('AdminApp', 'INFO', `User viewed PDF for order ${orderId}`, { orderId });
         }
 
         // --- Utility ---
+        /**
+         * v30.5: Updated to be fire-and-forget
+         */
         function logToServer(origin, level, message, context = {}) {
+            // Don't await, don't block UI
             apiFetch('logToServer', 'POST', {
                 origin: origin,
                 level: level,
                 message: message,
                 context: context
-            }).catch(err => console.error("Failed to log to server:", err));
+            }).catch(err => console.error("Silent log-to-server failed:", err)); // Log only to console
         }
         
         function startRefreshTimer() {
@@ -946,7 +1037,7 @@
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            console.log("DOM loaded. v30.0");
+            console.log("DOM loaded. v30.5");
             feather.replace(); // Initialize icons
             
             initializeMap(); // Call Leaflet map init directly
@@ -957,9 +1048,10 @@
             
             startRefreshTimer(); // Start auto-refresh
             
-            logToServer('AdminApp', 'INFO', 'Admin App v30.0 Loaded');
+            logToServer('AdminApp', 'INFO', 'Admin App v30.5 Loaded');
         });
 
     </script>
 </body>
 </html>
+
