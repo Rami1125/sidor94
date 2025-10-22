@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DeliveryMaster Warehouse v29.4</title>
+    <!-- <link rel="manifest" href="manifest.json"> -->
+
+    <!-- v29.3: סקריפט זיהוי מובייל -->
+    <script>
+        (function() {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            document.documentElement.className = isMobile ? 'mobile' : 'desktop';
+        })();
+    </script>
+
+    <style>
+        /* ... (כל ה-CSS מ-v29.3 נשאר זהה) ... */
+        :root {
+            --bg-color: #f4f4f8;
+            --header-bg: #ffffff;
+            --card-bg: #ffffff;
+            --primary-color: #17a2b8;
+            --secondary-color: #6c757d;
+            --border-color: #dee2e6;
+            --shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-color);
+            margin: 0;
+            padding: 0;
+        }
+        .screen {
+            display: none;
+            flex-direction: column;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .screen.active {
+            display: flex;
+        }
+        .container {
+            padding: 15px;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+        #login-screen {
+            justify-content: center;
+            align-items: center;
+        }
+        #login-screen h2 {
+            color: var(--primary-color);
+        }
+        #login-screen input {
+            width: 80%;
+            padding: 12px;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            background-color: var(--primary-color);
+            color: white;
+            margin-top: 10px;
+        }
+        button.btn-secondary {
+            background-color: var(--secondary-color);
+        }
+        button:active {
+            opacity: 0.8;
+        }
+        #main-screen .header {
+            background: var(--header-bg);
+            padding: 15px;
+            box-shadow: var(--shadow);
+            border-bottom: 1px solid var(--border-color);
+        }
+        #manager-welcome {
+            margin: 0;
+            font-size: 1.3rem;
+            color: var(--primary-color);
+        }
+        #scan-result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            background: #e6f7ff;
+            border: 1px solid #b3e0ff;
+            color: #0056b3;
+            text-align: center;
+            min-height: 1.2em;
+        }
+        #warehouse-order-list {
+            padding: 10px 0;
+        }
+        .order-item {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: var(--shadow);
+            border-right: 5px solid var(--secondary-color);
+        }
+        .order-item h4 { margin: 0 0 5px 0; }
+        .order-item p { margin: 5px 0; font-size: 0.9rem; }
+        #loading-spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            z-index: 10000;
+            font-weight: 500;
+            display: none;
+        }
+    </style>
+</head>
+<body class="">
+
+    <div id="loading-spinner">טוען...</div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen active">
+        <div class="container">
+            <h2>כניסת מנהל מחסן</h2>
+            <input type="text" id="manager-id-input" placeholder="שם משתמש (מחסן)" autocapitalize="none">
+            <button onclick="login()">התחבר</button>
+        </div>
+    </div>
+
+    <!-- Main Screen -->
+    <div id="main-screen" class="screen">
+        <div class="header">
+            <h2 id="manager-welcome">מחסן: ...</h2>
+        </div>
+        
+        <div class="container">
+            <button id="scan-button" onclick="scanBarcode()">סרוק תעודה (סימולציה)</button>
+            <div id="scan-result"></div>
+            
+            <h3>הזמנות ממתינות לסריקה:</h3>
+            <div id="warehouse-order-list">
+            </div>
+            
+            <button onclick="logout()" class="btn-secondary">התנתק</button>
+        </div>
+    </div>
+    
+    <script>
+        // --- v29.3: הגדרות גלובליות ---
+        let currentManager = null;
+        
+        // --- v29.4: שדרוג תקשורת שרת ל-Fetch ---
+        function showLoading() { document.getElementById('loading-spinner').style.display = 'block'; }
+        function hideLoading() { document.getElementById('loading-spinner').style.display = 'none'; }
+        
+        /**
+         * v29.4: פונקציית תקשורת מבוססת fetch לאתר חיצוני
+         * (אפליקציית מחסן משתמשת רק ב-POST)
+         */
+        function runServerScript(action, params = {}, method = 'POST') {
+             showLoading();
+             
+             // v29.4: כתובת שרת קבועה (החלף בכתובת ה-exec שלך)
+             const SERVER_URL = "https://script.google.com/macros/s/AKfycbydcJnRqEUH821BnZa8Q131Z_a-VGXefpWlsXLMJEv8b1zFVHuDafo3JlbDcCf5Z3CkvQ/exec";
+
+             let url = SERVER_URL;
+             let options = {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                 mode: 'cors',
+                 body: JSON.stringify({ action, ...params })
+             };
+
+             return new Promise((resolve, reject) => {
+                 fetch(url, options)
+                     .then(response => {
+                         if (!response.ok) {
+                             throw new Error(`Server returned status: ${response.status}`);
+                         }
+                         return response.json();
+                     })
+                     .then(data => {
+                         hideLoading();
+                         if (data && data.status === 'success') {
+                             resolve(data.data);
+                         } else {
+                             reject(new Error(data.message || 'Unknown server error'));
+                         }
+                     })
+                     .catch(error => {
+                         hideLoading();
+                         console.error('Fetch Error:', error.message, error);
+                         reject(error);
+                     });
+             });
+         }
+
+        // --- פונקציות ניווט ו-Lifecycle (ללא שינוי מ-v29.3) ---
+        
+        document.addEventListener("DOMContentLoaded", () => {
+            currentManager = JSON.parse(localStorage.getItem('currentManager'));
+            if (currentManager) {
+                document.getElementById('manager-welcome').innerText = `מחסן: ${currentManager.warehouse} (${currentManager.name})`;
+                showScreen('main-screen');
+                loadWarehouseOrders();
+            } else {
+                showScreen('login-screen');
+            }
+        });
+        
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        // --- פונקציות ליבה (ללא שינוי מ-v29.3) ---
+
+        function login() {
+            // ... (הפונקציה נשארת זהה ל-v29.3) ...
+            const managerId = document.getElementById('manager-id-input').value.trim();
+            if (!managerId) {
+                alert('יש להזין שם משתמש');
+                return;
+            }
+            const deviceId = 'manager-device-' + (localStorage.getItem('deviceId') || Math.random().toString(36).substr(2, 9));
+            localStorage.setItem('deviceId', deviceId);
+            runServerScript('loginManager', { managerId, deviceId })
+                .then(managerData => {
+                    currentManager = managerData;
+                    localStorage.setItem('currentManager', JSON.stringify(currentManager));
+                    document.getElementById('manager-welcome').innerText = `מחסן: ${currentManager.warehouse} (${currentManager.name})`;
+                    showScreen('main-screen');
+                    loadWarehouseOrders();
+                })
+                .catch(err => alert(`שגיאת התחברות: ${err.message}`));
+        }
+        
+        function logout() {
+            // ... (הפונקציה נשארת זהה ל-v29.3) ...
+            if (confirm('האם אתה בטוח שברצונך להתנתק?')) {
+                localStorage.removeItem('currentManager');
+                currentManager = null;
+                document.getElementById('warehouse-order-list').innerHTML = '';
+                document.getElementById('manager-id-input').value = '';
+                showScreen('login-screen');
+            }
+        }
+
+        function loadWarehouseOrders() {
+            // ... (הפונקציה נשארת זהה ל-v29.3) ...
+            if (!currentManager) return;
+            runServerScript('getWarehouseOrders', { warehouse: currentManager.warehouse })
+                .then(orders => {
+                    const listEl = document.getElementById('warehouse-order-list');
+                    listEl.innerHTML = '';
+                    if (orders.length === 0) {
+                        listEl.innerHTML = '<p style="text-align: center;">אין הזמנות ממתינות לסריקה.</p>';
+                        return;
+                    }
+                    orders.forEach(order => {
+                        const orderEl = document.createElement('div');
+                        orderEl.className = 'order-item';
+                        orderEl.innerHTML = `
+                            <h4>${order.orderId}</h4>
+                            <p>${order.customerName}</p>
+                            <p>${order.address}</p>
+                        `;
+                        orderEl.onclick = () => markOrderAsScanned(order.orderId);
+                        listEl.appendChild(orderEl);
+                    });
+                })
+                .catch(err => alert(`שגיאה בטעינת הזמנות: ${err.message}`));
+        }
+
+        function scanBarcode() {
+            // ... (הפונקציה נשארת זהה ל-v29.3) ...
+            const orderId = prompt("הזן מספר הזמנה (סימולציית סריקה):");
+            if (orderId && orderId.trim() !== '') {
+                markOrderAsScanned(orderId.trim());
+            }
+        }
+        
+        function markOrderAsScanned(orderId) {
+             // ... (הפונקציה נשארת זהה ל-v29.3) ...
+             const scanResultEl = document.getElementById('scan-result');
+             scanResultEl.style.color = '#0056b3';
+             scanResultEl.innerText = `סורק הזמנה ${orderId}...`;
+             runServerScript('updateOrderScanned', { 
+                orderId: orderId, 
+                managerId: currentManager.managerId 
+             })
+             .then(result => {
+                scanResultEl.style.color = 'green';
+                scanResultEl.innerText = `הזמנה ${orderId} נסרקה בהצלחה.`;
+                loadWarehouseOrders();
+             })
+             .catch(err => {
+                scanResultEl.style.color = 'red';
+                scanResultEl.innerText = `שגיאה בסריקת ${orderId}: ${err.message}`;
+             });
+        }
+        
+    </script>
+
+</body>
+</html>
+
