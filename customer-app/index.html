@@ -2,192 +2,336 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>מעקב אחר הזמנה</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מעקב משלוח</title>
+    <!-- DeliveryMaster Customer App v27.9 -->
+
+    <!-- TailwindCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- LeafletJS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
+    <!-- Icons (Feather) -->
+    <script src="https://unpkg.com/feather-icons"></script>
+
     <style>
-        body { font-family: 'Rubik', sans-serif; }
-        .timeline-item .icon {
-            width: 50px;
-            height: 50px;
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f7f6;
+        }
+        #map {
+            height: 300px;
+            width: 100%;
+            border-radius: 8px;
+            background-color: #eee;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: absolute;
-            right: -25px;
-            top: 50%;
-            transform: translateY(-50%);
-            border: 4px solid #f1f5f9;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
         }
-        .timeline-line {
-            position: absolute;
-            right: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        .timeline-item.completed .icon { background-color: #28a745; color: white; }
-        .timeline-item.active .icon { background-color: #007bff; color: white; }
-        .timeline-item.pending .icon { background-color: #e9ecef; color: #6c757d; }
     </style>
 </head>
 <body class="bg-gray-100">
-    <div id="app-container" class="max-w-2xl mx-auto p-4 md:p-8 min-h-screen flex flex-col justify-center">
-        <!-- Loading State -->
-        <div id="loading-state" class="text-center">
-            <i class="fas fa-spinner fa-spin text-4xl text-blue-500"></i>
-            <p class="mt-4 text-lg text-gray-600">טוען פרטי הזמנה...</p>
-        </div>
 
-        <!-- Error State -->
-        <div id="error-state" class="hidden text-center bg-white p-8 rounded-lg shadow-md">
-            <i class="fas fa-exclamation-triangle text-4xl text-red-500"></i>
-            <h2 class="mt-4 text-2xl font-bold text-gray-800">שגיאה</h2>
-            <p id="error-message" class="mt-2 text-gray-600">לא ניתן היה למצוא את ההזמנה המבוקשת.</p>
-        </div>
+    <div class="container mx-auto max-w-lg p-4">
+        
+        <header class="text-center my-6">
+            <!-- לוגו יוחלף בלוגו של הלקוח -->
+            <h1 class="text-3xl font-bold text-gray-800">מעקב משלוח</h1>
+            <p class="text-gray-600">ההזמנה שלך בדרך!</p>
+        </header>
 
-        <!-- Main Content -->
-        <div id="main-content" class="hidden">
-            <header class="text-center mb-8">
-                <img src="https://i.postimg.cc/ryPT3r29/image.png" alt="לוגו החברה" class="w-20 h-20 mx-auto mb-4 rounded-xl">
-                <h1 class="text-3xl font-bold text-gray-800">ההזמנה שלך בדרך!</h1>
-                <p class="text-gray-500 mt-2">הזמנה עבור <span id="customer-name" class="font-semibold"></span></p>
-            </header>
+        <main class="bg-white p-6 rounded-lg shadow-md">
+            
+            <!-- Loader -->
+            <div id="loader" class="text-center py-10">
+                <div class="loader"></div>
+                <p class="text-gray-600">טוען נתוני הזמנה...</p>
+            </div>
 
-            <main class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-bold text-gray-800 mb-6">ציר זמן</h2>
-                <div id="timeline" class="relative pr-8 space-y-8">
-                    <!-- Timeline items will be injected here -->
+            <!-- Error Message -->
+            <div id="error-message" class="hidden text-center py-10">
+                <i data-feather="alert-triangle" class="w-12 h-12 mx-auto text-red-500"></i>
+                <p class="text-red-600 mt-4" id="error-text">שגיאה בטעינת הנתונים. אנא נסה שוב.</p>
+            </div>
+
+            <!-- Order Details -->
+            <div id="order-content" class="hidden">
+                <div class="mb-4">
+                    <h2 class="text-xl font-semibold">הזמנה <span id="order-id" class="text-blue-600"></span></h2>
+                    <p class="text-gray-700">שלום <strong id="customer-name"></strong>, ההזמנה שלך לכתובת <strong id="customer-address"></strong> צפויה להגיע בקרוב.</p>
                 </div>
-            </main>
 
-            <footer class="text-center mt-8 text-sm text-gray-500">
-                <p>תודה שבחרתם בנו!</p>
-            </footer>
-        </div>
+                <!-- Status Steps -->
+                <div class="mb-6">
+                    <h3 class="font-semibold mb-3">סטטוס הזמנה: <span id="status-text" class="text-blue-600"></span></h3>
+                    <!-- כאן ניתן להוסיף גרפיקה של שלבי התקדמות -->
+                </div>
+                
+                <!-- Map -->
+                <div class="mb-6">
+                    <h3 class="font-semibold mb-3">מיקום הנהג</h3>
+                    <div id="map"></div>
+                </div>
+
+                <!-- Driver Details -->
+                <div class="bg-gray-50 p-4 rounded-lg flex items-center space-x-4 space-x-reverse">
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <i data-feather="truck" class="w-6 h-6 text-blue-600"></i>
+                    </div>
+                    <div>
+                        <p class="font-semibold">הנהג שלך: <span id="driver-name"></span></p>
+                        <p class="text-sm text-gray-600">סוג רכב: <span id="driver-vehicle"></span></p>
+                        <a href="#" id="driver-phone-link" class="text-blue-600 text-sm">
+                            <i data-feather="phone" class="w-4 h-4 inline-block ml-1"></i>
+                            <span id="driver-phone"></span>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Order Notes -->
+                <div class="mt-6 border-t pt-4">
+                    <h3 class="font-semibold mb-2">הערות למשלוח</h3>
+                    <p id="order-notes" class="text-gray-700 bg-gray-50 p-3 rounded-md">
+                        <!-- הערות יוזרקו לכאן -->
+                    </p>
+                </div>
+            </div>
+
+        </main>
+
+        <footer class="text-center mt-6 text-gray-500 text-sm">
+            <p>&copy; 2025 DeliveryMaster</p>
+        </footer>
+
     </div>
 
     <script>
-        // --- v27.9 Maintenance Start ---
+        // --- Config ---
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxhJjLpnh8qZFutncdTLOX_ul8PIqZRrgjeE4289pPFiTozPcYiV8b0VzAg7KmuE6KZ/exec';
+        let map;
+        let driverMarker;
+        let orderMarker;
 
-        // =================================================================
-        // DeliveryMaster Customer App - v27.9 (Synced)
-        // =================================================================
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzPl-UH4hgX47FJZ-O2y7CTDU026hIzEntVDuGnSviWV1mY33as18nWyMxj7znCQA/exec';
-        let refreshInterval;
-
-        const STATUS_DEFINITIONS = {
-            'התקבלה': { title: 'ההזמנה התקבלה', icon: 'fas fa-receipt', order: 1, statuses: ['חדש', 'ממתין למספר'] },
-            'במחסן': { title: 'בטיפול במחסן', icon: 'fas fa-warehouse', order: 2, statuses: ['שויך', 'באיסוף', 'טעון'] },
-            'בדרך': { title: 'הנהג יצא לדרך', icon: 'fas fa-truck', order: 3, statuses: ['בדרך'] },
-            'הושלם': { title: 'ההזמנה סופקה', icon: 'fas fa-check-circle', order: 4, statuses: ['הושלם'] }
-        };
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const params = new URLSearchParams(window.location.search);
-            const trackId = params.get('trackId');
-
-            if (!trackId) {
-                showError("מזהה מעקב חסר.");
-                return;
-            }
-
-            fetchTrackingData(trackId);
-            if (refreshInterval) clearInterval(refreshInterval);
-            refreshInterval = setInterval(() => fetchTrackingData(trackId), 30000); // Refresh every 30 seconds
+        // --- Icons ---
+        const driverIcon = L.icon({
+            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+            shadowSize: [41, 41]
         });
-        
-        async function apiFetch(action, params = {}) {
-            const url = new URL(API_URL);
-            url.searchParams.append('action', action);
-            Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
-            
+
+        const orderIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+            shadowSize: [41, 41]
+        });
+
+        // --- API ---
+        async function apiFetch(action) {
+            const url = `${API_URL}?${action}`;
             try {
                 const response = await fetch(url);
-                if (!response.ok) throw new Error("בעיית תקשורת עם השרת.");
-                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const result = await response.json();
-                if (result.status !== 'success' || !result.data) {
-                    throw new Error(result.message || "ההזמנה לא נמצאה.");
+                if (result.status === 'error') {
+                    throw new Error(result.data);
                 }
                 return result.data;
             } catch (error) {
-                console.error("API Fetch Error:", error.message);
+                console.error(`API Fetch Error (${action}):`, error);
+                showError(error.message);
                 throw error;
             }
         }
 
-
-        async function fetchTrackingData(trackId) {
+        // --- Map Functions ---
+        function initializeMap(orderLatLng, driverLatLng) {
             try {
-                // IMPORTANT: The backend function `getTrackingData` needs to be implemented in Code.gs
-                // For now, this will fail until the function is added to the server script.
-                const data = await apiFetch('getTrackingData', { trackId });
-                renderOrderData(data);
-                if (data.status === 'הושלם' && refreshInterval) {
-                    clearInterval(refreshInterval);
+                map = L.map('map');
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                }).addTo(map);
+
+                const bounds = L.latLngBounds();
+
+                // Add order marker
+                if (orderLatLng) {
+                    orderMarker = L.marker(orderLatLng, { icon: orderIcon })
+                        .addTo(map)
+                        .bindPopup("כתובת האספקה שלך");
+                    bounds.extend(orderLatLng);
                 }
+
+                // Add driver marker
+                if (driverLatLng) {
+                    driverMarker = L.marker(driverLatLng, { icon: driverIcon })
+                        .addTo(map)
+                        .bindPopup("מיקום הנהג");
+                    bounds.extend(driverLatLng);
+                }
+                
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                } else {
+                    // Default view if no coords
+                    map.setView([32.0853, 34.7818], 9);
+                }
+
             } catch (error) {
-                showError(error.message);
-                if (refreshInterval) clearInterval(refreshInterval);
+                console.error("Error initializing map:", error);
+                document.getElementById('map').innerHTML = "שגיאה בטעינת המפה.";
             }
-        }
-
-        function renderOrderData(data) {
-            showState('main-content');
-            document.getElementById('customer-name').textContent = data.customerName;
-
-            const timelineContainer = document.getElementById('timeline');
-            timelineContainer.innerHTML = ''; // Clear previous state
-
-            const currentStatusOrder = findStatusOrder(data.status);
-            
-            Object.values(STATUS_DEFINITIONS).sort((a,b) => a.order - b.order).forEach(step => {
-                let state = 'pending';
-                if (step.order < currentStatusOrder) state = 'completed';
-                if (step.order === currentStatusOrder) state = 'active';
-
-                const timelineItem = `
-                    <div class="timeline-item relative ${state}">
-                        <div class="timeline-line ${step.order < currentStatusOrder ? 'bg-green-500' : 'bg-gray-200'}"></div>
-                        <div class="icon"><i class="${step.icon}"></i></div>
-                        <div class="content pb-8">
-                            <h3 class="font-bold text-lg">${step.title}</h3>
-                            ${state === 'active' && data.driverId ? `<p class="text-sm text-gray-500">הנהג, ${data.driverId}, בדרך אליך.</p>` : ''}
-                        </div>
-                    </div>
-                `;
-                timelineContainer.innerHTML += timelineItem;
-            });
-        }
-
-        function findStatusOrder(status) {
-            for (const key in STATUS_DEFINITIONS) {
-                if (STATUS_DEFINITIONS[key].statuses.includes(status)) {
-                    return STATUS_DEFINITIONS[key].order;
-                }
-            }
-            return 1; // Default to the first step if status is unrecognized
         }
         
-        function showState(stateId) {
-            document.getElementById('loading-state').classList.add('hidden');
-            document.getElementById('error-state').classList.add('hidden');
-            document.getElementById('main-content').classList.add('hidden');
-            document.getElementById(stateId).classList.remove('hidden');
+        function updateMap(driverLatLng) {
+            if (!map) return;
+            
+            const latLng = [driverLatLng[0], driverLatLng[1]];
+
+            if (driverMarker) {
+                driverMarker.setLatLng(latLng);
+            } else {
+                 driverMarker = L.marker(latLng, { icon: driverIcon })
+                        .addTo(map)
+                        .bindPopup("מיקום הנהג");
+            }
+            
+            // Recalculate bounds
+            const bounds = L.latLngBounds();
+            if (orderMarker) bounds.extend(orderMarker.getLatLng());
+            if (driverMarker) bounds.extend(driverMarker.getLatLng());
+            
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
+        // --- UI ---
+        function showLoader(show) {
+            document.getElementById('loader').style.display = show ? 'block' : 'none';
         }
 
         function showError(message) {
-            showState('error-state');
-            document.getElementById('error-message').textContent = message;
+            showLoader(false);
+            document.getElementById('order-content').style.display = 'none';
+            document.getElementById('error-message').style.display = 'block';
+            document.getElementById('error-text').innerText = message || 'אירעה שגיאה. אנא בדוק את הקישור ונסה שוב.';
         }
 
-        // --- v27.9 Maintenance End ---
+        function showContent() {
+            showLoader(false);
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('order-content').style.display = 'block';
+            feather.replace(); // Initialize icons
+        }
+
+        // --- Logic ---
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            // v27.9 uses 'id' (orderId) or 'phone' (customerPhone)
+            const orderId = params.get('id');
+            const phone = params.get('phone');
+            
+            if (orderId) {
+                return `action=getTrackingData&orderId=${orderId}`;
+            }
+            if (phone) {
+                 return `action=getTrackingData&customerPhone=${phone}`;
+            }
+            return null;
+        }
+
+        async function loadOrderData() {
+            const params = getUrlParams();
+            if (!params) {
+                showError("קישור לא תקין. חסר מזהה הזמנה או מספר טלפון.");
+                return;
+            }
+
+            try {
+                // 1. Get Order and Driver Details
+                // 'getTrackingData' is mapped to 'getOrderDetails' on backend (v30.0 fix)
+                const order = await apiFetch(params);
+                
+                // 2. Get Live Driver Location
+                let driverLocation = null;
+                if (order.driverId && (order.status === 'בדרך' || order.status === 'שויך')) {
+                    const liveData = await apiFetch('action=getLiveMapData');
+                    if (liveData.drivers && liveData.drivers[order.driverId]) {
+                        driverLocation = liveData.drivers[order.driverId];
+                    }
+                }
+                
+                // 3. Get Driver's full details (phone, vehicle)
+                let driverDetails = null;
+                if (order.driverId) {
+                    const allDrivers = await apiFetch('action=getDrivers');
+                    driverDetails = allDrivers.find(d => d.driverId === order.driverId);
+                }
+
+                // 4. Render all data
+                renderOrder(order, driverLocation, driverDetails);
+                showContent();
+
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        function renderOrder(order, driverLocation, driverDetails) {
+            // Fill text fields
+            document.getElementById('order-id').innerText = `#${order.orderId}`;
+            document.getElementById('customer-name').innerText = order.customerName;
+            document.getElementById('customer-address').innerText = order.address;
+            document.getElementById('status-text').innerText = order.status || 'טוען...';
+            document.getElementById('order-notes').innerText = order.notes || 'אין הערות מיוחדות.';
+
+            // Fill driver details
+            if (driverDetails) {
+                document.getElementById('driver-name').innerText = driverDetails.name;
+                document.getElementById('driver-vehicle').innerText = driverDetails.vehicleType;
+                document.getElementById('driver-phone').innerText = driverDetails.phone;
+                document.getElementById('driver-phone-link').href = `tel:${driverDetails.phone}`;
+            } else {
+                 document.getElementById('driver-name').innerText = 'לא שויך';
+                 document.getElementById('driver-vehicle').innerText = 'N/A';
+                 document.getElementById('driver-phone').innerText = 'N/A';
+            }
+
+            // Initialize map
+            const orderLatLng = (order.latitude && order.longitude) ? [order.latitude, order.longitude] : null;
+            const driverLatLng = (driverLocation && driverLocation.latitude) ? [driverLocation.latitude, driverLocation.longitude] : null;
+
+            initializeMap(orderLatLng, driverLatLng);
+            
+            // TODO: Start timer to update driver location periodically if status is 'בדרך'
+        }
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadOrderData();
+        });
     </script>
 </body>
 </html>
