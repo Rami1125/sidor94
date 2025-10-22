@@ -13,7 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        /* ... (CSS remains the same as previous admin-app) ... */
+        /* ... (CSS remains the same as v30.3) ... */
          :root {
             --primary-color: #007bff; --secondary-color: #6c757d; --background-color: #f8f9fa;
             --shadow: 0 4px 15px rgba(0, 0, 0, 0.1); --border-radius: 8px;
@@ -107,10 +107,10 @@
 
     <script>
         // --- CONFIGURATION ---
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxQJjugJ69jD6vJC55KUGRbLQf6hpZzRIjwVgcJTd2-MccNaKgThXLawT8Te8n8Eb-5/exec'; // <-- PASTE NEW URL HERE
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzUE5C8LVJKvHfZy8self14WEmc7o-y41kmalYuf1MZQtm6PDuJmHSdJ00jYl8iSdvS/exec'; // <-- PASTE NEW URL HERE
         const currentUser = 'Admin';
         const currentRole = 'Administrator';
-        const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"]; // Keep if needed
+        const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"]; 
 
         // --- UTILITY FUNCTIONS ---
         function logEvent(message, type = 'info') {
@@ -120,7 +120,7 @@
 
         async function apiFetch(action, params = {}, method = 'GET', body = null) {
             const url = new URL(API_URL);
-            url.searchParams.append('action', action); // Action always in URL for simplicity
+            url.searchParams.append('action', action); 
             
             if(method === 'GET') {
                 Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
@@ -128,26 +128,38 @@
             
             const options = { method, mode: 'cors' };
             if (method === 'POST') {
-                // Send action BOTH in URL and body for doPost routing
                 options.body = JSON.stringify({ action, data: body }); 
                 options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
             }
 
             try {
-                logEvent(`API Call START: ${method} ${action}`, 'api');
-                const response = await fetch(url.toString(), options); // Use toString() for clarity
+                // logEvent(`API Call START: ${method} ${action}`, 'api'); // Reduced logging
+                const response = await fetch(url.toString(), options); 
                  if (!response.ok) {
                      const errorText = await response.text();
-                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                     // Attempt to parse server error message if JSON
+                     let serverMessage = errorText;
+                     try {
+                         const errorJson = JSON.parse(errorText);
+                         if (errorJson && errorJson.message) {
+                             serverMessage = errorJson.message;
+                         }
+                     } catch(parseError) { /* Ignore if not JSON */ }
+                     throw new Error(`שגיאת שרת (${response.status}): ${serverMessage}`);
                  }
                 const result = await response.json();
-                if (result.status !== 'success') throw new Error(result.message);
-                logEvent(`API Call SUCCESS: ${action}`, 'success');
+                if (result.status !== 'success') {
+                     throw new Error(result.message || 'Unknown server error');
+                }
+                // logEvent(`API Call SUCCESS: ${action}`, 'success'); // Reduced logging
                 return result.data;
             } catch (error) {
                  logEvent(`API Call FAILED: ${action} - ${error.message}`, 'error');
-                 alert(`שגיאת תקשורת עם השרת (${action}): ${error.message}`); // Notify user
-                 throw error; // Re-throw for calling function to handle
+                 // Only show alert for critical errors, not all network hiccups
+                 if (!error.message.includes('Failed to fetch')) { // Example: don't alert basic network errors
+                    alert(`שגיאת תקשורת עם השרת (${action}): ${error.message}`); 
+                 }
+                 throw error; // Re-throw so calling functions know it failed
             }
         }
 
@@ -159,7 +171,6 @@
         function closeModal(modalId) {
             const modal = document.getElementById(modalId);
             if(modal) modal.style.display = 'none';
-            // Specific cleanup for PDF modal
             if(modalId === 'pdfModal') {
                 document.getElementById('pdfViewer').src = 'about:blank';
             }
@@ -168,30 +179,38 @@
         // --- CORE APPLICATION LOGIC ---
         async function buildScheduler() {
             logEvent("Building scheduler...");
+            const scheduler = document.getElementById('scheduler');
+            scheduler.innerHTML = 'טוען לוח...'; 
+
             try {
+                // Fetch data concurrently
                 const [drivers, orders] = await Promise.all([
                     apiFetch('getDrivers'),
                     apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] })
                 ]);
                 logEvent("Driver and order data fetched.", "success");
                 
-                const scheduler = document.getElementById('scheduler');
                 scheduler.innerHTML = ''; 
 
                 const unassignedOrders = orders.filter(o => !o.driverId);
-                let schedulerHTML = `<div class="scheduler-column"><h3>ממתינות (${unassignedOrders.length})</h3><ul class="order-pool" data-driver-id="unassigned">${unassignedOrders.map(createScheduleCard).join('')}</ul></div>`;
+                const unassignedCol = document.createElement('div');
+                unassignedCol.className = 'scheduler-column';
+                unassignedCol.innerHTML = `<h3>ממתינות (${unassignedOrders.length})</h3><ul class="order-pool" data-driver-id="unassigned">${unassignedOrders.map(createScheduleCard).join('')}</ul>`;
+                scheduler.appendChild(unassignedCol);
                 
                 drivers.filter(d => d.status === 'פעיל').forEach(driver => {
                     const driverOrders = orders.filter(o => o.driverId === driver.driverId);
-                    schedulerHTML += `<div class="scheduler-column"><h3>${driver.name} (${driverOrders.length})</h3><ul class="driver-lane" data-driver-id="${driver.driverId}">${driverOrders.map(createScheduleCard).join('')}</ul></div>`;
+                    const driverCol = document.createElement('div');
+                    driverCol.className = 'scheduler-column';
+                    driverCol.innerHTML = `<h3>${driver.name} (${driverOrders.length})</h3><ul class="driver-lane" data-driver-id="${driver.driverId}">${driverOrders.map(createScheduleCard).join('')}</ul>`;
+                    scheduler.appendChild(driverCol);
                 });
                 
-                scheduler.innerHTML = schedulerHTML;
                 initSortable();
                 logEvent("Scheduler layout built.", "success");
             } catch (error) {
-                // Error already logged by apiFetch
-                document.getElementById('scheduler').innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים.</p>`;
+                // Error should be logged by apiFetch now
+                scheduler.innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים. בדוק את יומן הרישום (Console).</p>`;
             }
         }
 
@@ -200,18 +219,19 @@
                 new Sortable(lane, { 
                     group: 'shared', 
                     animation: 150, 
-                    ghostClass: 'ghost-card', 
+                    ghostClass: 'ghost-card', // Ensure ghost class is defined if needed
                     onEnd: handleDragEnd 
                 });
             });
         }
         
         async function handleDragEnd(event) {
-            const orderId = event.item.dataset.orderId;
+             // ... (Implementation remains the same as v30.4) ...
+             const orderId = event.item.dataset.orderId;
             const newDriverId = event.to.dataset.driverId === 'unassigned' ? '' : event.to.dataset.driverId;
             logEvent(`Order ${orderId} moved to driver ${newDriverId}.`);
             
-            // Update counts visually
+            // Update counts visually immediately
             document.querySelectorAll('.scheduler-column h3').forEach(h3 => {
                  const count = h3.nextElementSibling.children.length;
                  const baseName = h3.textContent.split('(')[0].trim();
@@ -221,12 +241,10 @@
             try {
                 await apiFetch('updateOrder', {}, 'POST', { orderId, updates: { driverId: newDriverId } });
                 logEvent(`Update for order ${orderId} successful.`, 'success');
-                // Optional: Consider updating map if needed after drag
             } catch (error) {
                 logEvent(`Failed to update order ${orderId} via API. Reverting visually.`, "error");
-                // Revert visual change on API failure
                 event.from.appendChild(event.item); 
-                // Re-update counts
+                // Re-update counts after reverting
                  document.querySelectorAll('.scheduler-column h3').forEach(h3 => {
                      const count = h3.nextElementSibling.children.length;
                      const baseName = h3.textContent.split('(')[0].trim();
@@ -236,8 +254,8 @@
         }
         
         function createScheduleCard(order) {
-            // Ensure order.orderId is treated as string for consistency
-            const orderIdStr = String(order.orderId || ''); 
+            // ... (Implementation remains the same as v30.4) ...
+             const orderIdStr = String(order.orderId || order.internalId || ''); 
             return `
                 <li class="schedule-card" data-order-id="${orderIdStr}">
                     <div class="schedule-card-details">
@@ -257,19 +275,16 @@
         }
 
         async function openPdfModal(orderId) {
-            if (!orderId) {
-                alert('מזהה הזמנה לא תקין.');
-                return;
-            }
+             // ... (Implementation remains the same as v30.4) ...
+              if (!orderId) { alert('מזהה הזמנה לא תקין.'); return; }
             const viewer = document.getElementById('pdfViewer');
-            viewer.src = 'about:blank'; // Clear previous
+            viewer.src = 'about:blank'; 
             openModal('pdfModal');
 
             try {
                 const url = await apiFetch('getOrderPDF', { orderId });
                 if (url) {
                     viewer.src = url;
-                    // Log view in background, don't wait for it
                     apiFetch('logPDFView', {}, 'POST', { user: currentUser, role: currentRole, orderId })
                         .catch(logError => logEvent(`Failed to log PDF view for ${orderId}: ${logError.message}`, 'error'));
                 } else {
@@ -277,13 +292,13 @@
                     closeModal('pdfModal');
                 }
             } catch (error) {
-                // Error already logged and alerted by apiFetch
-                closeModal('pdfModal');
+                closeModal('pdfModal'); // Error alerted by apiFetch
             }
         }
 
          async function openCommentsModal(orderId) {
-            if (!orderId) return;
+             // ... (Implementation remains the same as v30.3) ...
+              if (!orderId) return;
             openModal('commentsModal');
             const content = document.getElementById('commentsContent');
             content.innerHTML = 'טוען הערות...';
@@ -293,8 +308,8 @@
                     <div id="commentsContainer">
                         ${(comments && comments.length > 0) ? comments.map(c => `
                             <div class="comment">
-                                <p class="author">${c.author || 'לא ידוע'} (${new Date(c.timestamp).toLocaleString('he-IL')})</p>
-                                <p>${c.text || ''}</p>
+                                <p class="author">${c.author || 'לא ידוע'} (${c.timestamp ? new Date(c.timestamp).toLocaleString('he-IL') : 'זמן לא ידוע'})</p>
+                                <p>${c.text || ''}</p> 
                             </div>`).join('') : '<p>אין הערות להזמנה זו.</p>'}
                     </div>
                     <form id="commentForm">
@@ -309,7 +324,8 @@
         }
 
         async function handleCommentSubmit(event, orderId) {
-            event.preventDefault();
+            // ... (Implementation remains the same as v30.3) ...
+             event.preventDefault();
             const input = document.getElementById('commentInput');
             const text = input.value.trim();
             if (!text) return;
@@ -319,13 +335,14 @@
             button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
             try {
-                await apiFetch('postComment', {}, 'POST', { orderId, author: currentUser, text });
+                // Pass 'text' which matches the corrected backend function
+                await apiFetch('postComment', {}, 'POST', { orderId, author: currentUser, text }); 
                 input.value = '';
                 await openCommentsModal(orderId); // Refresh comments
             } catch (error) {
-                // Error already logged/alerted
+                // Error already handled by apiFetch
             } finally {
-                if(button) { // Check if button still exists
+                if(button) { 
                     button.disabled = false;
                     button.innerHTML = 'שלח';
                 }
@@ -333,7 +350,8 @@
         }
         
         async function openHistoryModal() {
-            openModal('historyModal');
+             // ... (Implementation remains the same as v30.3) ...
+              openModal('historyModal');
             const content = document.getElementById('historyContent');
             content.innerHTML = 'טוען היסטוריה...';
              try {
@@ -343,10 +361,15 @@
                     return; 
                 }
                 let tableHTML = `<table><thead><tr><th>זמן</th><th>מזהה</th><th>לקוח</th><th>נהג</th><th>סטטוס</th></tr></thead><tbody>`;
-                historyData.sort((a, b) => new Date(b.archiveTimestamp || b.createdAt) - new Date(a.archiveTimestamp || a.createdAt)) // Sort by archive or creation date
+                historyData.sort((a, b) => {
+                    const dateA = new Date(a.archiveTimestamp || a.createdAt || 0);
+                    const dateB = new Date(b.archiveTimestamp || b.createdAt || 0);
+                    return dateB - dateA;
+                })
                            .forEach(record => {
+                    const displayDate = new Date(record.archiveTimestamp || record.createdAt || Date.now()); 
                     tableHTML += `<tr>
-                                    <td>${new Date(record.archiveTimestamp || record.createdAt).toLocaleString('he-IL')}</td>
+                                    <td>${!isNaN(displayDate.getTime()) ? displayDate.toLocaleString('he-IL') : 'N/A'}</td>
                                     <td>${record.orderId || 'N/A'}</td>
                                     <td>${record.customerName || 'N/A'}</td>
                                     <td>${record.driverId || '-'}</td>
@@ -360,28 +383,37 @@
         }
         
          async function openLogsModal() {
-             openModal('logsModal');
+             // ... (Implementation remains the same as v30.3) ...
+               openModal('logsModal');
              const content = document.getElementById('logsContent');
              content.innerHTML = 'טוען תיעוד...';
              try {
-                // Use getLogs now defined in v30.x backend
-                const logsData = await apiFetch('getLogs'); 
+                // Fetch logs - assuming backend uses System_Logs now
+                const logsData = await apiFetch('getLogs'); // This likely fetches System_Logs 
                 if (!logsData || !logsData.length) { 
                     content.innerHTML = '<p>לא נמצאו נתוני תיעוד.</p>'; 
                     return; 
                 }
-                let tableHTML = `<table><thead><tr><th>זמן</th><th>משתמש</th><th>תפקיד</th><th>מזהה הזמנה</th><th>פעולה</th><th>פתח מסמך</th></tr></thead><tbody>`;
-                // Adjust property names based on System_Logs structure if needed
-                logsData.filter(log => log.Action === 'Viewed PDF') // Filter for PDF views if using old Logs sheet structure
-                       .sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp)) 
+                let tableHTML = `<table><thead><tr><th>זמן</th><th>מקור</th><th>רמה</th><th>הודעה</th><th>נתונים</th><th>מסמך</th></tr></thead><tbody>`;
+                 // Adapt to System_Logs structure
+                logsData.sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp)) 
                        .forEach(log => {
+                    let orderIdForButton = '';
+                     if (log.Data && typeof log.Data === 'string') {
+                        try { const dataObj = JSON.parse(log.Data); orderIdForButton = dataObj.orderId || ''; } catch(e) {}
+                     } else if (log.Data && typeof log.Data === 'object' && log.Data.orderId) { orderIdForButton = log.Data.orderId; }
+                     else if (log.Message && log.Message.includes('order')) {
+                        const match = log.Message.match(/order (\d+|INT-\w+)/i) || log.Message.match(/OrderID (\d+|INT-\w+)/i);
+                         if (match) orderIdForButton = match[1];
+                    }
+
                     tableHTML += `<tr>
-                        <td>${new Date(log.Timestamp).toLocaleString('he-IL')}</td>
-                        <td>${log.User || 'N/A'}</td>
-                        <td>${log.Role || 'N/A'}</td>
-                        <td>${log.OrderID || '-'}</td>
-                        <td>${log.Action || 'N/A'}</td>
-                        <td><button class="action-button" style="padding: 2px 8px; font-size: 0.8em;" onclick="openPdfModal('${log.OrderID}')" title="פתח PDF"><i class="fas fa-file-pdf"></i></button></td>
+                        <td>${log.Timestamp ? new Date(log.Timestamp).toLocaleString('he-IL') : 'N/A'}</td>
+                        <td>${log.Origin || 'N/A'}</td>
+                        <td>${log.Level || 'N/A'}</td>
+                        <td>${log.Message || 'N/A'}</td>
+                        <td>${String(log.Data || '').substring(0, 100)}</td> 
+                        <td>${orderIdForButton ? `<button class="action-button" style="padding: 2px 8px; font-size: 0.8em;" onclick="openPdfModal('${orderIdForButton}')" title="פתח PDF"><i class="fas fa-file-pdf"></i></button>` : ''}</td>
                     </tr>`;
                 });
                 content.innerHTML = tableHTML + `</tbody></table>`;
@@ -394,8 +426,26 @@
         document.addEventListener('DOMContentLoaded', () => {
             logEvent("DOM Loaded. Initializing app.", "success");
             buildScheduler();
+            
             // Initialize map if needed
-            // populateDropdowns(); // If create order form exists
+            const mapElement = document.getElementById('liveMap');
+            if (mapElement) {
+                try {
+                    initializeMap(); // Call the actual map init function
+                    logEvent("Map initialized.", "success"); 
+                } catch(e) {
+                    logEvent(`Map initialization failed: ${e.message}`, 'error');
+                }
+            } else {
+                 logEvent("Map element not found.", "info");
+            }
+
+             const deliveryTypeSelect = document.getElementById('deliveryType');
+             if (deliveryTypeSelect) {
+                 deliveryTypes.forEach(type => {
+                     deliveryTypeSelect.innerHTML += `<option value="${type}">${type}</option>`;
+                 });
+             }
 
             // Add Modal Close Listeners
             document.querySelectorAll('.modal .close-button').forEach(btn => {
@@ -412,16 +462,40 @@
             const logsBtn = document.getElementById('showLogsBtn');
             if(logsBtn) logsBtn.addEventListener('click', openLogsModal);
 
-            // Add listener for create order form if it exists
              const createOrderForm = document.getElementById('createOrderForm');
              if (createOrderForm) {
-                 // populateDropdowns(); // Call if dropdowns exist
                  createOrderForm.addEventListener('submit', handleCreateOrder);
              }
 
-             // Start periodic refresh if needed
-            // setInterval(buildScheduler, 60000); 
+            // Start periodic refresh for the scheduler
+            setInterval(buildScheduler, 60000); 
+            // Start periodic map update if needed
+            // setInterval(updateMap, 30000); // Uncomment if map needs periodic updates
         });
+
+         // --- Placeholder/Stub for handleCreateOrder ---
+         async function handleCreateOrder(e){
+             e.preventDefault();
+             // Replace with actual implementation using apiFetch('createOrder', ...)
+             logEvent('Create Order button clicked (implement logic)', 'info');
+             alert('יצירת הזמנה עדיין בפיתוח.');
+         }
+         // --- Placeholder for initializeMap and updateMap ---
+         // You need to add your actual Leaflet initialization code here
+         let liveMap; // Make map variable accessible
+         function initializeMap() { 
+             logEvent("Initializing Leaflet map...");
+             // Replace with your actual map initialization
+             liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9); // Example center
+             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
+             logEvent("Leaflet map initialized.");
+         }
+         async function updateMap() {
+             logEvent("Placeholder: Map would be updated here.");
+             // Add actual map update logic using apiFetch('getLiveMapData')
+             // Example: const mapData = await apiFetch('getLiveMapData'); ... update markers ...
+         }
+
     </script>
 </body>
 </html>
