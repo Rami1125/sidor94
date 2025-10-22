@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DeliveryMaster Viewer v29.4</title>
+    
+    <!-- v29.3: הוספת Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+    <!-- v29.3: סקריפט זיהוי מובייל -->
+    <script>
+        (function() {
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            document.documentElement.className = isMobile ? 'mobile' : 'desktop';
+        })();
+    </script>
+    
+    <style>
+        /* ... (כל ה-CSS מ-v29.3 נשאר זהה) ... */
+        :root {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --primary-color: #007bff;
+            --text-color: #212529;
+            --border-color: #dee2e6;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            box-sizing: border-box;
+            color: var(--text-color);
+        }
+        #app-wrapper {
+            width: 100%;
+            max-width: 800px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .container {
+            padding: 25px 30px;
+        }
+        h2 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 25px;
+        }
+        input[type="text"], input[type="tel"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            text-align: right;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            background-color: var(--primary-color);
+            color: white;
+            margin-top: 10px;
+        }
+        button:active {
+            opacity: 0.8;
+        }
+        #error-message {
+            color: #dc3545;
+            text-align: center;
+            font-weight: 500;
+            min-height: 1.2em;
+        }
+        #tracking-info {
+            display: none;
+            text-align: right;
+        }
+        #tracking-info h3 {
+            text-align: center;
+            color: var(--primary-color);
+        }
+        #tracking-info p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        #order-status {
+            font-weight: 600;
+            color: #28a745;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            margin: 20px auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: #eee;
+        }
+        .leaflet-container { border-radius: 8px; }
+        #loading-spinner {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 10000;
+            font-weight: 500;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: none;
+        }
+        .mobile body {
+            padding: 0;
+            background: var(--card-bg);
+        }
+        .mobile #app-wrapper {
+            box-shadow: none;
+            border-radius: 0;
+            min-height: 100vh;
+        }
+        .mobile .container {
+            padding: 20px;
+        }
+    </style>
+</head>
+<body class="">
+
+    <div id="loading-spinner">טוען...</div>
+
+    <div id="app-wrapper">
+        <div class="container">
+            <!-- Login Screen -->
+            <div id="login-form">
+                <h2>מעקב אחר הזמנה</h2>
+                <input type="text" id="order-id" placeholder="מספר הזמנה" inputmode="numeric">
+                <input type="tel" id="phone-digits" placeholder="4 ספרות אחרונות של הטלפון" inputmode="numeric">
+                <button onclick="trackOrder()">עקוב</button>
+                <p id="error-message"></p>
+            </div>
+            
+            <!-- Tracking Info -->
+            <div id="tracking-info">
+                <h3>פרטי הזמנה <span id="order-id-display"></span></h3>
+                <p>שלום <strong id="customer-name"></strong>,</p>
+                <p>ההזמנה שלך בסטטוס: <strong id="order-status"></strong></p>
+                
+                <div id="map"></div>
+                
+                <button onclick="location.reload()">בדיקת הזמנה אחרת</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- v29.3: הגדרות גלובליות ---
+        let map;
+        let driverMarker;
+        let orderMarker;
+        
+        const osmStreetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        });
+        
+        // --- v29.4: שדרוג תקשורת שרת ל-Fetch ---
+        function showLoading() { document.getElementById('loading-spinner').style.display = 'block'; }
+        function hideLoading() { document.getElementById('loading-spinner').style.display = 'none'; }
+
+        /**
+         * v29.4: פונקציית תקשורת מבוססת fetch לאתר חיצוני
+         * (אפליקציית צפייה משתמשת רק ב-GET)
+         */
+        function runServerScript(action, params = {}) {
+            showLoading();
+
+            // v29.4: כתובת שרת קבועה (החלף בכתובת ה-exec שלך)
+            const SERVER_URL = "https://script.google.com/macros/s/AKfycbydcJnRqEUH821BnZa8Q131Z_a-VGXefpWlsXLMJEv8b1zFVHuDafo3JlbDcCf5Z3CkvQ/exec";
+            
+            let url = SERVER_URL;
+            let options = {
+                method: 'GET',
+                mode: 'cors',
+            };
+            // ב-GET, ה-action והפרמטרים נשלחים כ-query params
+            const queryParams = new URLSearchParams({ action, ...params });
+            url += `?${queryParams.toString()}`;
+
+            return new Promise((resolve, reject) => {
+                fetch(url, options)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Server returned status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        hideLoading();
+                        if (data && data.status === 'success') {
+                            resolve(data.data);
+                        } else {
+                            reject(new Error(data.message || 'Unknown server error'));
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        console.error('Fetch Error:', error.message, error);
+                        reject(error);
+                    });
+            });
+        }
+        
+        // --- פונקציות ליבה (ללא שינוי מ-v29.3) ---
+
+        function trackOrder() {
+            // ... (הפונקציה נשארת זהה ל-v29.3) ...
+            const orderId = document.getElementById('order-id').value.trim();
+            const phone = document.getElementById('phone-digits').value.trim();
+            const errorEl = document.getElementById('error-message');
+            errorEl.innerText = '';
+            if (!orderId || !phone) {
+                errorEl.innerText = 'יש למלא את כל השדות.';
+                return;
+            }
+            runServerScript('trackOrder', { orderId, phone })
+                .then(data => {
+                    displayTrackingInfo(data.order, data.driverLocation);
+                })
+                .catch(err => {
+                    errorEl.innerText = `שגיאה: ${err.message}`;
+                });
+        }
+        
+        function displayTrackingInfo(order, driverLocation) {
+            // ... (הפונקציה נשארת זהה ל-v29.3) ...
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('tracking-info').style.display = 'block';
+            document.getElementById('order-id-display').innerText = order.orderId;
+            document.getElementById('customer-name').innerText = order.customerName;
+            document.getElementById('order-status').innerText = order.status;
+            initMap(order, driverLocation);
+        }
+
+        function initMap(order, driverLocation) {
+            // ... (הפונקציה נשארת זהה ל-v29.3) ...
+            if (map) {
+                map.remove();
+            }
+            if (!order.latitude || !order.longitude) {
+                document.getElementById('map').innerHTML = '<p style="text-align:center; padding-top: 20px;">מיקום היעד אינו זמין.</p>';
+                return;
+            }
+            const orderLatLng = [order.latitude, order.longitude];
+            map = L.map('map').setView(orderLatLng, 13);
+            osmStreetLayer.addTo(map);
+            L.marker(orderLatLng, {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                    iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+                })
+            }).addTo(map)
+              .bindPopup(`<b>היעד שלך:</b><br>${order.address}`)
+              .openPopup();
+            if (driverLocation && driverLocation.latitude && driverLocation.longitude) {
+                const driverLatLng = [driverLocation.latitude, driverLocation.longitude];
+                driverMarker = L.marker(driverLatLng, {
+                     icon: L.icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+                        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
+                    })
+                }).addTo(map)
+                  .bindPopup(`<b>הנהג בדרך</b><br>עדכון אחרון: ${new Date(driverLocation.lastUpdate).toLocaleTimeString('he-IL')}`);
+                map.fitBounds([driverLatLng, orderLatLng], { padding: [50, 50] });
+            } else {
+                map.setView(orderLatLng, 15);
+            }
+        }
+        
+    </script>
+</body>
+</html>
+
