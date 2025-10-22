@@ -2,286 +2,56 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>DeliveryMaster - חדר מצב</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - כניסה לצפייה</title>
+    <!-- DeliveryMaster Viewer Login v27.0 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <style>
-        body { font-family: 'Rubik', sans-serif; background-color: #f4f7f9; }
-        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); }
-        .order-item-clickable:hover { background-color: #f9fafb; }
-        .modal { transition: opacity 0.3s ease; }
-        .comment { background-color: #f1f5f9; border-radius: 12px; }
-        .comment.own { background-color: #e0f2fe; }
-        .pdf-link {
-            color: #007bff;
-            font-weight: 500;
-            text-decoration: none;
-            display: inline-block;
-            margin-top: 10px;
-            padding: 5px 10px;
-            border-radius: 8px;
-            background-color: rgba(0, 123, 255, 0.1);
-            cursor: pointer;
-        }
+        body { font-family: 'Arial', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 flex items-center justify-center h-screen">
 
-    <div class="container mx-auto p-4 md:p-6 lg:p-8">
-        <header class="text-center mb-10">
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-800"><i class="fas fa-broadcast-tower mr-3 text-blue-500"></i> חדר מצב</h1>
-            <p class="text-gray-500 mt-2 text-lg">תמונת מצב חיה של הפעילות בשטח</p>
-        </header>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-            <div id="kpi-total" class="kpi-card bg-white p-6 text-center rounded-lg shadow-md transition-transform"></div>
-            <div id="kpi-completed" class="kpi-card bg-white p-6 text-center rounded-lg shadow-md transition-transform"></div>
-            <div id="kpi-in-progress" class="kpi-card bg-white p-6 text-center rounded-lg shadow-md transition-transform"></div>
-            <div id="kpi-pending" class="kpi-card bg-white p-6 text-center rounded-lg shadow-md transition-transform"></div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            <div class="lg:col-span-2 xl:col-span-3 bg-white p-6 rounded-lg shadow-md flex flex-col md:flex-row gap-4">
-                <div id="liveMap" class="h-96 md:h-[600px] w-full z-0 rounded-lg flex-grow bg-gray-200"></div>
-                <div class="flex-shrink-0 md:w-56">
-                    <h3 class="font-bold mb-2 text-lg">נהגים פעילים</h3>
-                    <div id="driverList" class="h-48 md:h-[550px] overflow-y-auto pr-2 space-y-2"></div>
-                </div>
-            </div>
-            <div class="xl:col-span-1 bg-white p-6 rounded-lg shadow-md flex flex-col">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">סידור עבודה</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                    <input type="date" id="dateFilter" class="w-full p-2 border rounded-md">
-                    <input type="text" id="orderSearch" placeholder="חיפוש חופשי..." class="w-full p-2 border rounded-md">
-                </div>
-                <div id="orderList" class="h-96 md:h-[524px] overflow-y-auto flex-grow pr-2"></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="orderDetailsModal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden opacity-0">
-        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" id="modalContent"></div>
-    </div>
-
-    <div id="pdfModal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden opacity-0">
-        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-             <div class="p-6 flex-shrink-0 border-b flex justify-between items-center">
-                <h2 class="text-2xl font-bold">תצוגת מסמך</h2>
-                <button onclick="closeModal('pdfModal')" class="text-2xl">&times;</button>
-            </div>
-            <div class="p-6 flex-grow">
-                <iframe id="pdfViewer" style="width:100%; height: 100%; border:none;"></iframe>
-            </div>
-        </div>
+    <div class="w-full max-w-xs bg-white p-8 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">צפייה במפה</h1>
+        <p class="text-center text-gray-600 mb-6">הכנס סיסמת צפייה:</p>
+        
+        <input type="password" id="password-input" class="w-full px-4 py-2 border rounded-lg text-center" placeholder="סיסמה">
+        
+        <button id="login-btn" class_="w-full bg-blue-500 text-white py-2 rounded-lg mt-4 font-semibold hover:bg-blue-600">
+            כניסה
+        </button>
+        
+        <p id="error-message" class="text-red-500 text-center mt-3 text-sm"></p>
     </div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzPl-UH4hgX47FJZ-O2y7CTDU026hIzEntVDuGnSviWV1mY33as18nWyMxj7znCQA/exec';
-        
-        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), currentOrders = [], userName = '';
-        const currentRole = 'Viewer';
+        // This is a simple placeholder password.
+        // In a real app, this should be validated securely.
+        const VIEWER_PASSWORD = "1234"; // TODO: Move to settings
 
-        async function apiFetch(action, params = {}, method = 'GET', body = null) {
-            const url = new URL(API_URL);
-            if (method === 'GET') {
-                url.searchParams.append('action', action);
-                Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+        const passwordInput = document.getElementById('password-input');
+        const loginButton = document.getElementById('login-btn');
+        const errorMessage = document.getElementById('error-message');
+
+        function login() {
+            const pass = passwordInput.value;
+            if (pass === VIEWER_PASSWORD) {
+                // Store a session token to allow access to viewer.html
+                sessionStorage.setItem('viewerToken', 'VALID_TOKEN'); // Simple token
+                window.location.href = 'viewer.html';
+            } else {
+                errorMessage.innerText = 'סיסמה שגויה.';
             }
-            const options = { method };
-            if (method === 'POST') {
-                options.body = JSON.stringify({ action, data: body });
-                options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
-            }
-            const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`Network error for action: ${action}`);
-            const result = await response.json();
-            if (result.status !== 'success') throw new Error(result.message);
-            return result.data;
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            userName = localStorage.getItem('deliveryMasterViewerName') || prompt("נא להזין את שמך:") || 'אורח';
-            localStorage.setItem('deliveryMasterViewerName', userName);
-            document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
-            initializeMap();
-            fetchInitialData();
-            setInterval(fetchInitialData, 30000);
-            document.getElementById('orderSearch').addEventListener('input', () => renderOrderList(currentOrders));
-            document.getElementById('dateFilter').addEventListener('change', fetchInitialData);
+        loginButton.addEventListener('click', login);
+        passwordInput.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                login();
+            }
         });
-        
-        async function fetchInitialData() {
-            try {
-                const [orders, mapData] = await Promise.all([
-                    apiFetch('getOrders', { date: document.getElementById('dateFilter').value }),
-                    apiFetch('getLiveMapData')
-                ]);
-                currentOrders = orders;
-                updateKPIs(orders);
-                renderOrderList(orders);
-                updateMap(mapData);
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            }
-        }
-        
-        function updateKPIs(orders) {
-            const total = orders.length;
-            const completed = orders.filter(o => o.status === 'הושלם').length;
-            const inProgress = orders.filter(o => ['בדרך', 'באיסוף'].includes(o.status)).length;
-            const pending = total - completed - inProgress;
-            
-            document.getElementById('kpi-total').innerHTML = `<div class="text-3xl font-bold text-blue-500">${total}</div><p class="text-gray-500">סה"כ הזמנות</p>`;
-            document.getElementById('kpi-completed').innerHTML = `<div class="text-3xl font-bold text-green-500">${completed}</div><p class="text-gray-500">הושלמו</p>`;
-            document.getElementById('kpi-in-progress').innerHTML = `<div class="text-3xl font-bold text-yellow-500">${inProgress}</div><p class="text-gray-500">בתהליך</p>`;
-            document.getElementById('kpi-pending').innerHTML = `<div class="text-3xl font-bold text-gray-600">${pending}</div><p class="text-gray-500">ממתינות</p>`;
-        }
-        
-        function renderOrderList(orders) {
-             const searchTerm = document.getElementById('orderSearch').value.toLowerCase();
-             const list = document.getElementById('orderList');
-             const filteredOrders = orders.filter(o => 
-                 (o.customerName && o.customerName.toLowerCase().includes(searchTerm)) ||
-                 (o.address && o.address.toLowerCase().includes(searchTerm)) ||
-                 (o.driverId && o.driverId.toLowerCase().includes(searchTerm))
-             );
-             if (filteredOrders.length === 0) {
-                 list.innerHTML = '<p class="text-center text-gray-500">לא נמצאו הזמנות.</p>';
-                 return;
-             }
-             list.innerHTML = filteredOrders
-                 .sort((a,b) => (a.orderTime || "00:00").localeCompare(b.orderTime || "00:00"))
-                 .map(o => `
-                 <div class="order-item-clickable p-3 border-b cursor-pointer" onclick="openOrderModal('${o.orderId}')">
-                     <p class="font-semibold">${o.customerName}</p>
-                     <p class="text-sm text-gray-600">${o.address}</p>
-                     <p class="text-sm text-gray-500">נהג: ${o.driverId || 'טרם שויך'}</p>
-                 </div>
-             `).join('');
-        }
-        
-        function initializeMap() {
-             liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
-             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
-             orderMarkersLayer.addTo(liveMap);
-        }
-
-        function updateMap({drivers, orders}) {
-            Object.values(driverMarkers).forEach(m => m.remove());
-            driverMarkers = {};
-            orderMarkersLayer.clearLayers();
-            const driverList = document.getElementById('driverList');
-            driverList.innerHTML = '';
-
-            drivers.forEach(d => {
-                if (d.location?.latitude) {
-                    driverMarkers[d.driverId] = L.marker([d.location.latitude, d.location.longitude]).addTo(liveMap).bindPopup(`<b>${d.name}</b>`);
-                    driverList.innerHTML += `<div class="p-2 border-b">${d.name}</div>`;
-                }
-            });
-             if (driverList.innerHTML === '') driverList.innerHTML = '<p class="text-gray-500">אין נהגים פעילים כרגע.</p>';
-
-            orders.forEach(o => {
-                if (o.latitude && o.status !== 'הושלם') {
-                   const iconUrl = (!o.driverId) ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png' : 'https://cdn-icons-png.flaticon.com/512/3405/3405255.png';
-                   L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl, iconSize: [32, 32] }) })
-                       .addTo(orderMarkersLayer).bindPopup(`<b>${o.customerName}</b><br>שויך ל: ${o.driverId || 'טרם'}`);
-                }
-            });
-        }
-        
-        async function openOrderModal(orderId) {
-            const modal = document.getElementById('orderDetailsModal');
-            const content = document.getElementById('modalContent');
-            content.innerHTML = '<p class="p-8 text-center">טוען פרטי הזמנה...</p>';
-            modal.classList.remove('hidden');
-            setTimeout(() => modal.classList.add('opacity-100'), 10);
-            
-            try {
-                const order = await apiFetch('getOrderDetails', { orderId });
-                const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
-
-                content.innerHTML = `
-                    <div class="p-6 flex-shrink-0 border-b flex justify-between items-center">
-                        <h2 class="text-2xl font-bold">${order.customerName}</h2>
-                        <button onclick="closeModal('orderDetailsModal')" class="text-2xl">&times;</button>
-                    </div>
-                    <div class="p-6 flex-grow overflow-y-auto">
-                        <p><strong>סטטוס:</strong> <span class="font-semibold">${order.status}</span></p>
-                        <p><strong>כתובת:</strong> ${order.address}</p>
-                        <p><strong>נהג:</strong> ${order.driverId || 'לא שויך'}</p>
-                        ${hasPdf ? `<a href="#" class="pdf-link" onclick="event.preventDefault(); openPdfModal('${order.orderId}')"><i class="fas fa-file-pdf"></i> הצג מסמך הזמנה</a>` : ''}
-                        <div class="mt-4">
-                            <h3 class="font-bold mb-2">הערות:</h3>
-                            <div id="commentsContainer" class="space-y-2 max-h-48 overflow-y-auto">
-                                ${(order.comments || []).map(c => `<div class="comment p-3 ${c.author === userName ? 'own' : ''}"><p class="font-semibold">${c.author || ''}</p><p>${c.text || ''}</p></div>`).join('') || '<p class="text-gray-500">אין הערות</p>'}
-                            </div>
-                            <form id="commentForm" class="mt-4 flex gap-2">
-                                <input type="text" placeholder="הוסף הערה..." class="flex-grow p-2 border rounded">
-                                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">שלח</button>
-                            </form>
-                        </div>
-                    </div>`;
-                document.getElementById('commentForm').addEventListener('submit', (e) => handleCommentSubmit(e, orderId));
-            } catch (error) {
-                content.innerHTML = `<div class="p-8 text-center text-red-500">${error.message} <button onclick="closeModal('orderDetailsModal')">סגור</button></div>`;
-            }
-        }
-
-        async function openPdfModal(orderId) {
-            const pdfModal = document.getElementById('pdfModal');
-            const pdfViewer = document.getElementById('pdfViewer');
-            pdfViewer.src = '';
-            pdfModal.classList.remove('hidden');
-             setTimeout(() => pdfModal.classList.add('opacity-100'), 10);
-
-            try {
-                const url = await apiFetch('getOrderPDF', { orderId });
-                if (url) {
-                    pdfViewer.src = url;
-                    await apiFetch('logPDFView', {}, 'POST', { user: userName, role: currentRole, orderId });
-                } else {
-                    alert('לא נמצא מסמך PDF עבור הזמנה זו.');
-                    closeModal('pdfModal');
-                }
-            } catch (error) {
-                alert(`שגיאה בטעינת המסמך: ${error.message}`);
-                closeModal('pdfModal');
-            }
-        }
-
-        async function handleCommentSubmit(e, orderId) {
-            e.preventDefault();
-            const form = e.target;
-            const input = form.querySelector('input');
-            const button = form.querySelector('button');
-            const text = input.value.trim();
-            if (!text) return;
-            
-            button.disabled = true;
-            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            try {
-                await apiFetch('postComment', {}, 'POST', {orderId, author: userName, text});
-                openOrderModal(orderId);
-            } catch (error) {
-                alert('שגיאה בשליחת הערה: ' + error.message);
-                button.disabled = false;
-                button.innerText = 'שלח';
-            }
-        }
-
-        function closeModal(modalId) {
-            const modal = document.getElementById(modalId);
-            modal.classList.remove('opacity-100');
-            setTimeout(() => modal.classList.add('hidden'), 300);
-        }
     </script>
+
 </body>
 </html>
