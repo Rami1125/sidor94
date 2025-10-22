@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - מפה</title>
+    <!-- DeliveryMaster Viewer App v27.0 -->
+
+    <!-- LeafletJS CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            background-color: #eee;
+        }
+        #header {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        #loader {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1001;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Check Auth -->
+    <script>
+        if (sessionStorage.getItem('viewerToken') !== 'VALID_TOKEN') {
+            window.location.href = 'index.html';
+        }
+    </script>
+
+    <div id="header">
+        <h1 class="text-lg font-semibold">מפת נהגים - <span id="last-updated" class="text-sm text-gray-600">טוען...</span></h1>
+    </div>
+
+    <div id="map"></div>
+    <div id="loader"></div>
+
+    <script>
+        // --- Config ---
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxhJjLpnh8qZFutncdTLOX_ul8PIqZRrgjeE4289pPFiTozPcYiV8b0VzAg7KmuE6KZ/exec';
+        const REFRESH_INTERVAL = 30000; // 30 seconds
+        const ISRAEL_CENTER = [32.0853, 34.7818]; // Tel Aviv center
+
+        // --- State ---
+        let map;
+        let driverMarkers = {};
+        
+        // --- Icons ---
+        const driverIcon = L.icon({
+            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+            shadowSize: [41, 41]
+        });
+
+        const driverIconStuck = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+            shadowSize: [41, 41]
+        });
+
+        // --- API ---
+        async function apiFetch(action) {
+            const url = `${API_URL}?action=${action}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const result = await response.json();
+                if (result.status === 'error') throw new Error(result.data);
+                return result.data;
+            } catch (error) {
+                console.error(`API Fetch Error (${action}):`, error);
+                document.getElementById('last-updated').innerText = 'שגיאת תקשורת';
+                throw error;
+            }
+        }
+
+        // --- Map Functions ---
+        function initializeMap() {
+            try {
+                map = L.map('map').setView(ISRAEL_CENTER, 9);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                }).addTo(map);
+            } catch (error) {
+                console.error("Error initializing map:", error);
+                document.getElementById('map').innerHTML = "שגיאה בטעינת המפה.";
+            }
+        }
+        
+        function updateDriverMarkers(liveMapData) {
+            if (!map) return;
+
+            const driverIds = Object.keys(liveMapData.drivers);
+            const bounds = L.latLngBounds();
+
+            driverIds.forEach(driverId => {
+                const driver = liveMapData.drivers[driverId];
+                if (!driver.latitude || !driver.longitude) return;
+
+                const latLng = [driver.latitude, driver.longitude];
+                const icon = driver.isStuck ? driverIconStuck : driverIcon;
+                const popupContent = `<b>${driver.name}</b><br>${driver.status}<br>${driver.lastUpdate}`;
+
+                if (driverMarkers[driverId]) {
+                    driverMarkers[driverId].setLatLng(latLng);
+                    driverMarkers[driverId].setIcon(icon);
+                    driverMarkers[driverId].getPopup().setContent(popupContent);
+                } else {
+                    driverMarkers[driverId] = L.marker(latLng, { icon: icon })
+                        .addTo(map)
+                        .bindPopup(popupContent);
+                }
+                bounds.extend(latLng);
+            });
+
+            // Remove old markers
+            Object.keys(driverMarkers).forEach(markerId => {
+                if (!driverIds.includes(markerId)) {
+                    map.removeLayer(driverMarkers[markerId]);
+                    delete driverMarkers[markerId];
+                }
+            });
+
+            // Fit map to markers
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+        
+        // --- Logic ---
+        async function refreshData() {
+            document.getElementById('loader').style.display = 'block';
+            try {
+                const data = await apiFetch('getLiveMapData');
+                updateDriverMarkers(data);
+                document.getElementById('last-updated').innerText = `עודכן: ${new Date().toLocaleTimeString('he-IL')}`;
+            } catch (error) {
+                console.error("Failed to refresh data:", error);
+            } finally {
+                document.getElementById('loader').style.display = 'none';
+            }
+        }
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeMap();
+            refreshData(); // First load
+            setInterval(refreshData, REFRESH_INTERVAL); // Start auto-refresh
+        });
+    </script>
+
+</body>
+</html>
