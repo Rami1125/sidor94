@@ -2,379 +2,282 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>DeliveryMaster - חדר מצב</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - לוגים</title>
+    <!-- DeliveryMaster Log Viewer v28.8 -->
+
+    <!-- TailwindCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- LeafletJS for Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+    <!-- Icons (Feather) -->
+    <script src="https://unpkg.com/feather-icons"></script>
+
     <style>
-        /* ... (CSS remains the same) ... */
-         body { font-family: 'Rubik', sans-serif; background-color: #f4f7f9; }
-        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); }
-        .order-item-clickable:hover { background-color: #f9fafb; }
-        .modal { transition: opacity 0.3s ease; }
-        .comment { background-color: #f1f5f9; border-radius: 12px; }
-        .comment.own { background-color: #e0f2fe; }
-        .pdf-link {
-            color: #007bff; font-weight: 500; text-decoration: none;
-            display: inline-flex; align-items: center; gap: 5px;
-            margin-top: 10px; padding: 5px 10px; border-radius: 8px;
-            background-color: rgba(0, 123, 255, 0.1); transition: background-color 0.2s;
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f9fafb;
         }
-         .pdf-link:hover { background-color: rgba(0, 123, 255, 0.2); }
+        .log-item {
+            border-right-width: 4px;
+        }
+        .log-INFO { border-right-color: #3498db; }
+        .log-ERROR { border-right-color: #e74c3c; }
+        .log-WARNING { border-right-color: #f39c12; }
+        .log-Client { border-right-color: #9b59b6; }
+        
+        #log-details-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        #log-details-content {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        #map-placeholder {
+            height: 300px;
+            background-color: #eee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
 
-    <div class="container mx-auto p-4 md:p-6 lg:p-8">
-        <header class="text-center mb-10">
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-800"><i class="fas fa-broadcast-tower mr-3 text-blue-500"></i> חדר מצב</h1>
-            <p class="text-gray-500 mt-2 text-lg">תמונת מצב חיה של הפעילות בשטח</p>
-        </header>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-            <div id="kpi-total" class="kpi-card bg-white p-6 text-center rounded-lg shadow-md transition-transform">טוען...</div>
-            <div id="kpi-completed" class="kpi-card bg-white p-6 text-center rounded-lg shadow-md transition-transform">טוען...</div>
-            <div id="kpi-in-progress" class="kpi-card bg-white p-6 text-center rounded-lg shadow-md transition-transform">טוען...</div>
-            <div id="kpi-pending" class="kpi-card bg-white p-6 text-center rounded-lg shadow-md transition-transform">טוען...</div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            <div class="lg:col-span-2 xl:col-span-3 bg-white p-6 rounded-lg shadow-md flex flex-col md:flex-row gap-4">
-                <div id="liveMap" class="h-96 md:h-[600px] w-full z-0 rounded-lg flex-grow bg-gray-200">טוען מפה...</div>
-                <div class="flex-shrink-0 md:w-56">
-                    <h3 class="font-bold mb-2 text-lg">נהגים פעילים</h3>
-                    <div id="driverList" class="h-48 md:h-[550px] overflow-y-auto pr-2 space-y-2">טוען נהגים...</div>
-                </div>
-            </div>
-            <div class="xl:col-span-1 bg-white p-6 rounded-lg shadow-md flex flex-col">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">סידור עבודה</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                    <input type="date" id="dateFilter" class="w-full p-2 border rounded-md">
-                    <input type="text" id="orderSearch" placeholder="חיפוש חופשי..." class="w-full p-2 border rounded-md">
-                </div>
-                <div id="orderList" class="h-96 md:h-[524px] overflow-y-auto flex-grow pr-2">טוען הזמנות...</div>
+    <header class="bg-white shadow-sm">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-gray-800">מציג לוגים - v28.8</h1>
+            <div class="flex items-center space-x-4 space-x-reverse">
+                <select id="level-filter" class="border rounded-md px-3 py-2" onchange="renderLogs()">
+                    <option value="ALL">כל הרמות</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="INFO">INFO</option>
+                    <option value="Client">Client</option>
+                </select>
+                <button onclick="loadLogs()" id="refresh-btn" class="p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                    <i data-feather="refresh-cw" class="w-5 h-5"></i>
+                </button>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- Order Details Modal -->
-    <div id="orderDetailsModal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden opacity-0">
-        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" id="modalContent">
-             <!-- Content dynamically injected -->
-             <div class="p-8 text-center">טוען פרטים...</div>
+    <main class="container mx-auto px-4 py-6">
+        <div id="loader" class="text-center py-10" style="display: none;">
+            <div class="loader inline-block border-4 border-t-4 border-gray-200 border-t-blue-500 rounded-full w-12 h-12 animate-spin"></div>
         </div>
-    </div>
+        <div id="log-list" class="space-y-3">
+            <!-- Log items will be injected here -->
+        </div>
+    </main>
 
-    <!-- PDF Viewer Modal -->
-    <div id="pdfModal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden opacity-0">
-        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-             <div class="p-4 flex-shrink-0 border-b flex justify-between items-center">
-                <h2 class="text-xl font-bold">תצוגת מסמך</h2>
-                <button onclick="closeModal('pdfModal')" class="text-2xl text-gray-500 hover:text-gray-800">&times;</button>
+    <!-- Log Details Modal -->
+    <div id="log-details-modal" onclick="closeModal()">
+        <div id="log-details-content" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">פרטי לוג</h2>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-800">
+                    <i data-feather="x"></i>
+                </button>
             </div>
-            <div class="p-4 flex-grow">
-                <iframe id="pdfViewer" style="width:100%; height: 100%; border:none;"></iframe>
+            <pre id="log-json" class="bg-gray-100 p-4 rounded-md overflow-x-auto text-sm"></pre>
+            <div id="map-placeholder">
+                טוען מפה...
             </div>
         </div>
     </div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzUE5C8LVJKvHfZy8self14WEmc7o-y41kmalYuf1MZQtm6PDuJmHSdJ00jYl8iSdvS/exec'; // <-- Updated API URL
-        
-        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), currentOrders = [], userName = '';
-        const currentRole = 'Viewer';
-        let refreshInterval; // To manage the interval timer
+        // --- Config ---
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxhJjLpnh8qZFutncdTLOX_ul8PIqZRrgjeE4289pPFiTozPcYiV8b0VzAg7KmuE6KZ/exec';
+        let allLogs = [];
+        let mapInstance = null;
 
-        // --- UTILITY FUNCTIONS ---
-         function logEvent(message, type = 'info') { /* ... */ }
-         async function apiFetch(action, params = {}, method = 'GET', body = null) {
-            const url = new URL(API_URL);
-            url.searchParams.append('action', action); 
-            if(method === 'GET') {
-                Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
-            }
-            const options = { method, mode: 'cors' };
+        // --- API ---
+        async function apiFetch(action, method = 'GET', data = null) {
+            const url = `${API_URL}?action=${action}`;
+            const options = {
+                method: method,
+                redirect: 'follow',
+                muteHttpExceptions: true,
+            };
+
             if (method === 'POST') {
-                options.body = JSON.stringify({ action, data: body }); 
-                options.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
+                options.headers = { 'Content-Type': 'application/json' };
+                options.body = JSON.stringify({ action: action, data: data });
             }
+
             try {
-                const response = await fetch(url.toString(), options); 
-                 if (!response.ok) {
-                     const errorText = await response.text();
-                     let serverMessage = errorText;
-                     try { const errorJson = JSON.parse(errorText); if (errorJson && errorJson.message) serverMessage = errorJson.message; } catch(parseError) {}
-                     throw new Error(`שגיאת שרת (${response.status}): ${serverMessage}`);
-                 }
+                const response = await fetch(method === 'GET' ? url : API_URL, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const result = await response.json();
-                if (result.status !== 'success') {
-                     throw new Error(result.message || 'Unknown server error');
+                if (result.status === 'error') {
+                    throw new Error(result.data);
                 }
                 return result.data;
             } catch (error) {
-                 console.error(`API Call FAILED: ${action} - ${error.message}`); 
-                 // Don't alert in viewer app, just log
-                 throw error; 
-            }
-        }
-        function closeModal(modalId) { /* ... */ }
-
-        // --- INITIALIZATION ---
-        document.addEventListener('DOMContentLoaded', () => {
-            userName = localStorage.getItem('deliveryMasterViewerName') || prompt("נא להזין את שמך:") || 'אורח';
-            localStorage.setItem('deliveryMasterViewerName', userName);
-            document.getElementById('dateFilter').value = new Date().toISOString().split('T')[0];
-            
-            initializeMap(); // Initialize map once on load
-            
-            fetchInitialData(); // Fetch initial data
-            
-            // Set up interval for automatic refresh
-            if (refreshInterval) clearInterval(refreshInterval); // Clear existing interval if any
-            refreshInterval = setInterval(fetchInitialData, 30000); // Refresh every 30 seconds
-            
-            document.getElementById('orderSearch').addEventListener('input', () => renderOrderList(currentOrders));
-            document.getElementById('dateFilter').addEventListener('change', fetchInitialData);
-             // Add modal close listener
-             window.onclick = (event) => {
-                if (event.target.classList.contains('modal')) closeModal(event.target.id);
-            };
-        });
-        
-        // --- DATA FETCHING & RENDERING ---
-        async function fetchInitialData() {
-            console.log("Fetching initial data..."); // Log start of fetch
-            try {
-                // Fetch orders and map data concurrently
-                const [orders, mapData] = await Promise.all([
-                    apiFetch('getOrders', { date: document.getElementById('dateFilter').value }),
-                    apiFetch('getLiveMapData') // Assuming getLiveMapData fetches relevant data
-                ]);
-                console.log("Data fetched successfully."); // Log success
-                currentOrders = orders; // Update current orders cache
-                updateKPIs(orders);
-                renderOrderList(orders);
-                updateMap(mapData); // Update map with fresh data
-            } catch (error) {
-                console.error("Error fetching initial data:", error);
-                // Optionally display a persistent error message on the page
-                 document.getElementById('orderList').innerHTML = `<div class="p-4 text-center text-red-600">שגיאה בטעינת נתונים.</div>`;
-                 document.getElementById('driverList').innerHTML = `<div class="p-4 text-center text-red-600">שגיאה בטעינת נתונים.</div>`;
-            }
-        }
-        
-        function updateKPIs(orders) {
-            // ... (Implementation remains the same) ...
-            const total = orders.length;
-            const completed = orders.filter(o => o.status === 'הושלם').length;
-            const inProgress = orders.filter(o => o.status === 'בדרך').length;
-            const pending = total - completed - inProgress; // Simplified calculation
-            document.getElementById('kpi-total').innerHTML = `<h3 class="font-semibold text-gray-500">סה"כ</h3><p class="text-4xl font-bold text-blue-600">${total}</p>`;
-            document.getElementById('kpi-completed').innerHTML = `<h3 class="font-semibold text-gray-500">הושלמו</h3><p class="text-4xl font-bold text-green-500">${completed}</p>`;
-            document.getElementById('kpi-in-progress').innerHTML = `<h3 class="font-semibold text-gray-500">בדרך</h3><p class="text-4xl font-bold text-yellow-500">${inProgress}</p>`;
-            document.getElementById('kpi-pending').innerHTML = `<h3 class="font-semibold text-gray-500">ממתינות</h3><p class="text-4xl font-bold text-gray-600">${pending}</p>`;
-
-        }
-        
-        function renderOrderList(orders) {
-            const orderListContainer = document.getElementById('orderList');
-            const searchTerm = document.getElementById('orderSearch').value.toLowerCase();
-            const filtered = orders.filter(o => 
-                Object.values(o).some(val => String(val).toLowerCase().includes(searchTerm))
-            );
-            
-            if (filtered.length === 0) {
-                 orderListContainer.innerHTML = '<p class="text-center p-8">לא נמצאו הזמנות.</p>';
-                 return;
-            }
-
-            orderListContainer.innerHTML = filtered
-                .sort((a,b) => (a.orderTime || "00:00").localeCompare(b.orderTime || "00:00"))
-                .map(order => {
-                    const orderIdStr = String(order.orderId || order.internalId || '');
-                    return `
-                    <div class="order-item-clickable p-3 border-b border-gray-200 cursor-pointer transition-all" onclick="openOrderModal('${orderIdStr}')">
-                        <p class="font-bold">${order.customerName}</p>
-                        <div class="flex justify-between text-sm text-gray-600"><span>נהג: ${order.driverId || 'טרם שובץ'}</span><span>סטטוס: ${order.status}</span></div>
-                    </div>`
-                 }).join('');
-        }
-        
-        // --- MAP FUNCTIONS ---
-        function initializeMap() {
-            try {
-                liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
-                orderMarkersLayer.addTo(liveMap);
-                console.log("Map initialized successfully.");
-            } catch(e) {
-                 console.error("Map initialization failed:", e);
-                 document.getElementById('liveMap').innerHTML = "שגיאה בטעינת מפה";
+                console.error(`API Fetch Error (${action}):`, error);
+                alert(`שגיאת תקשורת: ${error.message}`);
+                throw error;
             }
         }
 
-        function updateMap(mapData) {
-            if (!liveMap || !mapData) return;
-            const driverListContainer = document.getElementById('driverList');
-            
-            // Clear existing markers and list
-            Object.values(driverMarkers).forEach(marker => marker.remove());
-            driverMarkers = {};
-            orderMarkersLayer.clearLayers();
-            driverListContainer.innerHTML = ''; // Clear driver list
+        // --- Logic ---
+        function loadLogs() {
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('log-list').innerHTML = '';
+            document.getElementById('refresh-btn').disabled = true;
 
-            // Add driver markers and list items
-            if (mapData.drivers && mapData.drivers.length > 0) {
-                mapData.drivers.forEach(driver => {
-                    if (driver.location && driver.location.latitude && driver.location.longitude) {
-                        driverMarkers[driver.driverId] = L.marker([driver.location.latitude, driver.location.longitude])
-                           .addTo(liveMap)
-                           .bindPopup(`<b>${driver.name}</b>`);
-                        
-                        const el = document.createElement('div');
-                        el.className = 'p-2 rounded-md flex items-center gap-2 cursor-pointer hover:bg-blue-100';
-                        el.innerHTML = `<i class="fas fa-truck text-blue-500"></i> <span>${driver.name}</span>`;
-                        el.onclick = () => liveMap.setView([driver.location.latitude, driver.location.longitude], 14);
-                        driverListContainer.appendChild(el);
-                    }
+            apiFetch('getLogs&limit=200')
+                .then(logs => {
+                    allLogs = logs;
+                    renderLogs();
+                })
+                .catch(error => {
+                    document.getElementById('log-list').innerHTML = `<p class="text-center text-red-500">שגיאה בטעינת לוגים: ${error.message}</p>`;
+                })
+                .finally(() => {
+                    document.getElementById('loader').style.display = 'none';
+                    document.getElementById('refresh-btn').disabled = false;
                 });
-            } else {
-                 driverListContainer.innerHTML = '<p>אין נהגים פעילים.</p>';
-            }
-             
-             // Add order markers
-             if(mapData.orders && mapData.orders.length > 0) {
-                 mapData.orders.forEach(o => {
-                    // Make sure lat/lon exist and are numbers before adding marker
-                    if (o.latitude != null && o.longitude != null && !isNaN(o.latitude) && !isNaN(o.longitude) && o.status !== 'הושלם') {
-                       const iconUrl = (!o.driverId) ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png' : 'https://cdn-icons-png.flaticon.com/512/3405/3405255.png';
-                       L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl, iconSize: [32, 32] }) })
-                           .addTo(orderMarkersLayer)
-                           .bindPopup(`<b>${o.customerName}</b><br>${o.driverId || 'ממתין לשיבוץ'}`);
-                    }
-                });
-             }
-             console.log("Map updated with drivers and orders.");
         }
-        
-        // --- MODAL FUNCTIONS ---
-        async function openOrderModal(orderId) {
-            const modal = document.getElementById('orderDetailsModal');
-            const content = document.getElementById('modalContent');
-            content.innerHTML = '<div class="p-8 text-center"><i class="fas fa-spinner fa-spin text-2xl text-blue-500"></i></div>';
-            modal.classList.remove('hidden');
-            modal.classList.add('opacity-100');
+
+        function renderLogs() {
+            const list = document.getElementById('log-list');
+            const filter = document.getElementById('level-filter').value;
+            list.innerHTML = '';
+
+            const filteredLogs = allLogs.filter(log => filter === 'ALL' || log.Level === filter);
+
+            if (filteredLogs.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-500">לא נמצאו לוגים.</p>';
+                return;
+            }
+
+            filteredLogs.forEach((log, index) => {
+                list.appendChild(createLogElement(log, index));
+            });
+
+            feather.replace(); // Re-apply icons
+        }
+
+        function createLogElement(log, index) {
+            const el = document.createElement('div');
+            const level = log.Level || 'INFO';
+            const origin = log.Origin || 'Unknown';
+            const timestamp = new Date(log.Timestamp).toLocaleString('he-IL', {
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+
+            el.className = `log-item log-${level} bg-white p-4 rounded-md shadow-sm flex justify-between items-center`;
             
-            try {
-                // Fetch order details and comments concurrently
-                const [order, comments] = await Promise.all([
-                    apiFetch('getOrderDetails', { orderId }),
-                    apiFetch('getComments', { orderId })
-                ]);
-                
-                if (!order) { // Handle case where order is not found
-                    throw new Error("לא נמצאו פרטי הזמנה.");
-                }
-
-                let pdfLinkHtml = '';
-                // Check if pdfLink exists and is not empty before creating link
-                if(order.pdfLink && String(order.pdfLink).trim() !== ''){
-                    pdfLinkHtml = `<a href="#" class="pdf-link" onclick="event.preventDefault(); openPdfModal('${orderId}')"><i class="fas fa-file-pdf mr-1"></i> הצג מסמך הזמנה</a>`;
-                }
-
-                content.innerHTML = `
-                    <div class="p-4 flex-shrink-0 border-b flex justify-between items-center">
-                        <h2 class="text-xl font-bold">פרטי הזמנה: ${order.customerName}</h2>
-                        <button onclick="closeModal('orderDetailsModal')" class="text-2xl text-gray-500 hover:text-gray-800">&times;</button>
+            el.innerHTML = `
+                <div class="flex-1 overflow-hidden">
+                    <div class="flex items-center space-x-3 space-x-reverse">
+                        <span class="font-bold text-gray-800">${origin}</span>
+                        <span class="text-sm text-gray-500">${timestamp}</span>
                     </div>
-                    <div class="p-6 flex-grow overflow-y-auto">
-                        <p><strong>סטטוס:</strong> ${order.status || 'N/A'}</p>
-                        <p><strong>כתובת:</strong> ${order.address || 'N/A'}</p>
-                        <p><strong>נהג:</strong> ${order.driverId || 'N/A'}</p>
-                        <p><strong>תאריך:</strong> ${order.orderDate ? new Date(order.orderDate).toLocaleDateString('he-IL') : 'N/A'}</p>
-                        ${pdfLinkHtml} 
-                        
-                        <div class="mt-4">
-                            <h3 class="font-bold mb-2">הערות:</h3>
-                            <div id="commentsContainer" class="space-y-2 max-h-48 overflow-y-auto bg-gray-100 p-3 rounded">
-                                ${(comments && comments.length > 0) ? comments.map(c => `
-                                    <div class="comment p-3 ${c.author === userName ? 'own' : ''}">
-                                        <p class="font-semibold text-sm text-blue-600">${c.author || ''} (${c.timestamp ? new Date(c.timestamp).toLocaleString('he-IL') : ''})</p>
-                                        <p>${c.text || ''}</p>
-                                    </div>`).join('') : '<p class="text-gray-500">אין הערות.</p>'}
-                            </div>
-                            <form id="commentForm" class="mt-4 flex gap-2">
-                                <input type="text" id="commentInput" placeholder="הוסף הערה..." class="flex-grow p-2 border rounded">
-                                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">שלח</button>
-                            </form>
-                        </div>
-                    </div>`;
-                document.getElementById('commentForm').addEventListener('submit', (e) => handleCommentSubmit(e, orderId));
-            } catch (error) {
-                content.innerHTML = `<div class="p-8 text-center text-red-500">שגיאה בטעינת פרטים: ${error.message} <button onclick="closeModal('orderDetailsModal')" class="text-blue-500 underline ml-2">סגור</button></div>`;
-            }
+                    <p class="text-gray-700 truncate" title="${log.Message}">${log.Message}</p>
+                </div>
+                <button class="mr-4 text-gray-500 hover:text-blue-500" onclick="showDetails(${index})">
+                    <i data-feather="zoom-in"></i>
+                </button>
+            `;
+            return el;
         }
 
-        async function openPdfModal(orderId) {
-             // ... (Implementation remains the same as v30.4) ...
-              if (!orderId) { alert('מזהה הזמנה לא תקין.'); return; }
-            const pdfModal = document.getElementById('pdfModal');
-            const pdfViewer = document.getElementById('pdfViewer');
-            pdfViewer.src = 'about:blank'; 
-            pdfModal.classList.remove('hidden');
-            pdfModal.classList.add('opacity-100');
-
+        function showDetails(index) {
+            const log = allLogs[index];
+            let dataObject = {};
+            
             try {
-                const url = await apiFetch('getOrderPDF', { orderId });
-                if (url) {
-                    pdfViewer.src = url;
-                    apiFetch('logPDFView', {}, 'POST', { user: userName, role: currentRole, orderId })
-                        .catch(logError => console.error(`Failed to log PDF view: ${logError.message}`));
-                } else {
-                    alert('לא נמצא מסמך PDF עבור הזמנה זו.');
-                    closeModal('pdfModal');
-                }
-            } catch (error) {
-                 alert(`שגיאה בטעינת המסמך.`);
-                closeModal('pdfModal');
+                // The data might be a stringified JSON string, or just a string
+                dataObject = JSON.parse(log.Data);
+            } catch (e) {
+                dataObject = { rawData: log.Data };
+            }
+
+            // Format JSON for display
+            document.getElementById('log-json').textContent = JSON.stringify(log, null, 2);
+            document.getElementById('log-details-modal').style.display = 'flex';
+            
+            // Check for coordinates in the data object
+            let lat = null, lon = null;
+            if (dataObject.context && dataObject.context.latitude) {
+                // Client log with context
+                lat = dataObject.context.latitude;
+                lon = dataObject.context.longitude;
+            } else if (dataObject.latitude) {
+                // Simple object with coords
+                lat = dataObject.latitude;
+                lon = dataObject.longitude;
+            }
+
+            // Initialize map if coords exist
+            const mapEl = document.getElementById('map-placeholder');
+            if (mapInstance) {
+                mapInstance.remove();
+                mapInstance = null;
+            }
+            
+            if (lat && lon) {
+                mapEl.innerHTML = ''; // Clear "loading" text
+                mapEl.style.height = '300px';
+                
+                mapInstance = L.map(mapEl).setView([lat, lon], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(mapInstance);
+                L.marker([lat, lon]).addTo(mapInstance);
+                
+                // Leaflet sometimes has trouble resizing in a modal
+                // We force it to re-check its size
+                setTimeout(() => mapInstance.invalidateSize(), 100);
+                
+            } else {
+                mapEl.style.height = '100px';
+                mapEl.innerHTML = 'אין נתוני מיקום בלוג זה.';
+            }
+
+            feather.replace();
+        }
+
+        function closeModal() {
+            document.getElementById('log-details-modal').style.display = 'none';
+            if (mapInstance) {
+                mapInstance.remove();
+                mapInstance = null;
             }
         }
 
-        async function handleCommentSubmit(e, orderId) {
-            e.preventDefault();
-            const input = document.getElementById('commentInput');
-            const text = input.value.trim();
-            if (!text) return;
-            const btn = e.target.querySelector('button');
-            btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            try {
-                await apiFetch('postComment', {}, 'POST', { orderId, author: userName, text });
-                input.value = '';
-                await openOrderModal(orderId); // Refresh the entire modal to show new comment
-            } catch (error) {
-                // Error handled by apiFetch
-            } finally {
-                 if(btn) { btn.disabled = false; btn.textContent = 'שלח'; }
-            }
-        }
-
-        function closeModal(modalId) {
-            const modal = document.getElementById(modalId);
-            if(modal) {
-                modal.classList.add('hidden');
-                modal.classList.remove('opacity-100');
-            }
-            if(modalId === 'pdfModal') {
-                document.getElementById('pdfViewer').src = 'about:blank';
-            }
-        }
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+            loadLogs();
+        });
     </script>
+
 </body>
 </html>
-
