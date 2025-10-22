@@ -2,564 +2,788 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster - מרכז בקרה</title>
+    <!-- v29.3: עדכון Viewport למניעת זום במובייל -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DeliveryMaster Admin v29.3</title>
     
-    <!-- External Libraries -->
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Critical libraries load synchronously -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- Google Maps API Script -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCbVYMijMs8zH6m4iiSiBfn_RiCMuau9ps&libraries=places&callback=onMapApiLoad" async defer></script>
+    <!-- v29.3: הוספת Leaflet.js (החלפת Google Maps) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+    <!-- v29.3: סקריפט זיהוי מובייל/דסקטופ -->
+    <script>
+        (function() {
+            // הוספת קלאס ל-<html> במקום ל-<body> כדי למנוע FOUC
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            document.documentElement.className = isMobile ? 'mobile' : 'desktop';
+        })();
+    </script>
 
     <style>
-        /* --- DeliveryMaster v28.7 - Unified Design System --- */
-        /* Styles remain identical to v28.6 */
+        /* --- סגנון בסיסי --- */
         :root {
-            --primary-color: #0078D7;
-            --secondary-color: #F4F6FA;
-            --text-color: #1A1A1A;
-            --background-color: #E9EEF4;
+            --bg-color: #f0f2f5;
+            --sidebar-bg: #ffffff;
+            --header-bg: #ffffff;
+            --text-color: #333;
+            --primary-color: #007bff;
             --border-color: #dee2e6;
-            --shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            --success: #198754;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --border-radius: 12px;
+            --shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        *, *::before, *::after { box-sizing: border-box; }
-        body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; overflow: hidden; }
-        #app-container { display: flex; height: 100vh; }
-        .sidebar { width: 260px; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border-left: 1px solid #ffffff4d; padding: 20px; display: flex; flex-direction: column; z-index: 10; }
-        .sidebar-header h1 { font-size: 1.5rem; color: var(--primary-color); text-align: center; margin-bottom: 30px;}
-        .nav-menu { list-style: none; padding: 0; margin: 0; }
-        .nav-menu a { display: flex; align-items: center; padding: 15px; margin-bottom: 8px; border-radius: var(--border-radius); color: #6c757d; text-decoration: none; font-weight: 500; transition: all 0.2s ease; }
-        .nav-menu a i { width: 25px; text-align: center; margin-left: 10px; font-size: 1.1rem; }
-        .nav-menu a:hover { background-color: rgba(0, 120, 215, 0.1); color: var(--primary-color); }
-        .nav-menu a.active { background-color: var(--primary-color); color: white; box-shadow: 0 4px 10px rgba(0, 120, 215, 0.3); }
-        .sidebar-footer { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color); font-size: 0.8rem; text-align: center; }
-        #sync-indicator { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 500; }
-        #sync-indicator .spinner { display: none; animation: spin 1s linear infinite; }
-        #sync-indicator.syncing .spinner { display: inline-block; }
-        .main-content { flex-grow: 1; padding: 25px; overflow-y: auto; }
-        .page { display: none; animation: fadeIn 0.5s; }
-        .page.active { display: block; }
-        .card { background: white; padding: 25px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 25px; }
-        h2 { font-size: 1.8rem; font-weight: 500; margin-bottom: 20px; }
-        h3 { font-size: 1.2rem; font-weight: 500; margin-bottom: 15px; color: var(--primary-color); }
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin-bottom: 25px; }
-        .kpi-card { background: white; padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); text-align: center; border-top: 4px solid var(--primary-color); }
-        .kpi-value { font-size: 2.5rem; font-weight: 700; }
-        .kpi-label { color: #6c757d; }
-        .kpi-card.completed { border-top-color: var(--success); }
-        .kpi-card.in-progress { border-top-color: var(--warning); }
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; }
-        .live-feed .feed-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #F4F6FA; }
-        .placeholder-text { color: #6c757d; text-align: center; padding: 20px; }
-        .map-container { position: relative; }
-        #map-search-input { position: absolute; top: 10px; right: 10px; width: 250px; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 5; }
-        #liveMap { height: 400px; width: 100%; border-radius: var(--border-radius); background-color: #eee; }
-        #scheduler { display: grid; grid-template-columns: 250px repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
-        .scheduler-column { background-color: var(--secondary-color); border-radius: var(--border-radius); padding: 15px; }
-        .order-pool, .driver-lane { min-height: 400px; list-style-type: none; padding: 0; }
-        .schedule-card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.08); cursor: grab; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-        .form-group input, .form-group select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); }
-        .address-group { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
-        .btn { background-color: var(--primary-color); color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500; width: 100%; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; z-index: 1000; transition: opacity 0.3s, visibility 0.3s; }
-        .modal.active { opacity: 1; visibility: visible; }
-        .modal-content { background: white; padding: 30px; border-radius: var(--border-radius); width: 90%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; transform: scale(0.95); transition: transform 0.3s; }
-        .modal.active .modal-content { transform: scale(1); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
-        .close-button { font-size: 1.5rem; cursor: pointer; color: #aaa; background: none; border: none; }
-        .modal-body { overflow-y: auto; }
-        .modal-body iframe { width: 100%; height: 65vh; border: none; }
-        .comment { background-color: var(--secondary-color); padding: 10px 15px; border-radius: 8px; margin-bottom: 10px; }
-        .comment .author { font-weight: bold; color: var(--primary-color); }
+        
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            color: var(--text-color);
+            direction: rtl;
+        }
+        
+        #app-container {
+            display: flex;
+            min-height: 100vh;
+        }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        /* --- סרגל צד --- */
+        #sidebar {
+            width: 240px;
+            background: var(--sidebar-bg);
+            border-left: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            transition: width 0.3s ease;
+        }
+        #sidebar h1 {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin: 0 0 20px 0;
+            text-align: center;
+        }
+        #sidebar nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #sidebar nav li {
+            padding: 12px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        #sidebar nav li:hover, #sidebar nav li.active {
+            background-color: #f0f2f5;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        /* --- תוכן ראשי --- */
+        #main-content {
+            flex-grow: 1;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        
+        header {
+            background: var(--header-bg);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .tab-content {
+            display: none;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* --- רכיבים --- */
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        input[type="date"], input[type="text"] {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        /* --- מפה (v29.3) --- */
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            background-color: #eee; /* רקע בזמן טעינה */
+        }
+        /* התאמות ל-Leaflet */
+        .leaflet-container {
+            border-radius: 8px;
+        }
+
+        /* --- סידור (Scheduler) --- */
+        #scheduler-container {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 10px 0;
+            min-height: 400px;
+        }
+        .driver-column, .unassigned-column {
+            flex: 1;
+            min-width: 250px;
+            background: #f9f9f9;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        .column-header {
+            padding: 10px;
+            font-weight: 600;
+            background: #f0f0f0;
+            border-bottom: 1px solid var(--border-color);
+            text-align: center;
+        }
+        .order-list {
+            padding: 10px;
+            min-height: 350px; /* מאפשר גרירה לאזור ריק */
+        }
+        .order-card {
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+            cursor: grab;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .order-card:active {
+            cursor: grabbing;
+            background: #fefefe;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+        }
+        .order-card-dragging {
+            opacity: 0.5;
+            transform: rotate(3deg);
+        }
+
+        /* --- טעינה --- */
+        #loading-spinner {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 10000;
+            font-weight: 500;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            display: none; /* מופעל ע"י JS */
+        }
+
+        /* --- רספונסיביות (v29.3) --- */
+        
+        /* סגנון דסקטופ (ברירת מחדל) */
+        .desktop #app-container {
+            flex-direction: row;
+        }
+
+        /* סגנון מובייל (מופעל ע"י קלאס ב-<html>) */
+        .mobile #app-container {
+            flex-direction: column;
+        }
+        .mobile #sidebar {
+            width: 100%;
+            height: auto;
+            position: relative;
+            box-shadow: none;
+            border-left: none;
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px;
+            flex-direction: row; /* שינוי כיוון לפריסה רוחבית */
+            overflow-x: auto; /* גלילה רוחבית לניווט */
+            white-space: nowrap; /* מניעת שבירת שורות */
+        }
+        .mobile #sidebar h1 {
+            display: none; /* הסתרת כותרת במובייל */
+        }
+        .mobile #sidebar nav ul {
+            display: flex; /* סידור הפריטים בשורה */
+            gap: 10px;
+        }
+         .mobile #sidebar nav li {
+            padding: 8px 12px;
+         }
+        
+        .mobile #main-content {
+            padding: 10px;
+        }
+        .mobile header {
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .mobile .tab-content {
+            padding: 10px;
+        }
+        .mobile #map {
+            height: 300px; /* הקטנת גובה מפה במובייל */
+        }
+        .mobile #scheduler-container {
+            flex-direction: column; /* הצגת עמודות אחת מתחת לשניה */
+        }
+        .mobile .driver-column, .mobile .unassigned-column {
+            min-width: 100%; /* רוחב מלא */
+        }
+        
     </style>
 </head>
-<body>
+<body class=""> <!-- הקלאס 'mobile' או 'desktop' יתווסף ע"י JS ל-<html> -->
+
+    <div id="loading-spinner">טוען...</div>
 
     <div id="app-container">
-        <aside class="sidebar">
-            <div class="sidebar-header"><h1><i class="fas fa-shipping-fast"></i> DeliveryMaster</h1></div>
-            <nav class="nav-menu">
-                <a href="#dashboard" class="nav-link"><i class="fas fa-tachometer-alt"></i> <span>לוח בקרה</span></a>
-                <a href="#scheduler" class="nav-link"><i class="fas fa-calendar-alt"></i> <span>לוח שיבוצים</span></a>
-                <a href="#reports" class="nav-link"><i class="fas fa-chart-line"></i> <span>דוחות</span></a>
-                <a href="#settings" class="nav-link"><i class="fas fa-cog"></i> <span>הגדרות</span></a>
+        <!-- סרגל צד -->
+        <aside id="sidebar">
+            <h1>DeliveryMaster</h1>
+            <nav>
+                <ul>
+                    <li class="tab-link active" data-tab="dashboard-tab">מפה חיה</li>
+                    <li class="tab-link" data-tab="scheduler-tab">סידור עבודה</li>
+                    <li class="tab-link" data-tab="orders-tab">הזמנות</li>
+                    <li class="tab-link" data-tab="drivers-tab">נהגים</li>
+                    <li class="tab-link" data-tab="reports-tab">דוחות</li>
+                </ul>
             </nav>
-            <div class="sidebar-footer">
-                <div id="sync-indicator"><i class="fas fa-sync-alt spinner"></i><span id="sync-status"></span></div>
-                <p class="mt-2">v28.7</p> <!-- Updated version -->
-            </div>
         </aside>
 
-        <main class="main-content">
-            <!-- v28.7 FIX: Ensure all page divs exist on initial load -->
-            <div id="dashboard-page" class="page">
-                <div class="kpi-grid">
-                    <div id="kpi-total" class="kpi-card"><div class="placeholder-text">...</div></div>
-                    <div id="kpi-completed" class="kpi-card completed"><div class="placeholder-text">...</div></div>
-                    <div id="kpi-in-progress" class="kpi-card in-progress"><div class="placeholder-text">...</div></div>
-                    <div id="kpi-pending" class="kpi-card"><div class="placeholder-text">...</div></div>
+        <!-- תוכן ראשי -->
+        <main id="main-content">
+            <header>
+                <h2 id="header-title">מפה חיה</h2>
+                <!-- כאן אפשר להוסיף כפתורי פעולה, חיפוש וכו' -->
+                <div id="header-actions">
+                    <input type="date" id="scheduler-date" title="בחר תאריך לסידור">
+                    <button onclick="loadScheduler()">טען סידור</button>
                 </div>
-                <div class="dashboard-grid">
-                    <div class="card live-feed">
-                        <h3><i class="fas fa-history"></i> פעילות אחרונה</h3>
-                        <div id="live-feed-content"><p class="placeholder-text">טוען פעילות...</p></div>
-                    </div>
-                    <div class="card">
-                        <h3><i class="fas fa-chart-pie"></i> ביצועי נהגים</h3>
-                        <div style="height: 300px; position: relative;"><canvas id="driver-chart"></canvas></div>
-                    </div>
-                </div>
+            </header>
+
+            <!-- Tab: Dashboard (Live Map) -->
+            <div id="dashboard-tab" class="tab-content active">
+                <!-- v29.3: אלמנט המפה של Leaflet -->
+                <div id="map"></div>
+                <!-- ... (כאן ניתן להוסיף סטטיסטיקות נוספות) ... -->
             </div>
-            <div id="scheduler-page" class="page">
-                 <div class="card">
-                    <h2><i class="fas fa-calendar-alt"></i> לוח שיבוצים חי</h2>
-                    <div id="scheduler"><p class="placeholder-text">טוען לוח שיבוצים...</p></div>
+            
+            <!-- Tab: Scheduler -->
+            <div id="scheduler-tab" class="tab-content">
+                <div id="scheduler-controls">
+                    <!-- התאריך עבר לכותרת, אך ניתן להוסיף כאן כפתורי סינון -->
                 </div>
-                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 25px;">
-                    <div class="card">
-                        <h2><i class="fas fa-map-marked-alt"></i> מפה טקטית</h2>
-                        <div class="map-container">
-                            <input id="map-search-input" type="text" placeholder="חיפוש כתובת במפה..."/>
-                            <div id="liveMap"></div>
+                <div id="scheduler-container">
+                    <div class="unassigned-column" id="unassigned-column" data-driver-id="null">
+                        <div class="column-header">הזמנות ממתינות לשיבוץ</div>
+                        <div class="order-list" id="unassigned-list">
+                            <!-- כרטיסי הזמנות יטענו לכאן -->
                         </div>
                     </div>
-                     <div class="card">
-                        <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
-                        <form id="createOrderForm" autocomplete="off"></form>
-                    </div>
+                    <!-- עמודות נהגים יטענו לכאן דינמית -->
                 </div>
             </div>
-             <div id="reports-page" class="page">
-                <div class="card"><h2><i class="fas fa-chart-line"></i> דוחות וביצועים</h2><p>אזור הדוחות בבנייה.</p></div>
+            
+            <!-- Tab: Orders -->
+            <div id="orders-tab" class="tab-content">
+                <h2>ניהול הזמנות (מלא)</h2>
+                <!-- טבלה / רשימה של כל ההזמנות להיום -->
             </div>
-            <div id="settings-page" class="page">
-                <div class="card">
-                    <h2><i class="fas fa-cog"></i> הגדרות מערכת</h2>
-                    <div id="sync-hub"></div>
-                    <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 16px;">
-                        <button id="syncEmailsBtn" class="btn"><i class="fas fa-envelope"></i> סנכרן מיילים כעת</button>
-                        <button id="unlinkedDocsBtn" class="btn btn-warning"><i class="fas fa-exclamation-triangle"></i> הצג מסמכים ללא שיוך</button>
-                    </div>
-                </div>
+            
+            <!-- Tab: Drivers -->
+            <div id="drivers-tab" class="tab-content">
+                <h2>ניהול נהגים</h2>
+                <!-- טבלה / רשימה של כל הנהגים -->
+            </div>
+            
+            <!-- Tab: Reports -->
+            <div id="reports-tab" class="tab-content">
+                <h2>דוחות וניתוחים</h2>
+                <!-- כאן ישולבו הדוחות מ-v28.8 -->
             </div>
         </main>
     </div>
-    
-    <div id="modal-container"></div>
-    <div id="toast-container" style="position: fixed; bottom: 20px; left: 20px; z-index: 9999;"></div>
+
 
     <script>
-        // --- DeliveryMaster v28.7 - Critical Stability Fix ---
-        
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzPl-UH4hgX47FJZ-O2y7CTDU026hIzEntVDuGnSviWV1mY33as18nWyMxj7znCQA/exec';
-        const state = {
-            currentPage: 'dashboard', allTodayOrders: [], drivers: [], customers: [],
-            map: null, driverMarkers: {}, orderMarkers: {}, driverChart: null, isMapReady: false,
-        };
+        // --- v29.3: הגדרות מפה גלובליות (Leaflet) ---
+        var map;
+        var driverMarkers = {};
+        var orderMarkers = {};
+        var osmStreetLayer, esriSatelliteLayer;
 
-        // --- Malshinnon (Logger) ---
-        function log(message, type = 'info', data = {}) {
-             const style = `color:${type === 'error' ? '#dc3545' : type === 'warn' ? '#ffc107' : '#0078D7'}; font-weight: ${type === 'error' ? 'bold' : 'normal'};`;
-             console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, style, message, data);
-        }
-
-        // --- Global Map Callback ---
-        window.onMapApiLoad = function() {
-            log("Google Maps API loaded successfully.");
-            state.isMapReady = true;
-            if (state.currentPage === 'scheduler') {
-                initializeMap();
-            }
-        }
+        // --- v29.3: פונקציות עזר של המפה (כפי שהוגדר ב-v29.2) ---
         
-        // --- Map Functions ---
-        function initializeMap() {
-            if (state.map || !document.getElementById('liveMap')) {
-                 log("Map initialization skipped: Already initialized or element not found.", 'warn');
-                 return;
+        /**
+         * יצירה או עדכון סמן (נהג או הזמנה)
+         * @param {string} id - מזהה ייחודי (driverId או orderId)
+         * @param {number} lat - קו רוחב
+         * @param {number} lng - קו אורך
+         * @param {string} popupContent - תוכן ה-HTML שיוצג בלחיצה
+         * @param {Object} markerStorage - האובייקט לאחסון הסמנים (driverMarkers או orderMarkers)
+         * @param {string | null} iconUrl - (אופציונלי) כתובת לאייקון מותאם אישית
+         */
+        function createOrUpdateMarker(id, lat, lng, popupContent, markerStorage, iconUrl = null) {
+            if (!map || !lat || !lng) {
+                console.warn(`Skipping marker create/update for ${id}: Invalid map or location.`);
+                return; 
             }
-            log("Initializing Google Map...");
-            const mapOptions = { 
-                center: { lat: 32.0853, lng: 34.7818 }, zoom: 9, mapTypeId: 'roadmap',
-                mapTypeControl: true, streetViewControl: true,
-                mapTypeControlOptions: { style: google.maps.MapTypeControlStyle.DROPDOWN_MENU, position: google.maps.ControlPosition.TOP_RIGHT },
-            };
-            try {
-                state.map = new google.maps.Map(document.getElementById("liveMap"), mapOptions);
-                state.map.setTilt(45);
-                
-                const searchInput = document.getElementById('map-search-input');
-                const autocomplete = new google.maps.places.Autocomplete(searchInput);
-                autocomplete.bindTo('bounds', state.map);
-                let searchMarker = new google.maps.Marker({ map: state.map, anchorPoint: new google.maps.Point(0, -29) });
-                
-                autocomplete.addListener('place_changed', () => {
-                     searchMarker.setVisible(false);
-                     const place = autocomplete.getPlace();
-                     if (!place.geometry || !place.geometry.location) {
-                         log("Autocomplete place not found or geometry missing.", 'warn');
-                         return;
-                     }
-                     if (place.geometry.viewport) state.map.fitBounds(place.geometry.viewport);
-                     else { state.map.setCenter(place.geometry.location); state.map.setZoom(17); }
-                     searchMarker.setPosition(place.geometry.location);
-                     searchMarker.setVisible(true);
+
+            var latLng = [lat, lng];
+            var customIcon = null;
+
+            if (iconUrl) {
+                customIcon = L.icon({
+                    iconUrl: iconUrl,
+                    iconSize: [25, 41], // גודל סטנדרטי של אייקון Leaflet
+                    iconAnchor: [12, 41], // נקודת העיגון התחתונה-אמצעית
+                    popupAnchor: [1, -34] // מיקום הפופאפ יחסית לאייקון
                 });
-                log("Google Map initialized successfully.");
+            }
 
-                // Attempt initial map update if data might be ready
-                apiFetch('getLiveMapData').then(mapData => updateMapUI(mapData)).catch(e => log("Initial map data fetch failed:", 'error', e));
-
-            } catch (error) {
-                log("Google Map initialization failed:", 'error', error);
-                const mapDiv = document.getElementById('liveMap');
-                if (mapDiv) mapDiv.innerHTML = '<p class="placeholder-text text-red-500">שגיאה בטעינת המפה. אנא ודא שהחיוב בחשבון Google Cloud מופעל.</p>';
+            if (markerStorage[id]) {
+                // סמן קיים - עדכן מיקום ופופאפ
+                markerStorage[id].setLatLng(latLng);
+                markerStorage[id].bindPopup(popupContent);
+                if (customIcon) {
+                    markerStorage[id].setIcon(customIcon);
+                }
+            } else {
+                // סמן חדש - צור והוסף למפה
+                var markerOptions = customIcon ? { icon: customIcon } : {};
+                markerStorage[id] = L.marker(latLng, markerOptions)
+                    .addTo(map)
+                    .bindPopup(popupContent);
             }
         }
 
-        function updateMapUI({ drivers, orders }) {
-             log("Updating map UI...");
-             if (!state.map) return;
-             // Clear old markers
-            Object.values(state.driverMarkers).forEach(m => m.setMap(null));
-            Object.values(state.orderMarkers).forEach(m => m.setMap(null));
-            state.driverMarkers = {}; state.orderMarkers = {};
-            const bounds = new google.maps.LatLngBounds();
+        /**
+         * הסרת סמן מהמפה
+         * @param {string} id - מזהה הסמן
+         * @param {Object} markerStorage - האובייקט ממנו יוסר הסמן
+         */
+        function removeMarker(id, markerStorage) {
+            if (markerStorage[id]) {
+                try {
+                    map.removeLayer(markerStorage[id]);
+                } catch(e) {
+                    console.error(`Error removing marker ${id}: ${e.message}`);
+                }
+                delete markerStorage[id];
+            }
+        }
 
-            // Add driver markers
-            drivers.forEach(d => {
-                 if (d.location?.latitude && d.location?.longitude) {
-                     const pos = { lat: d.location.latitude, lng: d.location.longitude };
-                      state.driverMarkers[d.driverId] = new google.maps.Marker({
-                           position: pos, map: state.map, title: d.name,
-                           icon: { /* ... icon definition ... */ }
-                      });
-                      bounds.extend(pos);
-                 }
-            });
-            // Add order markers
-            orders.forEach(o => {
-                 if (o.latitude && o.longitude && o.status !== 'הושלם') {
-                    const pos = { lat: o.latitude, lng: o.longitude };
-                    state.orderMarkers[o.orderId || o.internalId] = new google.maps.Marker({
-                        position: pos, map: state.map, title: o.customerName,
-                        icon: { /* ... icon definition ... */ }
+        /**
+         * v29.3: פונקציית אתחול המפה (Leaflet)
+         */
+        function initMap() {
+            if (document.getElementById('map') && !map) { // ודא שהמפה לא אותחלה כבר
+                // הגדרת שכבות בסיס
+                osmStreetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                });
+
+                esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>'
+                });
+
+                // אתחול המפה
+                map = L.map('map', {
+                    center: [31.7683, 35.2137], // מרכז ישראל
+                    zoom: 8,
+                    layers: [osmStreetLayer] // שכבת ברירת מחדל
+                });
+
+                // הוספת בורר שכבות
+                var baseLayers = {
+                    "מפת רחובות (עברית)": osmStreetLayer,
+                    "תצוגת לווין": esriSatelliteLayer
+                };
+                L.control.layers(baseLayers).addTo(map);
+                
+                console.log('Leaflet Map Initialized (v29.3)');
+                
+                // טעינת נתונים ראשונית למפה
+                loadLiveMapData();
+            }
+        }
+        
+        // --- פונקציות API (באמצעות google.script.run) ---
+
+        function showLoading() { document.getElementById('loading-spinner').style.display = 'block'; }
+        function hideLoading() { document.getElementById('loading-spinner').style.display = 'none'; }
+        
+        /**
+         * פונקציית עזר גנרית להרצת פונקציות שרת
+         * @param {string} action - שם הפונקציה ב-Code.gs (למשל 'getDrivers')
+         * @param {Object} params - אובייקט פרמטרים
+         * @param {string} method - 'GET' או 'POST'
+         * @returns {Promise<any>}
+         */
+        function runServerScript(action, params = {}, method = 'GET') {
+            showLoading();
+            return new Promise((resolve, reject) => {
+                const handler = google.script.run
+                    .withSuccessHandler(response => {
+                        hideLoading();
+                        if (response && response.status === 'success') {
+                            resolve(response.data);
+                        } else {
+                            const errorMessage = (response && response.message) ? response.message : 'Unknown server error';
+                            console.error('Server Error:', errorMessage, response);
+                            reject(new Error(errorMessage));
+                        }
+                    })
+                    .withFailureHandler(error => {
+                        hideLoading();
+                        console.error('Script Error:', error.message, error);
+                        reject(error);
                     });
-                    bounds.extend(pos);
-                 }
-            });
-            
-            if (!bounds.isEmpty()) state.map.fitBounds(bounds);
-            log("Map UI updated.");
-        }
 
-        // --- Core App Initialization & Routing ---
-        document.addEventListener('DOMContentLoaded', () => {
-            log("DOM Loaded. Initializing app...");
-            initRouter();
-            initApp();
-        });
-
-        function initRouter() {
-            log("Initializing router...");
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.addEventListener('click', (e) => { e.preventDefault(); navigateTo(link.getAttribute('href').substring(1)); });
-            });
-            window.addEventListener('popstate', () => {
-                const pageId = location.hash.substring(1) || 'dashboard';
-                log(`Navigating via popstate to: ${pageId}`);
-                renderPage(pageId);
-            });
-            log("Router initialized.");
-        }
-
-        function navigateTo(pageId) {
-            log(`Attempting to navigate to: ${pageId}`);
-            if (pageId === state.currentPage) return;
-            history.pushState({ page: pageId }, '', `#${pageId}`);
-            renderPage(pageId);
-        }
-
-        async function renderPage(pageId) {
-            log(`Rendering page: ${pageId}`);
-            state.currentPage = pageId;
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.getAttribute('href') === `#${pageId}`));
-            document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === `${pageId}-page`));
-
-            try {
-                // Ensure the content container exists before trying to check its content
-                const schedulerElement = document.getElementById('scheduler');
-                if (pageId === 'scheduler' && schedulerElement?.innerHTML.includes('placeholder')) await loadSchedulerView();
-                
-                const syncHubElement = document.getElementById('sync-hub');
-                if (pageId === 'settings' && syncHubElement && !syncHubElement.hasChildNodes()) await loadSettingsView();
-                 
-            } catch (error) {
-                 log(`Error loading content for page ${pageId}:`, 'error', error);
-            }
-        }
-        
-        function initApp() {
-            log("Initializing application...");
-            const initialPage = location.hash.substring(1) || 'dashboard';
-            renderPage(initialPage);
-            backgroundSync(); 
-            setInterval(backgroundSync, 30000); 
-            log("Application initialized.");
-        }
-
-        // --- Data Fetching & Sync ---
-        let isSyncing = false;
-        async function backgroundSync() {
-            if (isSyncing) return; isSyncing = true;
-            log("Starting background sync...");
-            const syncIndicator = document.getElementById('sync-indicator');
-            const syncStatusEl = document.getElementById('sync-status');
-            syncIndicator?.classList.add('syncing');
-            if (syncStatusEl) syncStatusEl.textContent = 'מסתנכרן...';
-
-            try {
-                const results = await Promise.all([
-                    apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] }).catch(e => { log("Failed to fetch Orders", 'error', e); return e; }),
-                    apiFetch('getDrivers').catch(e => { log("Failed to fetch Drivers", 'error', e); return e; }),
-                    apiFetch('getCustomers').catch(e => { log("Failed to fetch Customers", 'error', e); return e; }),
-                    apiFetch('getLiveMapData').catch(e => { log("Failed to fetch LiveMapData", 'error', e); return e; }),
-                    apiFetch('getSyncStatus').catch(e => { log("Failed to fetch SyncStatus", 'error', e); return e; }),
-                    apiFetch('getAnalyticsData').catch(e => { log("Failed to fetch AnalyticsData", 'warn', e); return e; }) // Still expect this to fail
-                ]);
-                
-                const [orders, drivers, customers, mapData, syncData, analyticsData] = results;
-
-                if (orders instanceof Error) {
-                    log("Critical error: Failed to fetch orders. Sync aborted.", 'error');
-                    throw orders; 
-                }
-
-                state.allTodayOrders = orders; 
-                if (!(drivers instanceof Error)) state.drivers = drivers;
-                if (!(customers instanceof Error)) state.customers = customers;
-
-                // Update UI conditionally
-                updateDashboardUI(orders, analyticsData instanceof Error ? null : analyticsData); 
-                if (document.getElementById('scheduler')) updateSchedulerUI();
-                if (state.map && !(mapData instanceof Error)) updateMapUI(mapData);
-                if (document.getElementById('sync-hub') && !(syncData instanceof Error)) updateSettingsUI(syncData);
-                if (document.getElementById('customers-list') && !(customers instanceof Error)) populateCustomerDatalist(customers);
-                
-                if (syncStatusEl) syncStatusEl.textContent = `עודכן: ${new Date().toLocaleTimeString('he-IL')}`;
-                log("Background sync completed successfully.");
-            } catch (error) {
-                log("Critical background sync failed:", 'error', error);
-                if (syncStatusEl) syncStatusEl.textContent = 'שגיאת סנכרון';
-            } finally {
-                syncIndicator?.classList.remove('syncing'); isSyncing = false;
-            }
-        }
-
-        async function apiFetch(action, params = {}, method = 'GET', body = null) {
-            log(`API Fetch Start: ${action}`, params);
-            try {
-                const url = new URL(API_URL);
-                if (method === 'GET') {
-                    url.searchParams.append('action', action);
-                    Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
-                }
-                const options = { method, mode: 'cors', headers: {} };
+                // הרצת הפונקציה המתאימה בשרת
                 if (method === 'POST') {
-                    options.body = JSON.stringify({ action, data: body });
-                    options.headers['Content-Type'] = 'text/plain;charset=UTF-8';
+                    // POST שולח אובייקט יחיד
+                    const payload = { postData: { contents: JSON.stringify({ action, ...params }) } };
+                    handler.doPost(payload);
+                } else {
+                    // GET שולח אובייקט פרמטרים
+                    const payload = { parameter: { action, ...params } };
+                    handler.doGet(payload);
                 }
-                const response = await fetch(url, options);
-                if (!response.ok) throw new Error(`Network error (${response.status}) for ${action}`);
-                const result = await response.json();
-                if (result.status !== 'success') throw new Error(result.message || `API error for ${action}`);
-                log(`API Fetch Success: ${action}`);
-                return result.data;
-            } catch (error) {
-                log(`API Fetch Error (${action}):`, 'error', error);
-                showToast(`שגיאת תקשורת: ${action}`, 'error'); // showToast must be defined
-                throw error; 
+            });
+        }
+        
+        // --- פונקציית הטעינה הראשית ---
+        document.addEventListener("DOMContentLoaded", () => {
+            // אתחול המפה רק אם הטאב שלה פעיל
+            if (document.getElementById('dashboard-tab').classList.contains('active')) {
+                initMap();
+            }
+            
+            // הגדרת תאריך ברירת מחדל
+            const dateInput = document.getElementById('scheduler-date');
+            if (dateInput) {
+                dateInput.valueAsDate = new Date();
+            }
+            
+            // טעינת הסידור
+            loadScheduler();
+            
+            // הגדרת אירועי לחיצה לטאבים
+            setupTabs();
+            
+            // רענון אוטומטי למפה
+            setInterval(loadLiveMapData, 60000); // כל 60 שניות
+        });
+        
+        // --- ניהול טאבים ---
+        function setupTabs() {
+            const tabLinks = document.querySelectorAll('.tab-link');
+            tabLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    const tabId = link.getAttribute('data-tab');
+                    
+                    // עדכון כותרת
+                    document.getElementById('header-title').innerText = link.innerText;
+                    
+                    // עדכון קלאס פעיל בקישורים
+                    tabLinks.forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                    
+                    // הצגת הטאב הנכון
+                    document.querySelectorAll('.tab-content').forEach(tab => {
+                        tab.classList.remove('active');
+                    });
+                    document.getElementById(tabId).classList.add('active');
+                    
+                    // אתחול המפה אם זה הטאב שלה
+                    if (tabId === 'dashboard-tab') {
+                        initMap(); // יאתחל רק אם לא אותחל כבר
+                        // רענון גודל המפה (חשוב אם ה-div היה מוסתר)
+                        if(map) {
+                            setTimeout(() => map.invalidateSize(), 10);
+                        }
+                    }
+                });
+            });
+        }
+
+        // --- פונקציות ליבה ---
+        
+        function loadScheduler() {
+            const date = document.getElementById('scheduler-date').value;
+            if (!date) {
+                alert('יש לבחור תאריך');
+                return;
+            }
+            
+            Promise.all([
+                runServerScript('getDrivers', {}, 'GET'),
+                runServerScript('getOrders', { date: date }, 'GET')
+            ]).then(([drivers, orders]) => {
+                buildSchedulerUI(drivers, orders);
+                displayOrdersOnMap(orders); // עדכון סמני הזמנות במפה
+            }).catch(err => {
+                console.error('Error loading scheduler:', err);
+                alert('שגיאה בטעינת הסידור: ' + err.message);
+            });
+        }
+
+        function loadLiveMapData() {
+            // טעינת נתונים חיים (רק אם הטאב של המפה פעיל)
+            if (document.getElementById('dashboard-tab').classList.contains('active') && map) {
+                console.log('Refreshing live map data...');
+                runServerScript('getLiveMapData', {}, 'GET')
+                    .then(data => {
+                        updateDriverMarkers(data.drivers);
+                        displayOrdersOnMap(data.orders);
+                    })
+                    .catch(err => console.error('Failed to load map data:', err.message));
             }
         }
-        
-        // --- v28.6 HOTFIX: Restoring ALL function definitions ---
-        
-        // --- View Loaders ---
-        async function loadSchedulerView() {
-            log("Loading scheduler view...");
-            const formContainer = document.getElementById('createOrderForm');
-            const schedulerContainer = document.getElementById('scheduler');
-            if (!formContainer || !schedulerContainer) return; 
-            schedulerContainer.innerHTML = '<p class="placeholder-text">טוען לוח שיבוצים...</p>'; 
-            formContainer.innerHTML = `
-                <div class="form-group"><label for="customerName">שם לקוח (התחל להקליד)</label><input type="text" id="customerName" list="customers-list" required><datalist id="customers-list"></datalist></div>
-                <div class="form-group"><label for="customerId">מספר לקוח</label><input type="text" id="customerId"></div>
-                <div class="form-group"><label for="customerPhone">טלפון</label><input type="tel" id="customerPhone" required></div>
-                <div class="form-group address-group"><div><label for="street">רחוב</label><input type="text" id="street" required></div><div><label for="houseNumber">מספר</label><input type="text" id="houseNumber" required></div></div>
-                <div class="form-group"><label for="city">עיר</label><input type="text" id="city" required></div>
-                <button type="submit" class="btn">צור הזמנת ביניים</button>`;
-            
-            formContainer.addEventListener('submit', handleCreateOrder);
-            populateCustomerDatalist(state.customers);
-            const customerNameInput = document.getElementById('customerName');
-            if (customerNameInput) customerNameInput.addEventListener('input', handleCustomerSelection);
-            
-            if (state.isMapReady && !state.map) initializeMap();
-            updateSchedulerUI(); 
-            log("Scheduler view loaded.");
-        }
 
-        async function loadSettingsView() {
-            log("Loading settings view...");
-            const hub = document.getElementById('sync-hub');
-            if (!hub) return;
-            hub.innerHTML = `
-                <h3><i class="fas fa-cogs"></i> מרכז סנכרון</h3>
-                <p><strong>סנכרון מיילים אחרון:</strong> <span id="last-sync-time">...</span></p>
-                <p><strong>מיילים שגויים להיום:</strong> <span id="error-count">...</span></p>`;
-            document.getElementById('syncEmailsBtn')?.addEventListener('click', (e) => handleSyncAction(e, 'processComaxEmails', 'סנכרון מיילים'));
-            document.getElementById('unlinkedDocsBtn')?.addEventListener('click', () => openModal('unlinkedDocs'));
-            const syncData = await apiFetch('getSyncStatus').catch(() => null); 
-            if (syncData) updateSettingsUI(syncData);
-             log("Settings view loaded.");
+        /**
+         * v29.3: עדכון סמני נהגים (Leaflet)
+         */
+        function updateDriverMarkers(drivers) {
+            if (!map) return;
+            const activeDriverIds = [];
+            
+            drivers.forEach(driver => {
+                if (driver.location && driver.location.latitude && driver.location.longitude) {
+                    activeDriverIds.push(driver.driverId);
+                    const lastUpdate = driver.location.lastUpdate ? new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL') : 'אין';
+                    const popupContent = `<b>${driver.name}</b><br>רכב: ${driver.vehicleType || 'לא ידוע'}<br>עדכון אחרון: ${lastUpdate}`;
+                    
+                    const iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png'; // אייקון כחול
+                    
+                    createOrUpdateMarker(
+                        driver.driverId,
+                        driver.location.latitude,
+                        driver.location.longitude,
+                        popupContent,
+                        driverMarkers,
+                        iconUrl
+                    );
+                }
+            });
+            
+            // הסרת סמנים של נהגים שכבר לא פעילים
+            Object.keys(driverMarkers).forEach(driverId => {
+                if (!activeDriverIds.includes(driverId)) {
+                    removeMarker(driverId, driverMarkers);
+                }
+            });
         }
+        
+        /**
+         * v29.3: עדכון סמני הזמנות (Leaflet)
+         */
+        function displayOrdersOnMap(orders) {
+            if (!map) return;
+            const activeOrderIds = [];
 
-        // --- UI Updaters ---
-        function updateDashboardUI(orders, analyticsData) {
-            log("Updating dashboard UI...");
-             // Check if elements exist before updating
-             const kpiTotal = document.getElementById('kpi-total');
-             const feedContent = document.getElementById('live-feed-content');
-             const chartCanvas = document.getElementById('driver-chart');
-             
-             if(kpiTotal) { // Assuming if one kpi exists, they all do
-                const total = orders.length;
-                const completed = orders.filter(o => o.status === 'הושלם').length;
-                const inProgress = orders.filter(o => ['בדרך', 'באיסוף', 'טעון', 'שויך'].includes(o.status)).length; 
-                const pending = orders.filter(o => !o.status || o.status === 'חדש' || o.status === 'ממתין למספר').length; 
+            // סנן רק הזמנות פעילות שיש להן מיקום
+            const mapOrders = orders.filter(o => o.latitude && o.longitude && o.status !== 'הושלם' && o.status !== 'מבוטל');
+
+            mapOrders.forEach(order => {
+                activeOrderIds.push(order.orderId);
+                const popupContent = `<b>הזמנה: ${order.orderId}</b><br>${order.customerName}<br>${order.address}<br>סטטוס: ${order.status}`;
                 
-                kpiTotal.innerHTML = `<div class="kpi-value">${total}</div><div class="kpi-label">סה"כ הזמנות</div>`;
-                document.getElementById('kpi-completed').innerHTML = `<div class="kpi-value">${completed}</div><div class="kpi-label">הושלמו</div>`;
-                document.getElementById('kpi-in-progress').innerHTML = `<div class="kpi-value">${inProgress}</div><div class="kpi-label">בתהליך</div>`;
-                document.getElementById('kpi-pending').innerHTML = `<div class="kpi-value">${pending}</div><div class="kpi-label">ממתינות</div>`;
-             }
-
-            if(feedContent) {
-                const recentOrders = [...orders]
-                    .filter(o => o.lastModified).sort((a,b) => new Date(b.lastModified) - new Date(a.lastModified)).slice(0, 5);
-                feedContent.innerHTML = recentOrders.length > 0 ? recentOrders.map(o => `...`).join('') : '<p class="placeholder-text">אין פעילות.</p>';
-            }
-
-            if (chartCanvas && analyticsData) {
-                 try {
-                    const ctx = chartCanvas.getContext('2d');
-                    if (state.driverChart) state.driverChart.destroy();
-                    state.driverChart = new Chart(ctx, { /* ... chart config ... */ });
-                 } catch (chartError) { log("Failed to update chart:", 'error', chartError); }
-            } else if (chartCanvas) { /* ... clear chart ... */ }
-            log("Dashboard UI updated.");
-        }
-
-        function updateSchedulerUI() {
-            log("Updating scheduler UI...");
-            const scheduler = document.getElementById('scheduler');
-            if (!scheduler) return;
-            const unassigned = state.allTodayOrders.filter(o => !o.driverId);
-            let html = `<div class="scheduler-column"><h3>ממתינות (${unassigned.length})</h3><ul class="order-pool" data-driver-id="unassigned">${unassigned.map(createScheduleCard).join('')}</ul></div>`;
-            state.drivers.filter(d => d.status === 'פעיל').forEach(driver => {
-                const driverOrders = state.allTodayOrders.filter(o => o.driverId === driver.driverId);
-                html += `<div class="scheduler-column"><h3>${driver.name} (${driverOrders.length})</h3><ul class="driver-lane" data-driver-id="${driver.driverId}">${driverOrders.map(createScheduleCard).join('')}</ul></div>`;
+                // קביעת צבע סמן לפי סטטוס
+                let iconUrl;
+                if (order.status === 'שויך') {
+                    iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png'; // צהוב
+                } else if (order.status === 'בדרך') {
+                    iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png'; // ירוק
+                } else {
+                    iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png'; // אפור (חדש)
+                }
+                
+                createOrUpdateMarker(
+                    order.orderId,
+                    order.latitude,
+                    order.longitude,
+                    popupContent,
+                    orderMarkers,
+                    iconUrl
+                );
             });
-            scheduler.innerHTML = html;
-            initSortable();
-             log("Scheduler UI updated.");
-        }
-
-        function updateSettingsUI(syncData) {
-            log("Updating settings UI...");
-            const lastSyncEl = document.getElementById('last-sync-time');
-            const errorCountEl = document.getElementById('error-count');
-            if (lastSyncEl) lastSyncEl.textContent = syncData?.lastEmailSync || 'N/A';
-            if (errorCountEl) errorCountEl.textContent = syncData?.errorCount ?? 'N/A';
-            log("Settings UI updated.");
-        }
-
-        // --- Event Handlers & Helpers ---
-        function initSortable() {
-            document.querySelectorAll('.order-pool, .driver-lane').forEach(lane => {
-                 if (lane && typeof Sortable !== 'undefined') {
-                    new Sortable(lane, { group: 'shared', animation: 150, onEnd: handleDragEnd });
-                 }
+            
+            // הסרת סמני הזמנות שכבר לא רלוונטיות
+            Object.keys(orderMarkers).forEach(orderId => {
+                if (!activeOrderIds.includes(String(orderId))) { // המרה ל-string ליתר ביטחון
+                    removeMarker(orderId, orderMarkers);
+                }
             });
-        }
-
-        async function handleDragEnd(event) {
-            // ... implementation ...
-        }
-
-        function populateCustomerDatalist(customers) {
-            // ... implementation ...
-        }
-
-        function handleCustomerSelection(event) {
-            // ... implementation ...
-        }
-
-        async function handleCreateOrder(e) {
-            // ... implementation ...
-        }
-
-        function createScheduleCard(order) {
-            // ... implementation ...
         }
         
-        async function openModal(type, id) {
-             const modalContainer = document.getElementById('modal-container');
-             // ... full implementation from v28.5 ...
+        // --- לוגיקת סידור (Scheduler) ---
+        
+        function buildSchedulerUI(drivers, orders) {
+            const container = document.getElementById('scheduler-container');
+            
+            // ניקוי עמודות נהגים קיימות (שמירה על עמודת "ממתינות")
+            container.querySelectorAll('.driver-column').forEach(col => col.remove());
+            
+            // ניקוי רשימת ממתינות
+            const unassignedList = document.getElementById('unassigned-list');
+            unassignedList.innerHTML = '';
+
+            // יצירת עמודות לנהגים
+            drivers.forEach(driver => {
+                const driverCol = document.createElement('div');
+                driverCol.className = 'driver-column';
+                driverCol.dataset.driverId = driver.driverId;
+                driverCol.innerHTML = `
+                    <div class="column-header">${driver.name} (${driver.vehicleType})</div>
+                    <div class="order-list" id="list-driver-${driver.driverId}"></div>
+                `;
+                container.appendChild(driverCol);
+            });
+            
+            // מיון הזמנות
+            orders.forEach(order => {
+                const card = createOrderCard(order);
+                if (order.driverId && container.querySelector(`#list-driver-${order.driverId}`)) {
+                    // הזמנה משויכת
+                    container.querySelector(`#list-driver-${order.driverId}`).appendChild(card);
+                } else {
+                    // הזמנה לא משויכת
+                    unassignedList.appendChild(card);
+                }
+            });
+            
+            // הפעלת גרירה
+            setupDragAndDrop();
+        }
+        
+        function createOrderCard(order) {
+            const card = document.createElement('div');
+            card.className = 'order-card';
+            card.id = `order-${order.orderId}`;
+            card.dataset.orderId = order.orderId;
+            card.draggable = true;
+            card.innerHTML = `
+                <strong>${order.customerName}</strong><br>
+                <small>${order.address}</small><br>
+                <small>סטטוס: ${order.status} | סוג: ${order.deliveryType}</small>
+            `;
+            return card;
         }
 
-        async function handleCommentSubmit(event, orderId) { 
-             // ... full implementation ... 
-        }
+        function setupDragAndDrop() {
+            const cards = document.querySelectorAll('.order-card');
+            const lists = document.querySelectorAll('.order-list');
+            let draggedCard = null;
 
-        // v28.6 FIX: Restore showToast function
-        function showToast(message, type = 'info') {
-            log(`Toast: ${message} (Type: ${type})`);
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-            const toast = document.createElement('div');
-            let bgColor;
-            switch(type) {
-                case 'success': bgColor = 'var(--success)'; break;
-                case 'error': bgColor = 'var(--danger)'; break;
-                default: bgColor = 'var(--primary-color)'; break;
-            }
-            toast.style.backgroundColor = bgColor;
-            toast.style.color = 'white';
-            toast.style.padding = '10px 20px';
-            toast.style.borderRadius = '8px';
-            toast.style.marginBottom = '10px';
-            toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-            toast.textContent = message;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 5000);
+            cards.forEach(card => {
+                card.addEventListener('dragstart', (e) => {
+                    draggedCard = card;
+                    setTimeout(() => card.classList.add('order-card-dragging'), 0);
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                
+                card.addEventListener('dragend', () => {
+                    if (draggedCard) {
+                        draggedCard.classList.remove('order-card-dragging');
+                        draggedCard = null;
+                    }
+                });
+            });
+            
+            lists.forEach(list => {
+                list.addEventListener('dragover', (e) => {
+                    e.preventDefault(); // הכרחי לאפשר drop
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                
+                list.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (draggedCard) {
+                        const targetList = e.currentTarget;
+                        const targetColumn = targetList.closest('.driver-column, .unassigned-column');
+                        const newDriverId = targetColumn.dataset.driverId;
+                        const orderId = draggedCard.dataset.orderId;
+                        
+                        // הוספה ויזואלית
+                        targetList.appendChild(draggedCard);
+                        
+                        // קריאה לשרת לעדכון השיוך
+                        assignOrder(orderId, newDriverId);
+                    }
+                });
+            });
         }
-
+        
+        function assignOrder(orderId, driverId) {
+            // 'null' מה-DOM מגיע כסטרינג, השרת מצפה ל-null אמיתי או ID
+            const targetDriverId = (driverId === 'null' || !driverId) ? null : driverId;
+            
+            console.log(`Assigning ${orderId} to ${targetDriverId}`);
+            
+            runServerScript('assignOrder', { 
+                orderId: orderId, 
+                driverId: targetDriverId,
+                index: 0 // (לא ממומש כרגע)
+            }, 'POST')
+            .then(() => {
+                console.log(`Order ${orderId} assigned successfully.`);
+                // רענון קטן לסטטוס בכרטיס (אופציונלי)
+                const card = document.getElementById(`order-${orderId}`);
+                if (card) {
+                    const statusEl = card.querySelector('small'); // מציאת האלמנט
+                    if (statusEl) {
+                         // עדכון גס, אפשר לשפר
+                         statusEl.innerHTML = statusEl.innerHTML.replace(/סטטוס: [^|]+/, `סטטוס: ${targetDriverId ? 'שויך' : 'ממתין'}`);
+                    }
+                }
+            })
+            .catch(err => {
+                alert(`שגיאה בשיוך הזמנה: ${err.message}`);
+                // שחזור מיקום הכרטיס (דורש לוגיקה מורכבת יותר)
+                loadScheduler(); // הפתרון הפשוט - טעינה מחדש
+            });
+        }
+        
     </script>
 </body>
 </html>
-
