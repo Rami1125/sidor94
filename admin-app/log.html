@@ -2,677 +2,578 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DeliveryMaster Admin v29.4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - מרכז בקרה</title>
     
-    <!-- v29.3: הוספת Leaflet.js -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-     crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-     crossorigin=""></script>
-
-    <!-- v29.3: סקריפט זיהוי מובייל/דסקטופ -->
-    <script>
-        (function() {
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            document.documentElement.className = isMobile ? 'mobile' : 'desktop';
-        })();
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        /* ... (כל ה-CSS מ-v29.3 נשאר זהה) ... */
         :root {
-            --bg-color: #f0f2f5;
-            --sidebar-bg: #ffffff;
-            --header-bg: #ffffff;
-            --text-color: #333;
             --primary-color: #007bff;
-            --border-color: #dee2e6;
-            --shadow: 0 2px 8px rgba(0,0,0,0.1);
+            --secondary-color: #6c757d;
+            --background-color: #f8f9fa;
+            --text-color: #343a40;
+            --white: #ffffff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
         }
+        body { font-family: 'Rubik', sans-serif; background-color: var(--background-color); margin: 0; padding: 20px; color: var(--text-color); }
+        .container { max-width: 1800px; margin: 0 auto; }
+        .header-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { text-align: center; color: var(--primary-color); flex-grow: 1; }
+        h2 { text-align: center; margin-bottom: 20px; color: var(--primary-color); }
+        .main-layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
+        .card { background: var(--white); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--shadow); margin-bottom: 20px; }
+        #liveMap { height: 400px; width: 100%; border-radius: var(--border-radius); border: 1px solid #ddd; z-index: 5; }
+        .scheduler-container { display: grid; grid-template-columns: 250px repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; min-height: 400px; }
+        .scheduler-column { background-color: #f0f3f5; border-radius: var(--border-radius); padding: 15px; display: flex; flex-direction: column; }
+        .scheduler-column h3 { text-align: center; padding-bottom: 10px; border-bottom: 2px solid var(--primary-color); margin-bottom: 15px; position: sticky; top: 0; background-color: #f0f3f5; z-index: 10;}
+        .order-pool, .driver-lane { min-height: 300px; list-style-type: none; padding: 0; flex-grow: 1; overflow-y: auto; max-height: 60vh; }
+        .schedule-card { 
+            background: var(--white); padding: 10px 15px; border-radius: 5px; 
+            margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            cursor: grab; border-right: 4px solid var(--secondary-color);
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .schedule-card.placeholder { border-right-color: var(--warning); background-color: #fffaf0; }
+        .card-main-content { display: flex; justify-content: space-between; align-items: center; width: 100%;}
+        .schedule-card-details p { margin: 2px 0; font-size: 0.9em; }
+        .schedule-card-details .card-customer { font-weight: 500; font-size: 1em; }
+        .card-actions { display: flex; align-items: center; gap: 5px; }
+        .action-button { background: none; border: none; font-size: 1.2rem; color: var(--secondary-color); cursor: pointer; padding: 5px;}
+        .action-button:hover { color: var(--primary-color); }
+        .ghost-card { background: #cce5ff; opacity: 0.7; border: 2px dashed var(--primary-color); }
+        .form-group { margin-bottom: 15px; position: relative; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ced4da; font-family: 'Rubik', sans-serif; box-sizing: border-box; }
+        .address-group { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+        button { background-color: var(--primary-color); color: var(--white); border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-size: 1em; width: 100%; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 1000px; border-radius: var(--border-radius); max-height: 80vh; display: flex; flex-direction: column;}
+        .close-button { color: #aaa; float: left; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+        .table-container { overflow-y: auto; flex-grow: 1; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; }
+        th { background-color: #f2f2f2; }
+        .sync-buttons button { margin-bottom: 10px; }
+        .finalize-section { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; }
+        .finalize-section h4 { margin: 0; font-size: 0.95em; color: var(--warning); text-align: center; font-weight: bold;}
+        .finalize-input-group { display: flex; gap: 10px; }
+        .finalize-input-group input { flex-grow: 1; }
+        .finalize-input-group button { width: auto; font-size: 0.9em; padding: 8px 12px; }
         
-        html, body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-            color: var(--text-color);
-            direction: rtl;
-        }
-        
-        #app-container {
-            display: flex;
-            min-height: 100vh;
-        }
-        #sidebar {
-            width: 240px;
-            background: var(--sidebar-bg);
-            border-left: 1px solid var(--border-color);
-            box-shadow: var(--shadow);
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            box-sizing: border-box;
-            transition: width 0.3s ease;
-        }
-        #sidebar h1 {
-            font-size: 1.5rem;
-            color: var(--primary-color);
-            margin: 0 0 20px 0;
-            text-align: center;
-        }
-        #sidebar nav ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        #sidebar nav li {
-            padding: 12px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.2s ease, color 0.2s ease;
-        }
-        #sidebar nav li:hover, #sidebar nav li.active {
-            background-color: #f0f2f5;
-            color: var(--primary-color);
-            font-weight: 600;
-        }
-        #main-content {
-            flex-grow: 1;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        header {
-            background: var(--header-bg);
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: var(--shadow);
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .tab-content {
-            display: none;
-            background: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: var(--shadow);
-        }
-        .tab-content.active {
-            display: block;
-        }
-        button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            transition: background-color 0.2s ease;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        input[type="date"], input[type="text"] {
-            padding: 8px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 0.9rem;
-        }
-        #map {
-            height: 500px;
-            width: 100%;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            background-color: #eee;
-        }
-        .leaflet-container {
-            border-radius: 8px;
-        }
-        #scheduler-container {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding: 10px 0;
-            min-height: 400px;
-        }
-        .driver-column, .unassigned-column {
-            flex: 1;
-            min-width: 250px;
-            background: #f9f9f9;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-        }
-        .column-header {
-            padding: 10px;
-            font-weight: 600;
-            background: #f0f0f0;
-            border-bottom: 1px solid var(--border-color);
-            text-align: center;
-        }
-        .order-list {
-            padding: 10px;
-            min-height: 350px;
-        }
-        .order-card {
-            background: #ffffff;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 8px;
-            cursor: grab;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .order-card:active {
-            cursor: grabbing;
-            background: #fefefe;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
-        }
-        .order-card-dragging {
-            opacity: 0.5;
-            transform: rotate(3deg);
-        }
-        #loading-spinner {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            z-index: 10000;
-            font-weight: 500;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            display: none;
-        }
-        .desktop #app-container {
-            flex-direction: row;
-        }
-        .mobile #app-container {
-            flex-direction: column;
-        }
-        .mobile #sidebar {
-            width: 100%;
-            height: auto;
-            position: relative;
-            box-shadow: none;
-            border-left: none;
-            border-bottom: 1px solid var(--border-color);
-            padding: 10px;
-            flex-direction: row;
-            overflow-x: auto;
-            white-space: nowrap;
-        }
-        .mobile #sidebar h1 {
-            display: none;
-        }
-        .mobile #sidebar nav ul {
-            display: flex;
-            gap: 10px;
-        }
-         .mobile #sidebar nav li {
-            padding: 8px 12px;
-         }
-        .mobile #main-content {
-            padding: 10px;
-        }
-        .mobile header {
-            padding: 10px;
-            margin-bottom: 10px;
-        }
-        .mobile .tab-content {
-            padding: 10px;
-        }
-        .mobile #map {
-            height: 300px;
-        }
-        .mobile #scheduler-container {
-            flex-direction: column;
-        }
-        .mobile .driver-column, .mobile .unassigned-column {
-            min-width: 100%;
-        }
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { padding: 15px 20px; border-radius: var(--border-radius); color: var(--white); box-shadow: var(--shadow); opacity: 0; transform: translateX(100%); transition: all 0.5s ease; font-size: 1.1em;}
+        .toast.show { opacity: 1; transform: translateX(0); }
+        .toast-success { background-color: var(--success); }
+        .toast-error { background-color: var(--danger); }
+        .toast-info { background-color: var(--info); }
     </style>
 </head>
-<body class="">
+<body>
 
-    <div id="loading-spinner">טוען...</div>
+    <div id="toast-container"></div>
 
-    <div id="app-container">
-        <!-- סרגל צד -->
-        <aside id="sidebar">
-            <h1>DeliveryMaster</h1>
-            <nav>
-                <ul>
-                    <li class="tab-link active" data-tab="dashboard-tab">מפה חיה</li>
-                    <li class="tab-link" data-tab="scheduler-tab">סידור עבודה</li>
-                    <li class="tab-link" data-tab="orders-tab">הזמנות</li>
-                    <li class="tab-link" data-tab="drivers-tab">נהגים</li>
-                    <li class="tab-link" data-tab="reports-tab">דוחות</li>
-                </ul>
-            </nav>
-        </aside>
-
-        <!-- תוכן ראשי -->
-        <main id="main-content">
-            <header>
-                <h2 id="header-title">מפה חיה</h2>
-                <div id="header-actions">
-                    <input type="date" id="scheduler-date" title="בחר תאריך לסידור">
-                    <button onclick="loadScheduler()">טען סידור</button>
+    <div class="container">
+         <div class="header-title">
+             <h1><i class="fas fa-tachometer-alt"></i> DeliveryMaster - מרכז בקרה</h1>
+        </div>
+        <div class="main-layout">
+            <div class="left-panel">
+                <div class="card">
+                    <h2><i class="fas fa-calendar-alt"></i> לוח שיבוצים חי</h2>
+                    <div id="scheduler" class="scheduler-container"></div>
                 </div>
-            </header>
-
-            <!-- Tab: Dashboard (Live Map) -->
-            <div id="dashboard-tab" class="tab-content active">
-                <div id="map"></div>
+                <div class="card">
+                    <h2><i class="fas fa-map-marked-alt"></i> מפה טקטית חיה</h2>
+                    <div id="liveMap"></div>
+                </div>
             </div>
-            
-            <!-- Tab: Scheduler -->
-            <div id="scheduler-tab" class="tab-content">
-                <div id="scheduler-controls">
-                </div>
-                <div id="scheduler-container">
-                    <div class="unassigned-column" id="unassigned-column" data-driver-id="null">
-                        <div class="column-header">הזמנות ממתינות לשיבוץ</div>
-                        <div class="order-list" id="unassigned-list">
+            <div class="right-panel">
+                <div class="card">
+                    <h2><i class="fas fa-plus-circle"></i> יצירת הזמנה חדשה</h2>
+                    <form id="createOrderForm" autocomplete="off">
+                        <div class="form-group">
+                            <label for="customerId">מספר לקוח (מ-COMAX)</label>
+                            <input type="text" id="customerId" required>
                         </div>
+                        <div class="form-group">
+                            <label for="customerName">שם לקוח</label>
+                            <input type="text" id="customerName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="contactPerson">איש קשר</label>
+                            <input type="text" id="contactPerson">
+                        </div>
+                        <div class="form-group"><label for="customerPhone">טלפון</label><input type="tel" id="customerPhone" required></div>
+                        <div class="form-group"><label for="city">עיר</label><select id="city" required></select></div>
+                        <div class="form-group address-group">
+                            <div><label for="street">רחוב</label><input type="text" id="street" required></div>
+                            <div><label for="houseNumber">מספר</label><input type="text" id="houseNumber" required></div>
+                        </div>
+                        <div class="form-group"><label for="deliveryType">סוג הובלה</label><select id="deliveryType"></select></div>
+                        <button type="submit">צור הזמנת ביניים</button>
+                    </form>
+                </div>
+                 <div class="card">
+                    <h2><i class="fas fa-sync-alt"></i> סנכרון מערכת</h2>
+                    <div class="sync-buttons">
+                        <button id="fullSyncBtn"><i class="fas fa-cloud-download-alt"></i> סנכרון מלא מקומקס</button>
+                        <button id="unlinkedDocsBtn" style="background-color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> דוח מסמכים ללא שיוך</button>
                     </div>
                 </div>
+                <div class="card">
+                    <h2><i class="fas fa-chart-line"></i> דוחות וביצועים</h2>
+                    <button id="showAnalyticsBtn" style="width: 100%; background-color: var(--success);"><i class="fas fa-chart-bar"></i> הצג דאשבורד</button>
+                </div>
+                <div class="card">
+                    <h2><i class="fas fa-history"></i> ארכיון</h2>
+                    <button id="showHistoryBtn" style="width: 100%; margin-bottom: 10px;"><i class="fas fa-history"></i> היסטוריית הזמנות</button>
+                    <button id="showLogsBtn" style="width: 100%; background-color: var(--info);"><i class="fas fa-clipboard-list"></i> תיעוד צפיות</button>
+                </div>
             </div>
-            
-            <!-- Tab: Orders -->
-            <div id="orders-tab" class="tab-content">
-                <h2>ניהול הזמנות (מלא)</h2>
-            </div>
-            
-            <!-- Tab: Drivers -->
-            <div id="drivers-tab" class="tab-content">
-                <h2>ניהול נהגים</h2>
-            </div>
-            
-            <!-- Tab: Reports -->
-            <div id="reports-tab" class="tab-content">
-                <h2>דוחות וניתוחים</h2>
-            </div>
-        </main>
+        </div>
     </div>
+    
+    <div id="historyModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>היסטוריית הזמנות</h2><div id="historyContent" class="table-container"></div></div></div>
+    <div id="analyticsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוחות וביצועים</h2><div id="analyticsContent"></div></div></div>
+    <div id="logsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תיעוד צפיות במסמכים</h2><div id="logsContent" class="table-container"></div></div></div>
+    <div id="pdfModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>תצוגת מסמך</h2><iframe id="pdfViewer" style="width:100%; height: 70vh; border:none;"></iframe></div></div>
+    <div id="commentsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>הערות להזמנה</h2><div id="commentsContent"></div></div></div>
+    <div id="unlinkedDocsModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h2>דוח מסמכים ללא שיוך</h2><div id="unlinkedDocsContent" class="table-container"></div></div></div>
 
 
     <script>
-        // --- v29.3: הגדרות מפה גלובליות (Leaflet) ---
-        var map;
-        var driverMarkers = {};
-        var orderMarkers = {};
-        var osmStreetLayer, esriSatelliteLayer;
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzPl-UH4hgX47FJZ-O2y7CTDU026hIzEntVDuGnSviWV1mY33as18nWyMxj7znCQA/exec';
+        const API_VERSION = "22.0";
 
-        // --- v29.3: פונקציות עזר של המפה ---
-        
-        function createOrUpdateMarker(id, lat, lng, popupContent, markerStorage, iconUrl = null) {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            if (!map || !lat || !lng) {
-                console.warn(`Skipping marker create/update for ${id}: Invalid map or location.`);
-                return; 
-            }
-            var latLng = [lat, lng];
-            var customIcon = null;
-            if (iconUrl) {
-                customIcon = L.icon({
-                    iconUrl: iconUrl,
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34]
-                });
-            }
-            if (markerStorage[id]) {
-                markerStorage[id].setLatLng(latLng);
-                markerStorage[id].bindPopup(popupContent);
-                if (customIcon) {
-                    markerStorage[id].setIcon(customIcon);
-                }
-            } else {
-                var markerOptions = customIcon ? { icon: customIcon } : {};
-                markerStorage[id] = L.marker(latLng, markerOptions)
-                    .addTo(map)
-                    .bindPopup(popupContent);
-            }
+        let liveMap, driverMarkers = {}, orderMarkersLayer = L.layerGroup(), allTodayOrders = [];
+        const currentUser = 'Admin';
+        const currentRole = 'Administrator';
+        const deliveryTypes = ["הובלת משאית", "הובלת מנוף", "הובלת מנוף 15 מטר", "משיכה עצמית", "מוביל חיצוני", "איסוף בלות פסולת", "גישה לאתר+עבודת מנוף", "עבודת מנוף"];
+        const cities = ["תל אביב-יפו", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה", "בני ברק", "באר שבע", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה", "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "רעננה", "רמלה", "גבעתיים", "הוד השרון"];
+
+        // --- UTILITY FUNCTIONS ---
+        function logEvent(message, type = 'info', data = '') {
+             const style = `color:${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'}; font-weight: bold;`;
+             console.log(`%c[${new Date().toLocaleTimeString('he-IL')}] [${type.toUpperCase()}]`, style, message, data);
         }
 
-        function removeMarker(id, markerStorage) {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            if (markerStorage[id]) {
-                try {
-                    map.removeLayer(markerStorage[id]);
-                } catch(e) {
-                    console.error(`Error removing marker ${id}: ${e.message}`);
-                }
-                delete markerStorage[id];
-            }
+        function showToast(message, type = 'info', duration = 4000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('show'), 100);
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 500);
+            }, duration);
         }
 
-        function initMap() {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            if (document.getElementById('map') && !map) {
-                osmStreetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                });
-                esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                    attribution: 'Tiles © <a href="https://www.esri.com/">Esri</a>'
-                });
-                map = L.map('map', {
-                    center: [31.7683, 35.2137],
-                    zoom: 8,
-                    layers: [osmStreetLayer]
-                });
-                var baseLayers = {
-                    "מפת רחובות (עברית)": osmStreetLayer,
-                    "תצוגת לווין": esriSatelliteLayer
-                };
-                L.control.layers(baseLayers).addTo(map);
-                console.log('Leaflet Map Initialized (v29.4)');
-                loadLiveMapData();
+        async function apiFetch(action, params = {}, method = 'GET', body = null) {
+            const url = new URL(API_URL);
+            if (method === 'GET') {
+                url.searchParams.append('action', action);
+                Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
             }
-        }
-        
-        // --- v29.4: שדרוג תקשורת שרת ל-Fetch ---
-
-        function showLoading() { document.getElementById('loading-spinner').style.display = 'block'; }
-        function hideLoading() { document.getElementById('loading-spinner').style.display = 'none'; }
-        
-        /**
-         * v29.4: פונקציית תקשורת מבוססת fetch לאתר חיצוני
-         * מחליפה את google.script.run
-         */
-        function runServerScript(action, params = {}, method = 'GET') {
-            showLoading();
-
-            // v29.4: כתובת שרת קבועה (החלף בכתובת ה-exec שלך)
-            const SERVER_URL = "https://script.google.com/macros/s/AKfycbydcJnRqEUH821BnZa8Q131Z_a-VGXefpWlsXLMJEv8b1zFVHuDafo3JlbDcCf5Z3CkvQ/exec";
-            
-            let url = SERVER_URL;
-            let options = {
-                method: method,
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // מומלץ ל-Apps Script
-                mode: 'cors',
-            };
-
+            const options = { method, mode: 'cors', headers: {} };
             if (method === 'POST') {
-                // ב-POST, ה-action והפרמטרים נשלחים ב-body
-                options.body = JSON.stringify({ action, ...params });
-            } else { // GET
-                // ב-GET, ה-action והפרמטרים נשלחים כ-query params
-                const queryParams = new URLSearchParams({ action, ...params });
-                url += `?${queryParams.toString()}`;
+                options.body = JSON.stringify({ action, data: body });
+                options.headers['Content-Type'] = 'text/plain;charset=UTF-8';
             }
+            const response = await fetch(url, options);
+            if (!response.ok) throw new Error(`Network error for action: ${action}`);
+            const result = await response.json();
+            if (result.status !== 'success') throw new Error(result.message);
+            return result.data;
+        }
+        
+        // --- CORE APPLICATION LOGIC ---
+        async function buildScheduler() {
+            logEvent("Building scheduler...");
+            document.getElementById('scheduler').innerHTML = '<p>טוען נתונים...</p>';
+            try {
+                const [drivers, orders] = await Promise.all([
+                    apiFetch('getDrivers'),
+                    apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] })
+                ]);
+                logEvent("Driver and order data fetched.", "success", orders);
+                
+                allTodayOrders = orders;
+                const unassignedOrders = allTodayOrders.filter(o => !o.driverId);
+                let schedulerHTML = `<div class="scheduler-column"><h3>ממתינות (${unassignedOrders.length})</h3><ul class="order-pool" data-driver-id="unassigned">${unassignedOrders.map(createScheduleCard).join('')}</ul></div>`;
+                
+                drivers.filter(d => d.status === 'פעיל').forEach(driver => {
+                    const driverOrders = allTodayOrders.filter(o => o.driverId === driver.driverId);
+                    schedulerHTML += `<div class="scheduler-column"><h3>${driver.name} (${driverOrders.length})</h3><ul class="driver-lane" data-driver-id="${driver.driverId}">${driverOrders.map(createScheduleCard).join('')}</ul></div>`;
+                });
+                
+                document.getElementById('scheduler').innerHTML = schedulerHTML;
+                initSortable();
+                logEvent("Scheduler layout built.", "success");
+            } catch (error) {
+                logEvent(`Failed to build scheduler: ${error.message}`, "error");
+                document.getElementById('scheduler').innerHTML = `<p style="color:red;">שגיאה בטעינת לוח השיבוצים: ${error.message}</p>`;
+            }
+        }
 
-            return new Promise((resolve, reject) => {
-                fetch(url, options)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Server returned status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        hideLoading();
-                        // הנחת מבנה התגובה של Code.gs
-                        if (data && data.status === 'success') {
-                            resolve(data.data);
-                        } else {
-                            reject(new Error(data.message || 'Unknown server error'));
-                        }
-                    })
-                    .catch(error => {
-                        hideLoading();
-                        console.error('Fetch Error:', error.message, error);
-                        reject(error);
-                    });
+        function initSortable() {
+            document.querySelectorAll('.order-pool, .driver-lane').forEach(lane => {
+                new Sortable(lane, { 
+                    group: { name: 'shared', pull: (sortable, store, dragEl) => !dragEl.classList.contains('placeholder') }, 
+                    animation: 150, 
+                    ghostClass: 'ghost-card', 
+                    onEnd: handleDragEnd 
+                });
             });
         }
         
-        // --- פונקציית הטעינה הראשית (ללא שינוי) ---
-        document.addEventListener("DOMContentLoaded", () => {
-            if (document.getElementById('dashboard-tab').classList.contains('active')) {
-                initMap();
+        async function handleDragEnd(event) {
+            const internalId = event.item.dataset.internalId;
+            const newDriverId = event.to.dataset.driverId === 'unassigned' ? '' : event.to.dataset.driverId;
+            logEvent(`Order ${internalId} moved to driver ${newDriverId}.`);
+            
+            document.querySelectorAll('.scheduler-column h3').forEach(h3 => {
+                const count = h3.nextElementSibling.children.length;
+                h3.textContent = `${h3.textContent.split('(')[0].trim()} (${count})`;
+            });
+
+            try {
+                const order = allTodayOrders.find(o => o.internalId === internalId);
+                if (!order || !order.orderId) {
+                    logEvent(`Cannot update driver for placeholder order ${internalId}`, 'warning');
+                    buildScheduler();
+                    return;
+                }
+                
+                await apiFetch('updateOrder', {}, 'POST', { orderId: order.orderId, updates: { driverId: newDriverId, status: newDriverId ? 'שויך' : 'חדש' } });
+                logEvent(`Update for order ${order.orderId} successful.`, 'success');
+                allTodayOrders = await apiFetch('getOrders', { date: new Date().toISOString().split('T')[0] });
+                updateMap();
+            } catch (error) {
+                logEvent(`Failed to update order: ${error.message}`, "error");
+                buildScheduler();
             }
-            const dateInput = document.getElementById('scheduler-date');
-            if (dateInput) {
-                dateInput.valueAsDate = new Date();
+        }
+
+        function initializeMap() {
+            try {
+                liveMap = L.map('liveMap').setView([32.0853, 34.7818], 9);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveMap);
+                orderMarkersLayer.addTo(liveMap);
+                logEvent("Map initialized.", "success");
+            } catch (e) {
+                logEvent(`Map initialization failed: ${e.message}`, 'error');
             }
-            loadScheduler();
-            setupTabs();
-            setInterval(loadLiveMapData, 60000);
-        });
+        }
         
-        // --- שאר פונקציות האפליקציה (ללא שינוי מ-v29.3) ---
-        
-        function setupTabs() {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            const tabLinks = document.querySelectorAll('.tab-link');
-            tabLinks.forEach(link => {
-                link.addEventListener('click', () => {
-                    const tabId = link.getAttribute('data-tab');
-                    document.getElementById('header-title').innerText = link.innerText;
-                    tabLinks.forEach(l => l.classList.remove('active'));
-                    link.classList.add('active');
-                    document.querySelectorAll('.tab-content').forEach(tab => {
-                        tab.classList.remove('active');
-                    });
-                    document.getElementById(tabId).classList.add('active');
-                    if (tabId === 'dashboard-tab') {
-                        initMap();
-                        if(map) {
-                            setTimeout(() => map.invalidateSize(), 10);
-                        }
+        async function updateMap() {
+            logEvent("Updating map...");
+            if (!liveMap) return;
+            try {
+                const { drivers, orders } = await apiFetch('getLiveMapData');
+                Object.values(driverMarkers).forEach(m => m.remove());
+                orderMarkersLayer.clearLayers();
+                drivers.forEach(d => {
+                    if (d.location?.latitude) {
+                        driverMarkers[d.driverId] = L.marker([d.location.latitude, d.location.longitude]).addTo(liveMap).bindPopup(`<b>${d.name}</b>`);
                     }
                 });
-            });
+                orders.forEach(o => {
+                    if (o.latitude && o.status !== 'הושלם') {
+                       const iconUrl = (!o.driverId) 
+                           ? 'https://cdn-icons-png.flaticon.com/512/1048/1048948.png'
+                           : 'https://cdn-icons-png.flaticon.com/512/3405/3405255.png';
+                       L.marker([o.latitude, o.longitude], { icon: L.icon({ iconUrl, iconSize: [32, 32] }) })
+                           .addTo(orderMarkersLayer).bindPopup(`<b>${o.customerName}</b><br>שויך ל: ${o.driverId || 'טרם'}`);
+                    }
+                });
+                logEvent("Map updated.", "success");
+            } catch (error) {
+                logEvent(`Failed to update map: ${error.message}`, "error");
+            }
         }
+        
+        async function handleCreateOrder(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true; btn.textContent = 'יוצר...';
+            
+            const orderData = {
+                customerId: document.getElementById('customerId').value,
+                customerName: document.getElementById('customerName').value,
+                contactPerson: document.getElementById('contactPerson').value,
+                customerPhone: document.getElementById('customerPhone').value,
+                city: document.getElementById('city').value,
+                street: document.getElementById('street').value,
+                houseNumber: document.getElementById('houseNumber').value,
+                deliveryType: document.getElementById('deliveryType').value
+            };
+            logEvent(`Creating order placeholder...`, 'info', orderData);
 
-        function loadScheduler() {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            const date = document.getElementById('scheduler-date').value;
-            if (!date) {
-                alert('יש לבחור תאריך');
+            try {
+                 await apiFetch('createOrder', {}, 'POST', orderData);
+                logEvent('New order placeholder created successfully.', 'success');
+                showToast('הזמנת ביניים נוצרה בהצלחה!', 'success');
+                document.getElementById('createOrderForm').reset();
+                setTimeout(() => { buildScheduler(); updateMap(); }, 800);
+            } catch(error) {
+                logEvent(`Error creating order placeholder: ${error.message}`, 'error');
+                showToast(`שגיאה ביצירת הזמנה: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = 'צור הזמנת ביניים';
+            }
+        }
+        
+        async function handleSaveOrderId(internalId) {
+            const input = document.getElementById(`finalize-input-${internalId}`);
+            const finalOrderId = input.value.trim();
+            if (!finalOrderId) {
+                showToast("אנא הזן מספר הזמנה.", 'error');
                 return;
             }
-            Promise.all([
-                runServerScript('getDrivers', {}, 'GET'),
-                runServerScript('getOrders', { date: date }, 'GET')
-            ]).then(([drivers, orders]) => {
-                buildSchedulerUI(drivers, orders);
-                displayOrdersOnMap(orders);
-            }).catch(err => {
-                console.error('Error loading scheduler:', err);
-                alert('שגיאה בטעינת הסידור: ' + err.message);
-            });
-        }
 
-        function loadLiveMapData() {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            if (document.getElementById('dashboard-tab').classList.contains('active') && map) {
-                console.log('Refreshing live map data...');
-                runServerScript('getLiveMapData', {}, 'GET')
-                    .then(data => {
-                        updateDriverMarkers(data.drivers);
-                        displayOrdersOnMap(data.orders);
-                    })
-                    .catch(err => console.error('Failed to load map data:', err.message));
+            const btn = input.nextElementSibling;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                await apiFetch('finalizeOrder', {}, 'POST', { internalId, finalOrderId });
+                logEvent(`Order ${internalId} finalized with ID ${finalOrderId}`, 'success');
+                showToast('מספר ההזמנה נשמר בהצלחה!', 'success');
+                await buildScheduler();
+            } catch (error) {
+                logEvent(`Failed to finalize order ${internalId}: ${error.message}`, 'error');
+                showToast(`שגיאה בשמירת מספר הזמנה: ${error.message}`, 'error');
+                btn.disabled = false;
+                btn.textContent = 'שמור';
             }
         }
 
-        function updateDriverMarkers(drivers) {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            if (!map) return;
-            const activeDriverIds = [];
-            drivers.forEach(driver => {
-                if (driver.location && driver.location.latitude && driver.location.longitude) {
-                    activeDriverIds.push(driver.driverId);
-                    const lastUpdate = driver.location.lastUpdate ? new Date(driver.location.lastUpdate).toLocaleTimeString('he-IL') : 'אין';
-                    const popupContent = `<b>${driver.name}</b><br>רכב: ${driver.vehicleType || 'לא ידוע'}<br>עדכון אחרון: ${lastUpdate}`;
-                    const iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png';
-                    createOrUpdateMarker(
-                        driver.driverId,
-                        driver.location.latitude,
-                        driver.location.longitude,
-                        popupContent,
-                        driverMarkers,
-                        iconUrl
-                    );
-                }
-            });
-            Object.keys(driverMarkers).forEach(driverId => {
-                if (!activeDriverIds.includes(driverId)) {
-                    removeMarker(driverId, driverMarkers);
-                }
-            });
-        }
-        
-        function displayOrdersOnMap(orders) {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            if (!map) return;
-            const activeOrderIds = [];
-            const mapOrders = orders.filter(o => o.latitude && o.longitude && o.status !== 'הושלם' && o.status !== 'מבוטל');
-            mapOrders.forEach(order => {
-                activeOrderIds.push(order.orderId);
-                const popupContent = `<b>הזמנה: ${order.orderId}</b><br>${order.customerName}<br>${order.address}<br>סטטוס: ${order.status}`;
-                let iconUrl;
-                if (order.status === 'שויך') {
-                    iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png';
-                } else if (order.status === 'בדרך') {
-                    iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png';
+        async function handleCustomerIdBlur(event) {
+            const customerId = event.target.value.trim();
+            if (!customerId) return;
+
+            logEvent(`Fetching details for customer ID: ${customerId}`);
+            try {
+                const customerDetails = await apiFetch('getCustomerDetailsById', { customerId });
+                if (customerDetails) {
+                    logEvent('Customer details found', 'success', customerDetails);
+                    document.getElementById('customerName').value = customerDetails.name || '';
+                    document.getElementById('contactPerson').value = customerDetails.contactPerson || '';
+                    document.getElementById('customerPhone').value = customerDetails.phone || '';
+
+                    const address = customerDetails.address || '';
+                    const addressParts = address.split(',');
+                    const city = addressParts.length > 1 ? addressParts[1].trim() : '';
+                    const streetAndNum = addressParts[0] || '';
+                    
+                    const match = streetAndNum.match(/(.*?)\s*([\d/]+.*)$/);
+                    let street = streetAndNum;
+                    let number = '';
+                    if (match) {
+                        street = match[1].trim();
+                        number = match[2].trim();
+                    }
+
+                    document.getElementById('street').value = street;
+                    document.getElementById('houseNumber').value = number;
+                    
+                    const citySelect = document.getElementById('city');
+                    const cityOption = Array.from(citySelect.options).find(opt => opt.value === city);
+                    if (cityOption) citySelect.value = city;
+
                 } else {
-                    iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png';
+                    logEvent(`No existing customer found for ID: ${customerId}. Ready for new customer creation.`, 'info');
+                    document.getElementById('customerName').value = '';
+                    document.getElementById('contactPerson').value = '';
+                    document.getElementById('customerPhone').value = '';
+                    document.getElementById('street').value = '';
+                    document.getElementById('houseNumber').value = '';
                 }
-                createOrUpdateMarker(
-                    order.orderId,
-                    order.latitude,
-                    order.longitude,
-                    popupContent,
-                    orderMarkers,
-                    iconUrl
-                );
-            });
-            Object.keys(orderMarkers).forEach(orderId => {
-                if (!activeOrderIds.includes(String(orderId))) {
-                    removeMarker(orderId, orderMarkers);
-                }
-            });
+            } catch (error) {
+                logEvent(`Error fetching customer details: ${error.message}`, 'error');
+                showToast('שגיאה בשליפת פרטי לקוח.', 'error');
+            }
         }
         
-        function buildSchedulerUI(drivers, orders) {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            const container = document.getElementById('scheduler-container');
-            container.querySelectorAll('.driver-column').forEach(col => col.remove());
-            const unassignedList = document.getElementById('unassigned-list');
-            unassignedList.innerHTML = '';
-            drivers.forEach(driver => {
-                const driverCol = document.createElement('div');
-                driverCol.className = 'driver-column';
-                driverCol.dataset.driverId = driver.driverId;
-                driverCol.innerHTML = `
-                    <div class="column-header">${driver.name} (${driver.vehicleType})</div>
-                    <div class="order-list" id="list-driver-${driver.driverId}"></div>
-                `;
-                container.appendChild(driverCol);
-            });
-            orders.forEach(order => {
-                const card = createOrderCard(order);
-                if (order.driverId && container.querySelector(`#list-driver-${order.driverId}`)) {
-                    container.querySelector(`#list-driver-${order.driverId}`).appendChild(card);
+        async function handleFullSync(event) {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> סנכרון בתהליך...';
+            showToast('מתחיל סנכרון מלא מקומקס...', 'info');
+            try {
+                const result = await apiFetch('runFullComaxSync', {}, 'POST');
+                logEvent('Full sync completed', 'success', result);
+                showToast(result.message, 'success', 6000);
+                await buildScheduler();
+            } catch (error) {
+                logEvent(`Full sync failed: ${error.message}`, 'error');
+                showToast(`שגיאת סנכרון: ${error.message}`, 'error', 6000);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> סנכרון מלא מקומקס';
+            }
+        }
+        
+        // --- MODAL & MISC FUNCTIONS ---
+        function populateDropdowns() {
+            const deliveryTypeSelect = document.getElementById('deliveryType');
+            deliveryTypes.forEach(type => { deliveryTypeSelect.innerHTML += `<option value="${type}">${type}</option>`; });
+            const citySelect = document.getElementById('city');
+            cities.sort().forEach(city => { citySelect.innerHTML += `<option value="${city}">${city}</option>`; });
+        }
+        
+        function openModal(modalId, contentId, loadingMessage) {
+            const modal = document.getElementById(modalId);
+            const content = document.getElementById(contentId || modalId + 'Content');
+            modal.style.display = 'block';
+            if (content && loadingMessage) content.innerHTML = `<p>${loadingMessage}</p>`;
+            return {modal, content};
+        }
+        
+        async function openHistoryModal() {
+            const { content } = openModal('historyModal', 'historyContent', 'טוען היסטוריה...');
+            try {
+                const historyData = await apiFetch('getHistory');
+                if (!historyData || !historyData.length) { content.innerHTML = '<p>לא נמצאו נתוני היסטוריה.</p>'; return; }
+                let tableHTML = `<table><thead><tr><th>תאריך</th><th>לקוח</th><th>סטטוס</th><th>נהג</th></tr></thead><tbody>`;
+                historyData.forEach(record => {
+                    tableHTML += `<tr>
+                        <td>${record.orderDate || 'N/A'}</td>
+                        <td>${record.customerName || 'N/A'}</td>
+                        <td>${record.status || 'N/A'}</td>
+                        <td>${record.driverId || '-'}</td>
+                    </tr>`;
+                });
+                content.innerHTML = tableHTML + `</tbody></table>`;
+            } catch (error) {
+                content.innerHTML = `<p style="color:red;">שגיאה בטעינת ההיסטוריה: ${error.message}</p>`;
+            }
+        }
+        
+        async function openPdfModal(orderId) {
+            if (!orderId || orderId === '-') {
+                alert('אין מזהה הזמנה זמין.');
+                return;
+            }
+            const { modal } = openModal('pdfModal');
+            const pdfViewer = document.getElementById('pdfViewer');
+            pdfViewer.src = 'about:blank';
+            try {
+                const url = await apiFetch('getOrderPDF', { orderId });
+                if (url) {
+                    pdfViewer.src = url;
+                    apiFetch('logPDFView', {}, 'POST', { user: currentUser, role: currentRole, orderId });
                 } else {
-                    unassignedList.appendChild(card);
+                    alert('לא נמצא מסמך PDF עבור הזמנה זו.');
+                    modal.style.display = 'none';
                 }
-            });
-            setupDragAndDrop();
+            } catch (error) {
+                alert('שגיאה בטעינת המסמך: ' + error.message);
+                modal.style.display = 'none';
+            }
         }
         
-        function createOrderCard(order) {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            const card = document.createElement('div');
-            card.className = 'order-card';
-            card.id = `order-${order.orderId}`;
-            card.dataset.orderId = order.orderId;
-            card.draggable = true;
-            card.innerHTML = `
-                <strong>${order.customerName}</strong><br>
-                <small>${order.address}</small><br>
-                <small>סטטוס: ${order.status} | סוג: ${order.deliveryType}</small>
-            `;
-            return card;
+        async function checkApiVersion() {
+            try {
+                const data = await apiFetch('getVersion');
+                logEvent(`API Version confirmed: ${data.version}`, 'success');
+                 if (data.version !== API_VERSION) {
+                    const msg = `Warning: Mismatched API version. Expected ${API_VERSION} but found ${data.version}. Please redeploy the script.`;
+                    showToast(msg, 'error', 10000);
+                    logEvent(msg, 'error');
+                }
+            } catch(error) {
+                logEvent(`Could not verify API version: ${error.message}`, 'error');
+                showToast('Could not verify API version. The backend might be running an old version.', 'error', 10000);
+            }
+        }
+        
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            logEvent("DOM Loaded. Initializing app.", "success");
+            
+            await checkApiVersion();
+            initializeMap();
+            populateDropdowns();
+            await buildScheduler();
+            await updateMap(); 
+            setInterval(() => { buildScheduler(); updateMap(); }, 30000);
+            
+            // Event Listeners
+            document.getElementById('customerId').addEventListener('blur', handleCustomerIdBlur);
+            document.getElementById('createOrderForm').addEventListener('submit', handleCreateOrder);
+            document.getElementById('showHistoryBtn').addEventListener('click', openHistoryModal);
+            document.getElementById('fullSyncBtn').addEventListener('click', handleFullSync);
+            
+            document.querySelectorAll('.close-button').forEach(btn => {
+                btn.onclick = () => btn.closest('.modal').style.display = 'none';
+            });
+            window.onclick = (event) => {
+                if (event.target.classList.contains('modal')) event.target.style.display = 'none';
+            };
+        });
+
+        // --- HTML TEMPLATES ---
+        function createScheduleCard(order) {
+            const isPlaceholder = !order.orderId && order.internalId;
+            const hasPdf = order.pdfLink && order.pdfLink.trim() !== '';
+
+            const mainContent = `
+                <div class="card-main-content">
+                    <div class="schedule-card-details">
+                        <p class="card-customer">${order.customerName || 'N/A'}</p>
+                        <p><i class="fas fa-map-marker-alt"></i> ${order.address || 'N/A'}</p>
+                        <p><i class="fas fa-clock"></i> ${order.orderTime || 'N/A'}</p>
+                    </div>
+                    <div class="card-actions">
+                         <button class="action-button" onclick="openCommentsModal('${isPlaceholder ? order.internalId : order.orderId}')" title="הצג הערות">
+                            <i class="fas fa-comments"></i>
+                        </button>
+                        <button class="action-button" onclick="openPdfModal('${order.orderId}')" title="הצג מסמך הזמנה" ${!hasPdf ? 'disabled' : ''}>
+                            <i class="fas fa-paperclip" ${hasPdf ? 'style="color: var(--primary-color);"' : ''}></i>
+                        </button>
+                    </div>
+                </div>`;
+
+            const finalizeSection = isPlaceholder ? `
+                <div class="finalize-section">
+                    <h4><i class="fas fa-exclamation-circle"></i> ממתין למספר הזמנה מקומקס</h4>
+                    <div class="finalize-input-group">
+                        <input type="text" id="finalize-input-${order.internalId}" placeholder="הזן מספר הזמנה..." required onkeydown="if(event.key==='Enter'){handleSaveOrderId('${order.internalId}'); event.preventDefault();}">
+                        <button onclick="handleSaveOrderId('${order.internalId}')">שמור</button>
+                    </div>
+                </div>` : '';
+            
+            const liClass = isPlaceholder ? 'schedule-card placeholder' : 'schedule-card';
+            const dataId = order.internalId || order.orderId;
+
+            return `<li class="${liClass}" data-internal-id="${dataId}">${mainContent}${finalizeSection}</li>`;
         }
 
-        function setupDragAndDrop() {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            const cards = document.querySelectorAll('.order-card');
-            const lists = document.querySelectorAll('.order-list');
-            let draggedCard = null;
-            cards.forEach(card => {
-                card.addEventListener('dragstart', (e) => {
-                    draggedCard = card;
-                    setTimeout(() => card.classList.add('order-card-dragging'), 0);
-                    e.dataTransfer.effectAllowed = 'move';
-                });
-                card.addEventListener('dragend', () => {
-                    if (draggedCard) {
-                        draggedCard.classList.remove('order-card-dragging');
-                        draggedCard = null;
-                    }
-                });
-            });
-            lists.forEach(list => {
-                list.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                });
-                list.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    if (draggedCard) {
-                        const targetList = e.currentTarget;
-                        const targetColumn = targetList.closest('.driver-column, .unassigned-column');
-                        const newDriverId = targetColumn.dataset.driverId;
-                        const orderId = draggedCard.dataset.orderId;
-                        targetList.appendChild(draggedCard);
-                        assignOrder(orderId, newDriverId);
-                    }
-                });
-            });
-        }
-        
-        function assignOrder(orderId, driverId) {
-            // ... (הפונקציה נשארת זהה ל-v29.3) ...
-            const targetDriverId = (driverId === 'null' || !driverId) ? null : driverId;
-            console.log(`Assigning ${orderId} to ${targetDriverId}`);
-            runServerScript('assignOrder', { 
-                orderId: orderId, 
-                driverId: targetDriverId,
-                index: 0
-            }, 'POST')
-            .then(() => {
-                console.log(`Order ${orderId} assigned successfully.`);
-                const card = document.getElementById(`order-${orderId}`);
-                if (card) {
-                    const statusEl = card.querySelector('small:last-child');
-                    if (statusEl) {
-                         statusEl.innerHTML = statusEl.innerHTML.replace(/סטטוס: [^|]+/, `סטטוס: ${targetDriverId ? 'שויך' : 'ממתין'}`);
-                    }
-                }
-            })
-            .catch(err => {
-                alert(`שגיאה בשיוך הזמנה: ${err.message}`);
-                loadScheduler();
-            });
-        }
-        
+        // --- PLACEHOLDER FUNCTIONS ---
+        async function openCommentsModal(id) { alert(`Opening comments for ${id}`); }
+        async function openAnalyticsModal() { alert('Analytics modal'); }
+        async function openLogsModal() { alert('Logs modal'); }
+        async function openUnlinkedDocsModal() { alert('Unlinked Docs modal'); }
+
     </script>
 </body>
 </html>
