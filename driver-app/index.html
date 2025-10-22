@@ -2,184 +2,687 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>DeliveryMaster - נהג</title>
-    
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0078D7">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>משימות נהג</title>
+    <!-- DeliveryMaster Driver App v28.8 -->
 
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- LeafletJS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Icons (Feather) -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Signature Pad -->
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+
     <style>
-        /* --- DeliveryMaster v28.0 - Unified Design System (Driver App) --- */
-        :root {
-            --primary-color: #0078D7;
-            --secondary-color: #F4F6FA;
-            --accent-color: #00C0A3;
-            --text-color: #1A1A1A;
-            --text-secondary-color: #6c757d;
-            --background-color: #E9EEF4;
-            --border-color: #dee2e6;
-            --shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            --success: #198754;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #0dcaf0;
-            --border-radius: 12px;
-        }
-        
         body {
-            font-family: 'Rubik', sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            margin: 0;
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f7f6;
+            overscroll-behavior: none; /* Prevents pull-to-refresh */
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
-        .view { display: none; }
-        .view.active { display: flex; flex-direction: column; height: 100vh; }
-        
-        /* Login View */
-        #loginView {
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(135deg, var(--primary-color), #005a9e);
+        /* Page transitions */
+        .page {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
         }
-        .login-card {
-            background: white;
-            padding: 40px 30px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            text-align: center;
-            width: 90%;
-            max-width: 350px;
-        }
-        
-        /* Main View */
-        .app-header {
-            background: white;
-            padding: 15px 20px;
-            box-shadow: var(--shadow);
+        .page.active {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-            position: sticky;
+        }
+        
+        #map-page {
+            position: fixed;
             top: 0;
-            z-index: 10;
-        }
-        .app-header h1 { font-size: 1.2rem; font-weight: 500; }
-
-        main { flex-grow: 1; overflow-y: auto; padding: 15px; }
-
-        .order-card {
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
             background: white;
-            border-radius: var(--border-radius);
-            margin-bottom: 15px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
+            transform: translateX(100%);
+            transition: transform 0.3s ease-out;
         }
-        .card-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
-        .card-header h2 { font-size: 1.1rem; font-weight: 500; }
-        
-        .info-line { display: flex; align-items: center; gap: 10px; padding: 8px 15px; }
-        .info-line i { color: var(--primary-color); width: 20px; }
-        
-        .card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; background-color: var(--secondary-color); }
-        .btn {
-            background-color: var(--primary-color); color: white; border: none; padding: 12px; border-radius: 8px;
-            font-size: 0.9rem; font-weight: 500; cursor: pointer; text-align: center;
-            display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease;
+        #map-page.active {
+            transform: translateX(0);
         }
-        .btn:hover { filter: brightness(1.1); }
-        .btn.full-width { grid-column: 1 / -1; }
-        .btn.btn-warning { background-color: var(--warning); color: #333; }
-        .btn.btn-success { background-color: var(--success); }
-        .btn.btn-info { background-color: var(--info); }
-        .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        #map-container {
+            flex: 1;
+            background: #eee;
+        }
+        
+        #signature-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        #signature-pad-container {
+            background: white;
+            border-radius: 8px;
+            width: 95%;
+            max-width: 500px;
+        }
+        #signature-pad {
+            width: 100%;
+            height: 250px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        /* Status button styling */
+        .status-button {
+            transition: background-color 0.2s;
+            font-weight: bold;
+            padding: 12px 0;
+        }
     </style>
 </head>
-<body>
+<body class="bg-gray-100">
 
-    <div id="loginView" class="view active">
-        <div class="login-card">
-            <h1><i class="fas fa-shipping-fast text-blue-500 text-3xl mb-4"></i><br>DeliveryMaster Driver</h1>
-            <input type="text" id="driverIdInput" placeholder="הזן מספר נהג" class="w-full p-3 mb-4 border rounded-lg text-center">
-            <button id="loginBtn" class="btn">כניסה</button>
+    <!-- Loading Page -->
+    <div id="loading-page" class="page active justify-center items-center">
+        <div class="loader"></div>
+        <p class="mt-4 text-gray-600">טוען נתונים...</p>
+    </div>
+
+    <!-- Login Page -->
+    <div id="login-page" class="page justify-center items-center p-6">
+        <div class="w-full max-w-sm bg-white p-8 rounded-lg shadow-md">
+            <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">DeliveryMaster</h1>
+            <p class="text-center text-gray-600 mb-6">הכנס את קוד הנהג שלך</p>
+            <input type="text" id="driver-id-input" class="w-full px-4 py-3 border rounded-lg text-center text-lg" placeholder="קוד נהג">
+            <button id="login-btn" class="w-full bg-blue-500 text-white py-3 rounded-lg mt-4 font-semibold hover:bg-blue-600">
+                כניסה
+            </button>
+            <p id="login-error" class="text-red-500 text-center mt-3"></p>
         </div>
     </div>
 
-    <div id="mainView" class="view">
-         <header class="app-header">
-            <h1 id="welcomeMessage"></h1>
-            <div>
-                 <i id="sync-indicator" class="fas fa-sync-alt hidden"></i>
-                 <button id="logoutBtn" class="bg-transparent border-none text-xl text-gray-600"><i class="fas fa-sign-out-alt"></i></button>
+    <!-- Main Page (Mission List) -->
+    <div id="main-page" class="page">
+        <header class="bg-white shadow-sm flex-shrink-0">
+            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+                <h1 class="text-xl font-bold text-gray-800">המשימות שלי</h1>
+                <div>
+                    <span id="driver-name-display" class="ml-4 text-gray-700"></span>
+                    <button id="logout-btn" class="text-red-500 hover:text-red-700">
+                        <i data-feather="log-out" class="w-6 h-6"></i>
+                    </button>
+                </div>
             </div>
         </header>
-        <main>
-            <div id="orderList"></div>
+
+        <main id="mission-list" class="flex-1 overflow-y-auto p-3 space-y-3">
+            <!-- Mission cards will be injected here -->
         </main>
+        
+        <footer class="bg-white p-3 border-t text-center">
+            <p class="text-sm text-gray-500">v28.8 | <span id="location-status">מאתר מיקום...</span></p>
+        </footer>
+    </div>
+    
+    <!-- Map Page -->
+    <div id="map-page">
+        <header class="bg-white shadow-sm flex-shrink-0">
+            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+                <button id="back-to-list-btn" class="text-blue-500 hover:text-blue-700">
+                    <i data-feather="arrow-right" class="w-6 h-6"></i>
+                </button>
+                <h1 id="map-title" class="text-xl font-bold text-gray-800">ניווט</h1>
+                <div id="map-nav-links" class="flex space-x-3 space-x-reverse">
+                    <!-- Nav links added by JS -->
+                </div>
+            </div>
+        </header>
+        <div id="map-container"></div>
+    </div>
+    
+    <!-- Signature Modal -->
+    <div id="signature-modal">
+        <div id="signature-pad-container">
+            <div class="p-3 border-b">
+                <h3 class="text-lg font-semibold text-center">חתימת הלקוח</h3>
+            </div>
+            <canvas id="signature-pad"></canvas>
+            <div class="p-3 flex justify-between">
+                <button id="clear-signature-btn" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-400">
+                    נקה
+                </button>
+                <button id="save-signature-btn" class="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600">
+                    שמור
+                </button>
+            </div>
+        </div>
     </div>
 
     <script>
-        // --- DeliveryMaster v28.0 - Driver App ---
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzPl-UH4hgX47FJZ-O2y7CTDU026hIzEntVDuGnSviWV1mY33as18nWyMxj7znCQA/exec'; // Replace with your deployment URL
-        let currentUser;
+        // --- Config ---
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxhJjLpnh8qZFutncdTLOX_ul8PIqZRrgjeE4289pPFiTozPcYiV8b0VzAg7KmuE6KZ/exec';
+        const LOCATION_INTERVAL = 30000; // 30 seconds
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Logic for login, logout, and background sync remains largely the same
-            // but is now cleaner and provides better UI feedback.
-            // All visual elements are updated based on the new design system.
+        // --- State ---
+        let currentDriver = null;
+        let allOrders = [];
+        let myMissions = [];
+        let locationIntervalId;
+        let mapInstance;
+        let driverMarker;
+        let orderMarker;
+        let signaturePad;
+        let currentOrderForSignature = null;
+        
+        // --- Icons ---
+        const driverIcon = L.icon({
+            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+        });
+        const orderIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
         });
 
-        async function backgroundSync(driverId) {
-            // Simplified: shows a spinner, fetches data, and re-renders the list
-            // without a full page reload.
-            document.getElementById('sync-indicator').classList.remove('hidden');
+        // --- API ---
+        async function apiFetch(action, method = 'POST', data = null) {
+            const url = `${API_URL}?action=${action}`;
+            const options = {
+                method: method,
+                redirect: 'follow',
+                muteHttpExceptions: true,
+            };
+
+            if (method === 'POST') {
+                options.headers = { 'Content-Type': 'application/json' };
+                options.body = JSON.stringify({ action: action, data: data });
+            }
+
             try {
-                const orders = await apiFetch('getOrders', { /* params */ });
-                renderOrders(orders);
+                const response = await fetch(method === 'GET' ? url : API_URL, options);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const result = await response.json();
+                if (result.status === 'error') throw new Error(result.data);
+                return result.data;
             } catch (error) {
-                // handle error
-            } finally {
-                document.getElementById('sync-indicator').classList.add('hidden');
+                console.error(`API Fetch Error (${action}):`, error);
+                logToServer('DriverApp', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
+                throw error;
             }
         }
         
-        function renderOrders(orders) {
-            const orderList = document.getElementById('orderList');
-            if (orders.length === 0) {
-                orderList.innerHTML = '<p class="text-center text-gray-500 p-8">אין משימות להיום.</p>';
+        // --- Page Navigation ---
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        // --- Authentication ---
+        async function login() {
+            const driverId = document.getElementById('driver-id-input').value.trim();
+            if (!driverId) {
+                showLoginError('אנא הכנס קוד נהג.');
                 return;
             }
-            orderList.innerHTML = orders.map(createOrderCardHTML).join('');
+
+            document.getElementById('login-btn').disabled = true;
+            document.getElementById('login-btn').innerText = 'מתחבר...';
+
+            try {
+                const allDrivers = await apiFetch('getDrivers', 'GET');
+                const driver = allDrivers.find(d => d.driverId === driverId && d.status === 'פעיל');
+                
+                if (driver) {
+                    currentDriver = driver;
+                    localStorage.setItem('driverId', driver.driverId);
+                    document.getElementById('driver-name-display').innerText = `שלום, ${driver.name}`;
+                    await loadData();
+                    showPage('main-page');
+                    startLocationTracking();
+                } else {
+                    showLoginError('קוד נהג לא תקין או לא פעיל.');
+                }
+            } catch (error) {
+                showLoginError(`שגיאת התחברות: ${error.message}`);
+            } finally {
+                document.getElementById('login-btn').disabled = false;
+                document.getElementById('login-btn').innerText = 'כניסה';
+            }
+        }
+        
+        function logout() {
+            if (!confirm('האם אתה בטוח שברצונך להתנתק?')) return;
+            currentDriver = null;
+            localStorage.removeItem('driverId');
+            stopLocationTracking();
+            myMissions = [];
+            allOrders = [];
+            document.getElementById('mission-list').innerHTML = '';
+            document.getElementById('login-error').innerText = '';
+            document.getElementById('driver-id-input').value = '';
+            showPage('login-page');
+        }
+        
+        function showLoginError(message) {
+            document.getElementById('login-error').innerText = message;
         }
 
-        function createOrderCardHTML(order) {
-            // Returns the new, restyled HTML for an order card.
-            // All buttons and info lines conform to the new design system.
-            return `
-            <div class="order-card">
-                <div class="card-header">
-                    <h2>${order.customerName}</h2>
-                    <span class="font-bold text-sm">${order.status}</span>
-                </div>
-                <div class="info-line"><i class="fas fa-map-marker-alt"></i> <span>${order.address}</span></div>
-                <div class="info-line"><i class="fas fa-phone"></i> <a href="tel:${order.customerPhone}">${order.customerPhone}</a></div>
-                <div class="card-actions">
-                    <button class="btn btn-warning" onclick="updateOrderStatus('${order.orderId}', 'בדרך')"><i class="fas fa-route"></i> התחל</button>
-                    <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}" target="_blank" class="btn btn-info"><i class="fas fa-diamond-turn-right"></i> נווט</a>
-                    <button class="btn btn-success full-width" onclick="updateOrderStatus('${order.orderId}', 'הושלם')"><i class="fas fa-check-circle"></i> סיים משימה</button>
-                </div>
-            </div>`;
+        async function checkAutoLogin() {
+            const storedDriverId = localStorage.getItem('driverId');
+            if (storedDriverId) {
+                document.getElementById('driver-id-input').value = storedDriverId;
+                await login();
+            } else {
+                showPage('login-page');
+            }
+        }
+        
+        // --- Data Handling ---
+        async function loadData() {
+            showPage('loading-page');
+            try {
+                allOrders = await apiFetch('getOrders', 'GET');
+                myMissions = allOrders
+                    .filter(o => o.driverId === currentDriver.driverId && o.status !== 'הושלם' && o.status !== 'בוטל')
+                    .sort((a, b) => new Date(a.orderDate) - new Date(b.orderDate)); // TODO: Add sorting
+                
+                renderMissions();
+                showPage('main-page');
+            } catch (error) {
+                alert(`שגיאה בטעינת נתונים: ${error.message}`);
+                showPage('login-page'); // Kick back to login on data failure
+            }
         }
 
-         async function apiFetch(action, params = {}, method = 'GET', body = null) {
-            // ... same apiFetch logic as original ...
+        function renderMissions() {
+            const list = document.getElementById('mission-list');
+            list.innerHTML = '';
+            if (myMissions.length === 0) {
+                list.innerHTML = `<div class="bg-white p-6 rounded-lg shadow text-center text-gray-600">אין לך משימות פתוחות כרגע.</div>`;
+                return;
+            }
+            myMissions.forEach(order => {
+                list.appendChild(createMissionCard(order));
+            });
+            feather.replace();
         }
+
+        function createMissionCard(order) {
+            const el = document.createElement('div');
+            el.className = 'bg-white p-4 rounded-lg shadow';
+            
+            const wazeLink = `https://waze.com/ul?q=${encodeURIComponent(order.address)}`;
+            const gMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.address)}`;
+
+            el.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <span class="font-bold text-xl text-blue-600">#${order.orderId}</span>
+                    <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">${order.status}</span>
+                </div>
+                <div class="mb-3">
+                    <h3 class="text-lg font-semibold text-gray-900">${order.customerName}</h3>
+                    <p class="text-gray-700">${order.address}</p>
+                    <a href="tel:${order.customerPhone}" class="text-blue-600 inline-flex items-center mt-1">
+                        <i data-feather="phone" class="w-4 h-4 ml-1"></i>
+                        ${order.customerPhone || 'אין טלפון'}
+                    </a>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-md mb-4">
+                    <h4 class="font-semibold text-sm mb-1">הערות:</h4>
+                    <p class="text-gray-700 text-sm">${order.notes || 'אין הערות.'}</p>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <button class="bg-blue-500 text-white p-3 rounded-md flex flex-col items-center" onclick="openMap('${order.orderId}')">
+                        <i data-feather="map" class="w-6 h-6 mb-1"></i>
+                        <span class="text-sm">מפה</span>
+                    </button>
+                    <a href="${wazeLink}" target="_blank" class="bg-gray-700 text-white p-3 rounded-md flex flex-col items-center">
+                        <img src="https://img.icons8.com/color/48/000000/waze.png" class="w-6 h-6 mb-1" alt="Waze"/>
+                        <span class="text-sm">Waze</span>
+                    </a>
+                    <a href="${gMapsLink}" target="_blank" class="bg-gray-700 text-white p-3 rounded-md flex flex-col items-center">
+                        <img src="https://img.icons8.com/color/48/000000/google-maps.png" class="w-6 h-6 mb-1" alt="Google Maps"/>
+                        <span class="text-sm">G-Maps</span>
+                    </a>
+                </div>
+
+                <!-- Status Update -->
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <input type="file" accept="image/*" id="photo-input-${order.orderId}" class="hidden" onchange="uploadPhoto('${order.orderId}', this)">
+                    <button class="bg-gray-200 text-gray-800 p-3 rounded-md text-sm" onclick="document.getElementById('photo-input-${order.orderId}').click()">
+                        <i data-feather="camera" class="w-5 h-5 inline-block ml-1"></i>
+                        העלה תמונה
+                    </button>
+                    <button class="bg-gray-200 text-gray-800 p-3 rounded-md text-sm" onclick="openSignaturePad('${order.orderId}')">
+                        <i data-feather="edit-3" class="w-5 h-5 inline-block ml-1"></i>
+                        החתם לקוח
+                    </button>
+                </div>
+
+                <!-- Status Flow -->
+                ${createStatusButton(order)}
+            `;
+            return el;
+        }
+
+        function createStatusButton(order) {
+            let text, action, style;
+            switch (order.status) {
+                case 'שויך':
+                    text = 'איסוף (בדרך למחסן)';
+                    action = `updateStatus('${order.orderId}', 'בדרך לאיסוף')`;
+                    style = 'bg-yellow-500 text-white';
+                    break;
+                case 'בדרך לאיסוף':
+                    text = 'הגעתי למחסן (העמסה)';
+                    action = `updateStatus('${order.orderId}', 'בתהליך ליקוט')`;
+                    style = 'bg-purple-500 text-white';
+                    break;
+                case 'בתהליך ליקוט':
+                    text = 'סיימתי להעמיס (בדרך ללקוח)';
+                    action = `updateStatus('${order.orderId}', 'בדרך')`;
+                    style = 'bg-green-500 text-white';
+                    break;
+                case 'בדרך':
+                    text = 'סיימתי פריקה (הושלם)';
+                    action = `completeDelivery('${order.orderId}')`;
+                    style = 'bg-blue-600 text-white';
+                    break;
+                default:
+                    text = order.status;
+                    action = '';
+                    style = 'bg-gray-400 text-white';
+            }
+            return `<button class="w-full ${style} rounded-lg status-button" onclick="${action}">${text}</button>`;
+        }
+        
+        async function updateStatus(orderId, newStatus, notes = '') {
+            try {
+                await apiFetch('updateOrderStatus', 'POST', {
+                    orderId: orderId,
+                    status: newStatus,
+                    notes: notes
+                });
+                logToServer('DriverApp', 'INFO', `Status updated for ${orderId}: ${newStatus}`);
+                await loadData(); // Reload all data to reflect change
+            } catch (error) {
+                alert(`שגיאה בעדכון סטטוס: ${error.message}`);
+            }
+        }
+        
+        function completeDelivery(orderId) {
+            const order = myMissions.find(o => o.orderId === orderId);
+            if (!order.signatureUrl) {
+                if (!confirm('לא נשמרה חתימה. האם אתה בטוח שברצונך להשלים את המשלוח?')) {
+                    return;
+                }
+            }
+            if (!order.photoUrl) {
+                if (!confirm('לא הועלתה תמונה. האם אתה בטוח שברצונך להשלים את המשלוח?')) {
+                    return;
+                }
+            }
+            // All checks passed or overridden
+            updateStatus(orderId, 'הושלם');
+        }
+
+        // --- Location Tracking ---
+        function startLocationTracking() {
+            if (locationIntervalId) clearInterval(locationIntervalId);
+            
+            const update = () => {
+                if (!currentDriver) {
+                    stopLocationTracking();
+                    return;
+                }
+                
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        document.getElementById('location-status').innerText = 'מיקום מעודכן';
+                        document.getElementById('location-status').className = 'text-green-600';
+                        
+                        try {
+                            await apiFetch('updateLocation', 'POST', {
+                                driverId: currentDriver.driverId,
+                                latitude: latitude,
+                                longitude: longitude
+                            });
+                            // Update map if open
+                            if (mapInstance && driverMarker) {
+                                driverMarker.setLatLng([latitude, longitude]);
+                            }
+                        } catch (error) {
+                             document.getElementById('location-status').innerText = 'שגיאת שרת';
+                             document.getElementById('location-status').className = 'text-red-600';
+                        }
+                    },
+                    (error) => {
+                        let msg = 'שגיאת מיקום';
+                        if (error.code === 1) msg = 'גישה נדחתה';
+                        if (error.code === 2) msg = 'מיקום לא זמין';
+                        document.getElementById('location-status').innerText = msg;
+                        document.getElementById('location-status').className = 'text-red-600';
+                        logToServer('DriverApp', 'ERROR', `Geolocation Error: ${error.message}`, { code: error.code });
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            };
+            
+            update(); // First update immediately
+            locationIntervalId = setInterval(update, LOCATION_INTERVAL);
+        }
+
+        function stopLocationTracking() {
+            if (locationIntervalId) clearInterval(locationIntervalId);
+            locationIntervalId = null;
+            document.getElementById('location-status').innerText = 'מיקום כבוי';
+            document.getElementById('location-status').className = 'text-gray-500';
+        }
+        
+        // --- Map Page ---
+        function openMap(orderId) {
+            const order = myMissions.find(o => o.orderId === orderId);
+            if (!order) return;
+            
+            document.getElementById('map-title').innerText = `הזמנה #${order.orderId}`;
+            
+            // Add nav links
+            const navLinks = document.getElementById('map-nav-links');
+            navLinks.innerHTML = `
+                <a href="https://waze.com/ul?q=${encodeURIComponent(order.address)}" target="_blank" class="text-blue-500 p-2 rounded-full bg-blue-100">
+                     <img src="https://img.icons8.com/color/48/000000/waze.png" class="w-6 h-6" alt="Waze"/>
+                </a>
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.address)}" target="_blank" class="text-gray-700 p-2 rounded-full bg-gray-100">
+                    <img src="https://img.icons8.com/color/48/000000/google-maps.png" class="w-6 h-6" alt="Google Maps"/>
+                </a>
+            `;
+
+            if (mapInstance) {
+                mapInstance.remove();
+                mapInstance = null;
+            }
+
+            mapInstance = L.map('map-container');
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
+            
+            const orderLatLng = [order.latitude, order.longitude];
+            orderMarker = L.marker(orderLatLng, { icon: orderIcon }).addTo(mapInstance).bindPopup("יעד המשלוח");
+            
+            const bounds = L.latLngBounds([orderLatLng]);
+
+            // Get current location for driver marker
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const driverLatLng = [position.coords.latitude, position.coords.longitude];
+                    driverMarker = L.marker(driverLatLng, { icon: driverIcon }).addTo(mapInstance).bindPopup("המיקום שלי");
+                    bounds.extend(driverLatLng);
+                    mapInstance.fitBounds(bounds, { padding: [20, 20] });
+                },
+                () => {
+                    // Couldnt get location, just center on order
+                    mapInstance.setView(orderLatLng, 13);
+                },
+                { enableHighAccuracy: true }
+            );
+
+            document.getElementById('map-page').classList.add('active');
+            
+            // Must invalidate size after page is shown
+            setTimeout(() => mapInstance.invalidateSize(), 300);
+            feather.replace();
+        }
+
+        function closeMap() {
+            document.getElementById('map-page').classList.remove('active');
+            if (mapInstance) {
+                mapInstance.remove();
+                mapInstance = null;
+                driverMarker = null;
+                orderMarker = null;
+            }
+        }
+        
+        // --- Signature Pad ---
+        function openSignaturePad(orderId) {
+            currentOrderForSignature = orderId;
+            const modal = document.getElementById('signature-modal');
+            modal.style.display = 'flex';
+            
+            if (!signaturePad) {
+                const canvas = document.getElementById('signature-pad');
+                // Adjust for device pixel ratio
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                canvas.getContext("2d").scale(ratio, ratio);
+                
+                signaturePad = new SignaturePad(canvas, {
+                    backgroundColor: 'rgb(255, 255, 255)'
+                });
+            }
+            signaturePad.clear();
+        }
+        
+        function closeSignaturePad() {
+            document.getElementById('signature-modal').style.display = 'none';
+        }
+
+        async function saveSignature() {
+            if (signaturePad.isEmpty()) {
+                alert("אנא החתם את הלקוח תחילה.");
+                return;
+            }
+            
+            const dataURL = signaturePad.toDataURL("image/png");
+            
+            // Show loading state
+            document.getElementById('save-signature-btn').disabled = true;
+            document.getElementById('save-signature-btn').innerText = 'שומר...';
+
+            try {
+                await apiFetch('uploadSignature', 'POST', {
+                    orderId: currentOrderForSignature,
+                    base64Data: dataURL
+                });
+                logToServer('DriverApp', 'INFO', `Signature uploaded for ${currentOrderForSignature}`);
+                closeSignaturePad();
+                await loadData(); // Reload to update UI
+            } catch (error) {
+                alert(`שגיאה בשמירת חתימה: ${error.message}`);
+            } finally {
+                document.getElementById('save-signature-btn').disabled = false;
+                document.getElementById('save-signature-btn').innerText = 'שמור';
+            }
+        }
+        
+        // --- Photo Upload ---
+        async function uploadPhoto(orderId, input) {
+            if (!input.files || input.files.length === 0) return;
+            
+            const file = input.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = async (event) => {
+                const base64Data = event.target.result;
+                // TODO: Show uploading indicator on the card
+                
+                try {
+                    await apiFetch('uploadPhoto', 'POST', {
+                        orderId: orderId,
+                        base64Data: base64Data
+                    });
+                    logToServer('DriverApp', 'INFO', `Photo uploaded for ${orderId}`);
+                    await loadData(); // Reload to update UI
+                } catch (error) {
+                    alert(`שגיאה בהעלאת תמונה: ${error.message}`);
+                } finally {
+                    // TODO: Hide indicator
+                    input.value = null; // Reset input
+                }
+            };
+            
+            reader.onerror = (error) => {
+                alert('שגיאה בקריאת הקובץ.');
+                console.error('FileReader error:', error);
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        // --- Utility ---
+        function logToServer(origin, level, message, context = {}) {
+            // Don't wait for this, just fire and forget
+            apiFetch('logToServer', 'POST', {
+                origin: origin,
+                level: level,
+                message: message,
+                context: context
+            }).catch(err => console.error("Failed to log to server:", err));
+        }
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+            
+            // Login
+            document.getElementById('login-btn').addEventListener('click', login);
+            document.getElementById('logout-btn').addEventListener('click', logout);
+            
+            // Map
+            document.getElementById('back-to-list-btn').addEventListener('click', closeMap);
+            
+            // Signature
+            document.getElementById('clear-signature-btn').addEventListener('click', () => signaturePad.clear());
+            document.getElementById('save-signature-btn').addEventListener('click', saveSignature);
+
+            checkAutoLogin();
+        });
     </script>
-
 </body>
 </html>
-
