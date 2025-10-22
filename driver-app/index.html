@@ -2,28 +2,17 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>משימות נהג</title>
-    <!-- DeliveryMaster Driver App v28.8 -->
-
-    <!-- TailwindCSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - כניסת נהג</title>
+    <!-- 
+      DeliveryMaster Driver Login v28.0
+      This file is a simple redirector/login page.
+      The main application is in driver.html
+    -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- LeafletJS for Map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- Icons (Feather) -->
-    <script src="https://unpkg.com/feather-icons"></script>
-    
-    <!-- Signature Pad -->
-    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
-
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            background-color: #f4f7f6;
-            overscroll-behavior: none; /* Prevents pull-to-refresh */
         }
         .loader {
             border: 4px solid #f3f3f3;
@@ -37,652 +26,58 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
-        /* Page transitions */
-        .page {
-            display: none;
-            flex-direction: column;
-            height: 100vh;
-        }
-        .page.active {
-            display: flex;
-        }
-        
-        #map-page {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 100;
-            background: white;
-            transform: translateX(100%);
-            transition: transform 0.3s ease-out;
-        }
-        #map-page.active {
-            transform: translateX(0);
-        }
-        #map-container {
-            flex: 1;
-            background: #eee;
-        }
-        
-        #signature-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 200;
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        #signature-pad-container {
-            background: white;
-            border-radius: 8px;
-            width: 95%;
-            max-width: 500px;
-        }
-        #signature-pad {
-            width: 100%;
-            height: 250px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        /* Status button styling */
-        .status-button {
-            transition: background-color 0.2s;
-            font-weight: bold;
-            padding: 12px 0;
-        }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 flex items-center justify-center h-screen">
 
-    <!-- Loading Page -->
-    <div id="loading-page" class="page active justify-center items-center">
-        <div class="loader"></div>
-        <p class="mt-4 text-gray-600">טוען נתונים...</p>
-    </div>
-
-    <!-- Login Page -->
-    <div id="login-page" class="page justify-center items-center p-6">
-        <div class="w-full max-w-sm bg-white p-8 rounded-lg shadow-md">
-            <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">DeliveryMaster</h1>
-            <p class="text-center text-gray-600 mb-6">הכנס את קוד הנהג שלך</p>
-            <input type="text" id="driver-id-input" class="w-full px-4 py-3 border rounded-lg text-center text-lg" placeholder="קוד נהג">
-            <button id="login-btn" class="w-full bg-blue-500 text-white py-3 rounded-lg mt-4 font-semibold hover:bg-blue-600">
-                כניסה
-            </button>
-            <p id="login-error" class="text-red-500 text-center mt-3"></p>
-        </div>
-    </div>
-
-    <!-- Main Page (Mission List) -->
-    <div id="main-page" class="page">
-        <header class="bg-white shadow-sm flex-shrink-0">
-            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-                <h1 class="text-xl font-bold text-gray-800">המשימות שלי</h1>
-                <div>
-                    <span id="driver-name-display" class="ml-4 text-gray-700"></span>
-                    <button id="logout-btn" class="text-red-500 hover:text-red-700">
-                        <i data-feather="log-out" class="w-6 h-6"></i>
-                    </button>
-                </div>
-            </div>
-        </header>
-
-        <main id="mission-list" class="flex-1 overflow-y-auto p-3 space-y-3">
-            <!-- Mission cards will be injected here -->
-        </main>
+    <div class="w-full max-w-sm bg-white p-8 rounded-lg shadow-md text-center">
+        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">DeliveryMaster</h1>
         
-        <footer class="bg-white p-3 border-t text-center">
-            <p class="text-sm text-gray-500">v28.8 | <span id="location-status">מאתר מיקום...</span></p>
-        </footer>
-    </div>
-    
-    <!-- Map Page -->
-    <div id="map-page">
-        <header class="bg-white shadow-sm flex-shrink-0">
-            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-                <button id="back-to-list-btn" class="text-blue-500 hover:text-blue-700">
-                    <i data-feather="arrow-right" class="w-6 h-6"></i>
-                </button>
-                <h1 id="map-title" class="text-xl font-bold text-gray-800">ניווט</h1>
-                <div id="map-nav-links" class="flex space-x-3 space-x-reverse">
-                    <!-- Nav links added by JS -->
-                </div>
-            </div>
-        </header>
-        <div id="map-container"></div>
-    </div>
-    
-    <!-- Signature Modal -->
-    <div id="signature-modal">
-        <div id="signature-pad-container">
-            <div class="p-3 border-b">
-                <h3 class="text-lg font-semibold text-center">חתימת הלקוח</h3>
-            </div>
-            <canvas id="signature-pad"></canvas>
-            <div class="p-3 flex justify-between">
-                <button id="clear-signature-btn" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-400">
-                    נקה
-                </button>
-                <button id="save-signature-btn" class="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600">
-                    שמור
-                </button>
-            </div>
+        <div id="login-form">
+            <p class="text-center text-gray-600 mb-6">כניסה לאפליקציית נהגים</p>
+            <p class="text-sm text-gray-500 mb-4">
+                הכניסה מתבצעת כעת דרך האפליקציה הראשית.
+            </p>
+            <button id="login-btn" class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600">
+                פתח אפליקציית נהגים
+            </button>
         </div>
+        
+        <div id="loading" class="hidden">
+             <div class="loader mx-auto"></div>
+             <p class="mt-4 text-gray-600">טוען...</p>
+        </div>
+
     </div>
 
     <script>
-        // --- Config ---
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxhJjLpnh8qZFutncdTLOX_ul8PIqZRrgjeE4289pPFiTozPcYiV8b0VzAg7KmuE6KZ/exec';
-        const LOCATION_INTERVAL = 30000; // 30 seconds
-
-        // --- State ---
-        let currentDriver = null;
-        let allOrders = [];
-        let myMissions = [];
-        let locationIntervalId;
-        let mapInstance;
-        let driverMarker;
-        let orderMarker;
-        let signaturePad;
-        let currentOrderForSignature = null;
+        // This file now simply redirects to driver.html
+        // The full app logic is contained there.
         
-        // --- Icons ---
-        const driverIcon = L.icon({
-            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-        });
-        const orderIcon = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-        });
-
-        // --- API ---
-        async function apiFetch(action, method = 'POST', data = null) {
-            const url = `${API_URL}?action=${action}`;
-            const options = {
-                method: method,
-                redirect: 'follow',
-                muteHttpExceptions: true,
-            };
-
-            if (method === 'POST') {
-                options.headers = { 'Content-Type': 'application/json' };
-                options.body = JSON.stringify({ action: action, data: data });
-            }
-
-            try {
-                const response = await fetch(method === 'GET' ? url : API_URL, options);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const result = await response.json();
-                if (result.status === 'error') throw new Error(result.data);
-                return result.data;
-            } catch (error) {
-                console.error(`API Fetch Error (${action}):`, error);
-                logToServer('DriverApp', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
-                throw error;
-            }
-        }
-        
-        // --- Page Navigation ---
-        function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
-        }
-
-        // --- Authentication ---
-        async function login() {
-            const driverId = document.getElementById('driver-id-input').value.trim();
-            if (!driverId) {
-                showLoginError('אנא הכנס קוד נהג.');
-                return;
-            }
-
-            document.getElementById('login-btn').disabled = true;
-            document.getElementById('login-btn').innerText = 'מתחבר...';
-
-            try {
-                const allDrivers = await apiFetch('getDrivers', 'GET');
-                const driver = allDrivers.find(d => d.driverId === driverId && d.status === 'פעיל');
-                
-                if (driver) {
-                    currentDriver = driver;
-                    localStorage.setItem('driverId', driver.driverId);
-                    document.getElementById('driver-name-display').innerText = `שלום, ${driver.name}`;
-                    await loadData();
-                    showPage('main-page');
-                    startLocationTracking();
-                } else {
-                    showLoginError('קוד נהג לא תקין או לא פעיל.');
-                }
-            } catch (error) {
-                showLoginError(`שגיאת התחברות: ${error.message}`);
-            } finally {
-                document.getElementById('login-btn').disabled = false;
-                document.getElementById('login-btn').innerText = 'כניסה';
-            }
-        }
-        
-        function logout() {
-            if (!confirm('האם אתה בטוח שברצונך להתנתק?')) return;
-            currentDriver = null;
-            localStorage.removeItem('driverId');
-            stopLocationTracking();
-            myMissions = [];
-            allOrders = [];
-            document.getElementById('mission-list').innerHTML = '';
-            document.getElementById('login-error').innerText = '';
-            document.getElementById('driver-id-input').value = '';
-            showPage('login-page');
-        }
-        
-        function showLoginError(message) {
-            document.getElementById('login-error').innerText = message;
-        }
-
-        async function checkAutoLogin() {
+        function redirectToApp() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            
+            // We check if a driver ID is already stored.
+            // driver.html will handle the full login logic.
             const storedDriverId = localStorage.getItem('driverId');
-            if (storedDriverId) {
-                document.getElementById('driver-id-input').value = storedDriverId;
-                await login();
-            } else {
-                showPage('login-page');
-            }
-        }
-        
-        // --- Data Handling ---
-        async function loadData() {
-            showPage('loading-page');
-            try {
-                allOrders = await apiFetch('getOrders', 'GET');
-                myMissions = allOrders
-                    .filter(o => o.driverId === currentDriver.driverId && o.status !== 'הושלם' && o.status !== 'בוטל')
-                    .sort((a, b) => new Date(a.orderDate) - new Date(b.orderDate)); // TODO: Add sorting
-                
-                renderMissions();
-                showPage('main-page');
-            } catch (error) {
-                alert(`שגיאה בטעינת נתונים: ${error.message}`);
-                showPage('login-page'); // Kick back to login on data failure
-            }
+            
+            let redirectUrl = 'driver.html';
+            
+            // We don't pass query params anymore as driver.html handles
+            // storage-based login.
+            
+            console.log('Redirecting to main driver app...');
+            window.location.href = redirectUrl;
         }
 
-        function renderMissions() {
-            const list = document.getElementById('mission-list');
-            list.innerHTML = '';
-            if (myMissions.length === 0) {
-                list.innerHTML = `<div class="bg-white p-6 rounded-lg shadow text-center text-gray-600">אין לך משימות פתוחות כרגע.</div>`;
-                return;
-            }
-            myMissions.forEach(order => {
-                list.appendChild(createMissionCard(order));
-            });
-            feather.replace();
-        }
+        document.getElementById('login-btn').addEventListener('click', redirectToApp);
 
-        function createMissionCard(order) {
-            const el = document.createElement('div');
-            el.className = 'bg-white p-4 rounded-lg shadow';
-            
-            const wazeLink = `https://waze.com/ul?q=${encodeURIComponent(order.address)}`;
-            const gMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.address)}`;
+        // Optional: Auto-redirect if we know they're logged in
+        // if (localStorage.getItem('driverId')) {
+        //     redirectToApp();
+        // }
 
-            el.innerHTML = `
-                <div class="flex justify-between items-center mb-2">
-                    <span class="font-bold text-xl text-blue-600">#${order.orderId}</span>
-                    <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">${order.status}</span>
-                </div>
-                <div class="mb-3">
-                    <h3 class="text-lg font-semibold text-gray-900">${order.customerName}</h3>
-                    <p class="text-gray-700">${order.address}</p>
-                    <a href="tel:${order.customerPhone}" class="text-blue-600 inline-flex items-center mt-1">
-                        <i data-feather="phone" class="w-4 h-4 ml-1"></i>
-                        ${order.customerPhone || 'אין טלפון'}
-                    </a>
-                </div>
-                <div class="bg-gray-50 p-3 rounded-md mb-4">
-                    <h4 class="font-semibold text-sm mb-1">הערות:</h4>
-                    <p class="text-gray-700 text-sm">${order.notes || 'אין הערות.'}</p>
-                </div>
-                
-                <!-- Action Buttons -->
-                <div class="grid grid-cols-3 gap-2 mb-3">
-                    <button class="bg-blue-500 text-white p-3 rounded-md flex flex-col items-center" onclick="openMap('${order.orderId}')">
-                        <i data-feather="map" class="w-6 h-6 mb-1"></i>
-                        <span class="text-sm">מפה</span>
-                    </button>
-                    <a href="${wazeLink}" target="_blank" class="bg-gray-700 text-white p-3 rounded-md flex flex-col items-center">
-                        <img src="https://img.icons8.com/color/48/000000/waze.png" class="w-6 h-6 mb-1" alt="Waze"/>
-                        <span class="text-sm">Waze</span>
-                    </a>
-                    <a href="${gMapsLink}" target="_blank" class="bg-gray-700 text-white p-3 rounded-md flex flex-col items-center">
-                        <img src="https://img.icons8.com/color/48/000000/google-maps.png" class="w-6 h-6 mb-1" alt="Google Maps"/>
-                        <span class="text-sm">G-Maps</span>
-                    </a>
-                </div>
-
-                <!-- Status Update -->
-                <div class="grid grid-cols-2 gap-2 mb-3">
-                    <input type="file" accept="image/*" id="photo-input-${order.orderId}" class="hidden" onchange="uploadPhoto('${order.orderId}', this)">
-                    <button class="bg-gray-200 text-gray-800 p-3 rounded-md text-sm" onclick="document.getElementById('photo-input-${order.orderId}').click()">
-                        <i data-feather="camera" class="w-5 h-5 inline-block ml-1"></i>
-                        העלה תמונה
-                    </button>
-                    <button class="bg-gray-200 text-gray-800 p-3 rounded-md text-sm" onclick="openSignaturePad('${order.orderId}')">
-                        <i data-feather="edit-3" class="w-5 h-5 inline-block ml-1"></i>
-                        החתם לקוח
-                    </button>
-                </div>
-
-                <!-- Status Flow -->
-                ${createStatusButton(order)}
-            `;
-            return el;
-        }
-
-        function createStatusButton(order) {
-            let text, action, style;
-            switch (order.status) {
-                case 'שויך':
-                    text = 'איסוף (בדרך למחסן)';
-                    action = `updateStatus('${order.orderId}', 'בדרך לאיסוף')`;
-                    style = 'bg-yellow-500 text-white';
-                    break;
-                case 'בדרך לאיסוף':
-                    text = 'הגעתי למחסן (העמסה)';
-                    action = `updateStatus('${order.orderId}', 'בתהליך ליקוט')`;
-                    style = 'bg-purple-500 text-white';
-                    break;
-                case 'בתהליך ליקוט':
-                    text = 'סיימתי להעמיס (בדרך ללקוח)';
-                    action = `updateStatus('${order.orderId}', 'בדרך')`;
-                    style = 'bg-green-500 text-white';
-                    break;
-                case 'בדרך':
-                    text = 'סיימתי פריקה (הושלם)';
-                    action = `completeDelivery('${order.orderId}')`;
-                    style = 'bg-blue-600 text-white';
-                    break;
-                default:
-                    text = order.status;
-                    action = '';
-                    style = 'bg-gray-400 text-white';
-            }
-            return `<button class="w-full ${style} rounded-lg status-button" onclick="${action}">${text}</button>`;
-        }
-        
-        async function updateStatus(orderId, newStatus, notes = '') {
-            try {
-                await apiFetch('updateOrderStatus', 'POST', {
-                    orderId: orderId,
-                    status: newStatus,
-                    notes: notes
-                });
-                logToServer('DriverApp', 'INFO', `Status updated for ${orderId}: ${newStatus}`);
-                await loadData(); // Reload all data to reflect change
-            } catch (error) {
-                alert(`שגיאה בעדכון סטטוס: ${error.message}`);
-            }
-        }
-        
-        function completeDelivery(orderId) {
-            const order = myMissions.find(o => o.orderId === orderId);
-            if (!order.signatureUrl) {
-                if (!confirm('לא נשמרה חתימה. האם אתה בטוח שברצונך להשלים את המשלוח?')) {
-                    return;
-                }
-            }
-            if (!order.photoUrl) {
-                if (!confirm('לא הועלתה תמונה. האם אתה בטוח שברצונך להשלים את המשלוח?')) {
-                    return;
-                }
-            }
-            // All checks passed or overridden
-            updateStatus(orderId, 'הושלם');
-        }
-
-        // --- Location Tracking ---
-        function startLocationTracking() {
-            if (locationIntervalId) clearInterval(locationIntervalId);
-            
-            const update = () => {
-                if (!currentDriver) {
-                    stopLocationTracking();
-                    return;
-                }
-                
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const { latitude, longitude } = position.coords;
-                        document.getElementById('location-status').innerText = 'מיקום מעודכן';
-                        document.getElementById('location-status').className = 'text-green-600';
-                        
-                        try {
-                            await apiFetch('updateLocation', 'POST', {
-                                driverId: currentDriver.driverId,
-                                latitude: latitude,
-                                longitude: longitude
-                            });
-                            // Update map if open
-                            if (mapInstance && driverMarker) {
-                                driverMarker.setLatLng([latitude, longitude]);
-                            }
-                        } catch (error) {
-                             document.getElementById('location-status').innerText = 'שגיאת שרת';
-                             document.getElementById('location-status').className = 'text-red-600';
-                        }
-                    },
-                    (error) => {
-                        let msg = 'שגיאת מיקום';
-                        if (error.code === 1) msg = 'גישה נדחתה';
-                        if (error.code === 2) msg = 'מיקום לא זמין';
-                        document.getElementById('location-status').innerText = msg;
-                        document.getElementById('location-status').className = 'text-red-600';
-                        logToServer('DriverApp', 'ERROR', `Geolocation Error: ${error.message}`, { code: error.code });
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
-            };
-            
-            update(); // First update immediately
-            locationIntervalId = setInterval(update, LOCATION_INTERVAL);
-        }
-
-        function stopLocationTracking() {
-            if (locationIntervalId) clearInterval(locationIntervalId);
-            locationIntervalId = null;
-            document.getElementById('location-status').innerText = 'מיקום כבוי';
-            document.getElementById('location-status').className = 'text-gray-500';
-        }
-        
-        // --- Map Page ---
-        function openMap(orderId) {
-            const order = myMissions.find(o => o.orderId === orderId);
-            if (!order) return;
-            
-            document.getElementById('map-title').innerText = `הזמנה #${order.orderId}`;
-            
-            // Add nav links
-            const navLinks = document.getElementById('map-nav-links');
-            navLinks.innerHTML = `
-                <a href="https://waze.com/ul?q=${encodeURIComponent(order.address)}" target="_blank" class="text-blue-500 p-2 rounded-full bg-blue-100">
-                     <img src="https://img.icons8.com/color/48/000000/waze.png" class="w-6 h-6" alt="Waze"/>
-                </a>
-                <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.address)}" target="_blank" class="text-gray-700 p-2 rounded-full bg-gray-100">
-                    <img src="https://img.icons8.com/color/48/000000/google-maps.png" class="w-6 h-6" alt="Google Maps"/>
-                </a>
-            `;
-
-            if (mapInstance) {
-                mapInstance.remove();
-                mapInstance = null;
-            }
-
-            mapInstance = L.map('map-container');
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
-            
-            const orderLatLng = [order.latitude, order.longitude];
-            orderMarker = L.marker(orderLatLng, { icon: orderIcon }).addTo(mapInstance).bindPopup("יעד המשלוח");
-            
-            const bounds = L.latLngBounds([orderLatLng]);
-
-            // Get current location for driver marker
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const driverLatLng = [position.coords.latitude, position.coords.longitude];
-                    driverMarker = L.marker(driverLatLng, { icon: driverIcon }).addTo(mapInstance).bindPopup("המיקום שלי");
-                    bounds.extend(driverLatLng);
-                    mapInstance.fitBounds(bounds, { padding: [20, 20] });
-                },
-                () => {
-                    // Couldnt get location, just center on order
-                    mapInstance.setView(orderLatLng, 13);
-                },
-                { enableHighAccuracy: true }
-            );
-
-            document.getElementById('map-page').classList.add('active');
-            
-            // Must invalidate size after page is shown
-            setTimeout(() => mapInstance.invalidateSize(), 300);
-            feather.replace();
-        }
-
-        function closeMap() {
-            document.getElementById('map-page').classList.remove('active');
-            if (mapInstance) {
-                mapInstance.remove();
-                mapInstance = null;
-                driverMarker = null;
-                orderMarker = null;
-            }
-        }
-        
-        // --- Signature Pad ---
-        function openSignaturePad(orderId) {
-            currentOrderForSignature = orderId;
-            const modal = document.getElementById('signature-modal');
-            modal.style.display = 'flex';
-            
-            if (!signaturePad) {
-                const canvas = document.getElementById('signature-pad');
-                // Adjust for device pixel ratio
-                const ratio = Math.max(window.devicePixelRatio || 1, 1);
-                canvas.width = canvas.offsetWidth * ratio;
-                canvas.height = canvas.offsetHeight * ratio;
-                canvas.getContext("2d").scale(ratio, ratio);
-                
-                signaturePad = new SignaturePad(canvas, {
-                    backgroundColor: 'rgb(255, 255, 255)'
-                });
-            }
-            signaturePad.clear();
-        }
-        
-        function closeSignaturePad() {
-            document.getElementById('signature-modal').style.display = 'none';
-        }
-
-        async function saveSignature() {
-            if (signaturePad.isEmpty()) {
-                alert("אנא החתם את הלקוח תחילה.");
-                return;
-            }
-            
-            const dataURL = signaturePad.toDataURL("image/png");
-            
-            // Show loading state
-            document.getElementById('save-signature-btn').disabled = true;
-            document.getElementById('save-signature-btn').innerText = 'שומר...';
-
-            try {
-                await apiFetch('uploadSignature', 'POST', {
-                    orderId: currentOrderForSignature,
-                    base64Data: dataURL
-                });
-                logToServer('DriverApp', 'INFO', `Signature uploaded for ${currentOrderForSignature}`);
-                closeSignaturePad();
-                await loadData(); // Reload to update UI
-            } catch (error) {
-                alert(`שגיאה בשמירת חתימה: ${error.message}`);
-            } finally {
-                document.getElementById('save-signature-btn').disabled = false;
-                document.getElementById('save-signature-btn').innerText = 'שמור';
-            }
-        }
-        
-        // --- Photo Upload ---
-        async function uploadPhoto(orderId, input) {
-            if (!input.files || input.files.length === 0) return;
-            
-            const file = input.files[0];
-            const reader = new FileReader();
-            
-            reader.onload = async (event) => {
-                const base64Data = event.target.result;
-                // TODO: Show uploading indicator on the card
-                
-                try {
-                    await apiFetch('uploadPhoto', 'POST', {
-                        orderId: orderId,
-                        base64Data: base64Data
-                    });
-                    logToServer('DriverApp', 'INFO', `Photo uploaded for ${orderId}`);
-                    await loadData(); // Reload to update UI
-                } catch (error) {
-                    alert(`שגיאה בהעלאת תמונה: ${error.message}`);
-                } finally {
-                    // TODO: Hide indicator
-                    input.value = null; // Reset input
-                }
-            };
-            
-            reader.onerror = (error) => {
-                alert('שגיאה בקריאת הקובץ.');
-                console.error('FileReader error:', error);
-            };
-
-            reader.readAsDataURL(file);
-        }
-
-        // --- Utility ---
-        function logToServer(origin, level, message, context = {}) {
-            // Don't wait for this, just fire and forget
-            apiFetch('logToServer', 'POST', {
-                origin: origin,
-                level: level,
-                message: message,
-                context: context
-            }).catch(err => console.error("Failed to log to server:", err));
-        }
-
-        // --- Init ---
-        document.addEventListener('DOMContentLoaded', () => {
-            feather.replace();
-            
-            // Login
-            document.getElementById('login-btn').addEventListener('click', login);
-            document.getElementById('logout-btn').addEventListener('click', logout);
-            
-            // Map
-            document.getElementById('back-to-list-btn').addEventListener('click', closeMap);
-            
-            // Signature
-            document.getElementById('clear-signature-btn').addEventListener('click', () => signaturePad.clear());
-            document.getElementById('save-signature-btn').addEventListener('click', saveSignature);
-
-            checkAutoLogin();
-        });
     </script>
 </body>
 </html>
