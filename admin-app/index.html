@@ -3,25 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster - ניהול</title>
-    <!-- DeliveryMaster Admin App v30.5 -->
     <!-- 
-      v30.5 Changelog:
-      - v30.1: Async loading principles confirmed.
-      - v30.4: Improved error handling in data load functions.
-      - v30.5: logToServer updated to be fire-and-forget.
+      DeliveryMaster Admin App v30.7 (UI Reverted)
+      
+      Changelog:
+      - v30.7: Reverted UI/structure to v28.6 (pre-session) based on user feedback.
+      - v30.7: Kept v30.6 anti-loop fix in apiFetch.
+      - v30.7: Kept Leaflet map implementation (v30.0) to remove Google API key dependency.
     -->
-    
-    <!-- LeafletJS CSS & JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <title>DeliveryMaster - ניהול</title>
 
-    <!-- TailwindCSS -->
+    <!-- v30.7: LeafletJS CSS & JS (replaces Google Maps) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Icons (Feather) -->
     <script src="https://unpkg.com/feather-icons"></script>
-
+    
+    <!-- v30.7: Original styling from v28.6 -->
     <style>
         :root {
             --header-height: 64px;
@@ -79,23 +78,9 @@
         #driver-list-container, #order-list-container {
             overflow-y: auto;
             flex: 1;
-            position: relative;
         }
-        .tab-content {
-            display: none;
-            flex: 1;
-            flex-direction: column;
-            overflow: hidden; /* v30.1 */
-        }
-        .tab-content.active {
-            display: flex;
-        }
-        .tab-button {
-            padding: 10px 15px;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            color: var(--text-light);
-        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
         .tab-button.active {
             color: var(--primary-color);
             border-bottom-color: var(--primary-color);
@@ -123,8 +108,6 @@
         .status-active { background-color: #2ecc71; }
         .status-stuck { background-color: #e74c3c; }
         .status-inactive { background-color: #95a5a6; }
-
-        /* Order Card Status */
         .status-badge {
             padding: 2px 8px;
             border-radius: 12px;
@@ -140,44 +123,7 @@
         .status-problem { background-color: #e74c3c; }
         .status-other { background-color: #7f8c8d; }
 
-        /* v30.1 Loader */
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        .loader-container {
-            position: absolute; /* Changed from absolute to relative */
-            top: 40%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10;
-        }
-        #map-loader {
-            position: absolute;
-            z-index: 1001; /* Above map */
-        }
-        
-        /* v30.4: Error message styling */
-        .error-message {
-            padding: 20px;
-            text-align: center;
-            color: #e74c3c;
-            background: #fffafa;
-            border: 1px solid #e74c3c;
-            border-radius: 8px;
-            margin: 20px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Toast Notification */
+        /* v30.7: Simple Toast */
         #toast {
             position: fixed;
             bottom: -100px;
@@ -191,14 +137,10 @@
             transition: bottom 0.5s ease;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        #toast.show {
-            bottom: 30px;
-        }
-        #toast.error {
-            background-color: #e74c3c;
-        }
+        #toast.show { bottom: 30px; }
+        #toast.error { background-color: #e74c3c; }
 
-        /* Modal */
+        /* v30.7: Reverted Modal styles */
         #modal-backdrop {
             position: fixed;
             top: 0;
@@ -206,7 +148,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.5);
-            z-index: 3000;
+            z-index: 1040;
             display: none;
         }
         #modal {
@@ -217,56 +159,69 @@
             background: white;
             padding: 24px;
             border-radius: 8px;
-            z-index: 3001;
+            z-index: 1050;
             width: 90%;
             max-width: 600px;
             max-height: 80vh;
             overflow-y: auto;
             display: none;
         }
-        #modal-content {
-            line-height: 1.6;
+        
+        /* v30.7: Original Loader */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
         }
-
-        /* Map Controls */
-        #map-controls {
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loader-container {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 1000;
-            background: white;
-            padding: 8px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
         }
-
+        
+        /* v30.7: Error message styling */
+        .error-message {
+            padding: 20px;
+            text-align: center;
+            color: #e74c3c;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Sidebar -->
-    <aside id="sidebar">
+    <!-- Sidebar (Original Structure) -->
+    <aside id="sidebar" class="flex flex-col">
         <div class="flex items-center justify-between p-4 border-b border-gray-200" style="height: var(--header-height);">
             <h1 class="text-xl font-bold text-gray-800">DeliveryMaster</h1>
             <i data-feather="refresh-cw" class="cursor-pointer text-gray-600 hover:text-blue-500" onclick="manualRefresh()"></i>
         </div>
 
-        <!-- Tabs -->
+        <!-- Tabs (Original Structure) -->
         <div class="flex border-b border-gray-200">
-            <button class="tab-button flex-1 active" onclick="showTab('drivers')">
+            <button class="tab-button flex-1 py-3 px-1 text-center text-sm font-semibold border-b-2 border-transparent text-gray-600 active" onclick="showTab('drivers')">
                 <i data-feather="truck" class="inline-block w-4 h-4 ml-1"></i> נהגים
             </button>
-            <button class="tab-button flex-1" onclick="showTab('orders')">
+            <button class="tab-button flex-1 py-3 px-1 text-center text-sm font-semibold border-b-2 border-transparent text-gray-600" onclick="showTab('orders')">
                 <i data-feather="package" class="inline-block w-4 h-4 ml-1"></i> הזמנות
             </button>
         </div>
+        
+        <div class="p-4 border-b border-gray-200 flex-shrink-0">
+            <input type="text" id="search-input" placeholder="חיפוש..." class="w-full px-3 py-2 border rounded-md" onkeyup="filterLists()">
+        </div>
 
-        <!-- Driver List Tab -->
-        <div id="drivers-tab" class="tab-content active">
-            <div class="p-4 border-b border-gray-200 flex-shrink-0">
-                <input type="text" id="driver-search" placeholder="חיפוש נהג..." class="w-full px-3 py-2 border rounded-md" onkeyup="filterDrivers()">
-            </div>
-            <div id="driver-list-container">
+        <!-- Driver List Tab (Original Structure) -->
+        <div id="drivers-tab" class="tab-content active flex-1 overflow-y-auto">
+            <div id="driver-list-container" class="relative h-full">
                 <div id="driver-list-loader" class="loader-container" style="display: none;">
                     <div class="loader"></div>
                 </div>
@@ -276,12 +231,9 @@
             </div>
         </div>
 
-        <!-- Order List Tab -->
-        <div id="orders-tab" class="tab-content">
-            <div class="p-4 border-b border-gray-200 flex-shrink-0">
-                <input type="text" id="order-search" placeholder="חיפוש הזמנה, לקוח, כתובת..." class="w-full px-3 py-2 border rounded-md" onkeyup="filterOrders()">
-            </div>
-            <div id="order-list-container">
+        <!-- Order List Tab (Original Structure) -->
+        <div id="orders-tab" class="tab-content flex-1 overflow-y-auto">
+             <div id="order-list-container" class="relative h-full">
                 <div id="order-list-loader" class="loader-container" style="display: none;">
                     <div class="loader"></div>
                 </div>
@@ -292,7 +244,7 @@
         </div>
     </aside>
 
-    <!-- Main Content -->
+    <!-- Main Content (Original Structure) -->
     <main id="main-content">
         <header id="header">
             <div class="flex items-center space-x-4 space-x-reverse">
@@ -315,7 +267,8 @@
             <div id="map-loader" class="loader-container">
                 <div class="loader"></div>
             </div>
-            <div id="map-controls">
+            <!-- v30.7: Kept map controls from v30.0 logic -->
+            <div id="map-controls" class="absolute top-2 right-2 z-[1000] bg-white p-2 rounded-md shadow-md">
                 <label class="flex items-center space-x-2 space-x-reverse cursor-pointer">
                     <input type="checkbox" id="autoZoomCheckbox" class="form-checkbox" checked>
                     <span class="text-sm">זום אוטומטי</span>
@@ -324,10 +277,10 @@
         </div>
     </main>
 
-    <!-- Toast Notification -->
+    <!-- Toast Notification (v30.7 Simple) -->
     <div id="toast"></div>
 
-    <!-- Modal -->
+    <!-- Modal (Original Structure) -->
     <div id="modal-backdrop" onclick="closeModal()"></div>
     <div id="modal">
         <div class="flex justify-between items-center mb-4">
@@ -343,7 +296,8 @@
 
     <script>
         // --- Config ---
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxhJjLpnh8qZFutncdTLOX_ul8PIqZRrgjeE4289pPFiTozPcYiV8b0VzAg7KmuE6KZ/exec';
+        // v30.7: Using the URL from the user's logs
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxhJjLpnh8qZFutncdTLOX_ul8PIqZRrgjeE4289pPFiTozPcYiV8b0VzAg7KmuE6KZ/exec'; 
         const REFRESH_INTERVAL = 30000; // 30 seconds
 
         // --- State ---
@@ -351,41 +305,32 @@
         let currentDrivers = [];
         let currentLiveMapData = {};
         let refreshTimer;
+        let map; // v30.7
+        let driverMarkers = {}; // v30.7
+        let orderMarkers = {}; // v30.7
+        const ISRAEL_CENTER = [32.0853, 34.7818]; // v30.7
 
-        // --- Map Functions (v30.0 Leaflet Implementation) ---
-        let map;
-        let driverMarkers = {};
-        let orderMarkers = {}; // Keep track of order markers
-        const ISRAEL_CENTER = [32.0853, 34.7818]; // Tel Aviv center
-
-        // Custom icons
+        // --- v30.7: Leaflet Icon Definitions ---
         const driverIcon = L.icon({
             iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
             shadowSize: [41, 41]
         });
-
         const driverIconStuck = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', // Red icon
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
             shadowSize: [41, 41]
         });
-        
         const orderIcon = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', // Blue icon
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
             shadowSize: [41, 41]
         });
 
+        // --- v30.7: Leaflet Map Functions ---
         function initializeMap() {
             console.log("Initializing Leaflet map...");
             try {
@@ -398,33 +343,28 @@
                 document.getElementById('map-loader').style.display = 'none';
             } catch (error) {
                 console.error("Error initializing Leaflet map:", error);
-                document.getElementById('map').innerHTML = "<div class='error-message'>Map failed to load. Please refresh.</div>";
+                document.getElementById('map').innerHTML = "<div class='error-message' style='padding-top: 50px;'>Map failed to load. Please refresh.</div>";
                 document.getElementById('map-loader').style.display = 'none';
             }
         }
-        
-        function updateDriverMarkers(liveMapData) {
-            if (!map) return; // Don't run if map isn't ready
 
+        function updateDriverMarkers(liveMapData) {
+            if (!map) return;
             const driverIds = Object.keys(liveMapData.drivers);
             const bounds = L.latLngBounds();
 
-            // Update existing markers or create new ones
             driverIds.forEach(driverId => {
                 const driver = liveMapData.drivers[driverId];
-                if (!driver.latitude || !driver.longitude) return; // Skip drivers without coords
-
+                if (!driver.latitude || !driver.longitude) return;
                 const latLng = [driver.latitude, driver.longitude];
                 const isStuck = driver.isStuck;
                 const icon = isStuck ? driverIconStuck : driverIcon;
 
                 if (driverMarkers[driverId]) {
-                    // Marker exists, update position and icon
                     driverMarkers[driverId].setLatLng(latLng);
                     driverMarkers[driverId].setIcon(icon);
                     driverMarkers[driverId].getPopup().setContent(`<b>${driver.name}</b><br>${driver.status}<br>${driver.lastUpdate}`);
                 } else {
-                    // Create new marker
                     driverMarkers[driverId] = L.marker(latLng, { icon: icon })
                         .addTo(map)
                         .bindPopup(`<b>${driver.name}</b><br>${driver.status}<br>${driver.lastUpdate}`);
@@ -432,7 +372,6 @@
                 bounds.extend(latLng);
             });
 
-            // Remove old markers (drivers who are no longer active)
             Object.keys(driverMarkers).forEach(markerId => {
                 if (!driverIds.includes(markerId)) {
                     map.removeLayer(driverMarkers[markerId]);
@@ -440,7 +379,6 @@
                 }
             });
 
-            // Fit map to markers only if there are active drivers
             if (bounds.isValid() && document.getElementById('autoZoomCheckbox').checked) {
                 map.fitBounds(bounds, { padding: [50, 50] });
             }
@@ -449,9 +387,8 @@
         function focusOnDriver(driverId) {
             const marker = driverMarkers[driverId];
             if (marker && map) {
-                map.setView(marker.getLatLng(), 15); // Zoom level 15
+                map.setView(marker.getLatLng(), 15);
                 marker.openPopup();
-                // Highlight the driver in the list
                 document.querySelectorAll('.driver-item').forEach(el => el.classList.remove('active'));
                 const driverElement = document.querySelector(`.driver-item[onclick*="'${driverId}'"]`);
                 if (driverElement) {
@@ -465,20 +402,15 @@
             const order = currentOrders.find(o => o.orderId == orderId);
             if (order && order.latitude && order.longitude && map) {
                 const latLng = [order.latitude, order.longitude];
-                
-                // Clear previous order markers
                 Object.values(orderMarkers).forEach(marker => map.removeLayer(marker));
                 orderMarkers = {};
                 
-                // Create a new marker for the order
                 orderMarkers[orderId] = L.marker(latLng, { icon: orderIcon })
                     .addTo(map)
                     .bindPopup(`<b>הזמנה: ${order.orderId}</b><br>${order.customerName}<br>${order.address}`)
                     .openPopup();
 
-                map.setView(latLng, 15); // Zoom level 15
-
-                // Highlight the order in the list
+                map.setView(latLng, 15);
                 document.querySelectorAll('.order-card').forEach(el => el.classList.remove('active'));
                 const orderElement = document.getElementById(`order-${orderId}`);
                 if (orderElement) {
@@ -486,16 +418,13 @@
                     orderElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
             } else {
-                console.warn(`Order ${orderId} has no coordinates or map is not ready.`);
                 showToast("לא ניתן למקד הזמנה. חסרות קואורדינטות.", true);
             }
         }
-        // --- End of Map Functions ---
-
 
         // --- Data Fetching ---
         /**
-         * v30.5: Updated apiFetch with logging and fire-and-forget logToServer
+         * v30.7: apiFetch with v30.6 anti-loop fix
          */
         async function apiFetch(action, method = 'GET', data = null) {
             const url = `${API_URL}?action=${action}`;
@@ -522,30 +451,26 @@
                 return result.data;
             } catch (error) {
                 console.error(`API Fetch Error (${action}):`, error);
-                
-                // v30.4: Show toast on error
                 showToast(`שגיאת תקשורת: ${error.message}`, true);
                 
-                // v30.5: Log error to server
-                logToServer('AdminApp', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
-                
+                // v30.6 FIX: Prevent recursive logging loop
+                if (action !== 'logToServer') { 
+                    logToServer('AdminApp', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
+                }
                 throw error; // Re-throw to stop promise chain
             }
         }
 
-        /**
-         * v30.4: Improved error handling
-         */
         function loadOrders() {
             showLoader('order-list-loader', true);
-            document.getElementById('order-list').innerHTML = ''; // Clear previous errors
+            document.getElementById('order-list').innerHTML = ''; // v30.7
             
             apiFetch('getOrders')
                 .then(data => {
                     currentOrders = data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate));
                     renderOrders();
                 })
-                .catch(error => {
+                .catch(error => { // v30.7
                     console.error("Failed to load orders:", error);
                     document.getElementById('order-list').innerHTML = 
                         `<div class="error-message">טעינת הזמנות נכשלה.<br>${error.message}</div>`;
@@ -553,31 +478,24 @@
                 .finally(() => showLoader('order-list-loader', false));
         }
 
-        /**
-         * v30.4: Improved error handling
-         */
         function loadDrivers() {
             showLoader('driver-list-loader', true);
-            document.getElementById('driver-list').innerHTML = ''; // Clear previous errors
+            document.getElementById('driver-list').innerHTML = ''; // v30.7
 
             apiFetch('getDrivers')
                 .then(data => {
                     currentDrivers = data;
-                    // We render drivers based on live map data, so just store this
                 })
-                .catch(error => {
+                .catch(error => { // v30.7
                     console.error("Failed to load drivers:", error);
                      document.getElementById('driver-list').innerHTML = 
                         `<div class="error-message">טעינת נהגים נכשלה.<br>${error.message}</div>`;
                 })
                 .finally(() => {
-                    // Loader is hidden by loadLiveMapData or its error state
+                    // Loader is hidden by loadLiveMapData
                 });
         }
 
-        /**
-         * v30.4: Improved error handling
-         */
         function loadLiveMapData() {
             apiFetch('getLiveMapData')
                 .then(data => {
@@ -586,64 +504,51 @@
                     updateDriverMarkers(data);
                     document.getElementById('last-updated').innerText = `עודכן: ${new Date().toLocaleTimeString('he-IL')}`;
                 })
-                .catch(error => {
+                .catch(error => { // v30.7
                     console.error("Failed to load live map data:", error);
                     document.getElementById('driver-list').innerHTML = 
                         `<div class="error-message">טעינת מפה חיה נכשלה.<br>${error.message}</div>`;
                 })
                 .finally(() => {
-                    // Hide driver loader regardless of success/fail
                     showLoader('driver-list-loader', false);
                 });
         }
 
-        // --- Rendering ---
+        // --- Rendering (Original Structure) ---
         function renderDrivers() {
             const list = document.getElementById('driver-list');
-            list.innerHTML = ''; // Clear list
-
+            list.innerHTML = '';
+            
             if (!currentLiveMapData.drivers || Object.keys(currentLiveMapData.drivers).length === 0) {
                  if(currentDrivers.length === 0) {
-                    // If driver list is also empty (e.g. initial load error)
-                    // list.innerHTML will already show error from loadDrivers()
-                    return;
+                    return; // Error message is already shown
                  }
                  list.innerHTML = '<div class="p-4 text-center text-gray-500">אין נהגים פעילים כרגע.</div>';
-                 // Continue to show inactive drivers
             }
 
             const activeDrivers = Object.keys(currentLiveMapData.drivers).map(id => ({
-                id: id,
-                ...currentLiveMapData.drivers[id]
+                id: id, ...currentLiveMapData.drivers[id]
             }));
 
-            // Find drivers from main list who are not in live data (inactive)
             const inactiveDrivers = currentDrivers.filter(d => 
                 !activeDrivers.some(ad => ad.id === d.driverId) && d.status === 'פעיל'
             );
 
-            // Render active drivers
             activeDrivers
                 .sort((a, b) => a.name.localeCompare(b.name, 'he'))
-                .forEach(driver => {
-                    list.appendChild(createDriverElement(driver));
-                });
+                .forEach(driver => list.appendChild(createDriverElement(driver)));
 
-            // Render inactive (but 'פעיל') drivers
             inactiveDrivers
                 .sort((a, b) => a.name.localeCompare(b.name, 'he'))
                 .forEach(driver => {
                     list.appendChild(createDriverElement({
-                        id: driver.driverId,
-                        name: driver.name,
-                        status: 'לא מחובר',
-                        lastUpdate: 'N/A',
-                        isStuck: false,
-                        isInactive: true
+                        id: driver.driverId, name: driver.name,
+                        status: 'לא מחובר', lastUpdate: 'N/A',
+                        isStuck: false, isInactive: true
                     }));
                 });
             
-            filterDrivers(); // Apply search filter
+            filterLists(); // Apply search filter
         }
 
         function createDriverElement(driver) {
@@ -654,14 +559,11 @@
 
             let statusClass, statusText;
             if (driver.isInactive) {
-                statusClass = 'status-inactive';
-                statusText = 'לא מחובר';
+                statusClass = 'status-inactive'; statusText = 'לא מחובר';
             } else if (driver.isStuck) {
-                statusClass = 'status-stuck';
-                statusText = 'תקוע';
+                statusClass = 'status-stuck'; statusText = 'תקוע';
             } else {
-                statusClass = 'status-active';
-                statusText = 'פעיל';
+                statusClass = 'status-active'; statusText = 'פעיל';
             }
 
             el.innerHTML = `
@@ -679,18 +581,13 @@
 
         function renderOrders() {
             const list = document.getElementById('order-list');
-            list.innerHTML = ''; // Clear list
-
+            list.innerHTML = '';
             if (currentOrders.length === 0) {
                 list.innerHTML = '<div class="p-4 text-center text-gray-500">לא נמצאו הזמנות.</div>';
                 return;
             }
-
-            currentOrders.forEach(order => {
-                list.appendChild(createOrderElement(order));
-            });
-            
-            filterOrders(); // Apply search filter
+            currentOrders.forEach(order => list.appendChild(createOrderElement(order)));
+            filterLists(); // Apply search filter
         }
 
         function createOrderElement(order) {
@@ -742,6 +639,7 @@
         }
 
         function getStatusClass(status) {
+            // (Function is unchanged from v28.6)
             switch (status) {
                 case 'חדש': return 'status-new';
                 case 'שויך': return 'status-assigned';
@@ -753,8 +651,7 @@
             }
         }
 
-        // --- UI Interactions ---
-
+        // --- UI Interactions (Original Structure) ---
         function showTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
@@ -763,58 +660,46 @@
             document.querySelector(`.tab-button[onclick="showTab('${tabName}')"]`).classList.add('active');
         }
 
-        function filterDrivers() {
-            const query = document.getElementById('driver-search').value.toLowerCase();
+        function filterLists() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            // Filter Drivers
             document.querySelectorAll('#driver-list .driver-item').forEach(item => {
                 const name = item.getAttribute('data-name');
-                if (name.includes(query)) {
-                    item.style.display = 'flex';
-                } else {
-                    item.style.display = 'none';
-                }
+                item.style.display = name.includes(query) ? 'flex' : 'none';
             });
-        }
-
-        function filterOrders() {
-            const query = document.getElementById('order-search').value.toLowerCase();
+            // Filter Orders
             document.querySelectorAll('#order-list .order-card').forEach(item => {
                 const searchData = item.getAttribute('data-search');
-                if (searchData.includes(query)) {
-                    item.style.display = 'block';
-                } else {
-                    item.style.display = 'none';
-                }
+                item.style.display = searchData.includes(query) ? 'block' : 'none';
             });
         }
 
         function manualRefresh() {
             showToast('מרענן נתונים...');
-            clearTimeout(refreshTimer); // Clear existing timer
-            
-            // v30.1: Use Promise.allSettled to ensure all data loads
-            // v30.4: Errors are now handled inside the load functions
+            clearTimeout(refreshTimer);
             Promise.allSettled([
                 loadOrders(),
                 loadDrivers(),
                 loadLiveMapData()
             ]).then(() => {
                 showToast('רענון הושלם');
-                startRefreshTimer(); // Restart timer
+                startRefreshTimer();
             });
         }
 
         function triggerFullSync() {
-            // v30.4: Replaced confirm with custom modal/toast logic
-            showToast('מפעיל סנכרון מלא...');
-            apiFetch('runFullSync', 'POST')
-                .then(response => {
-                    showToast('סנכרון מלא הושלם בהצלחה.');
-                    logToServer('AdminApp', 'INFO', 'Full sync triggered by user.', response);
-                    manualRefresh();
-                })
-                .catch(error => {
-                    showToast('שגיאה בהפעלת סנכרון מלא.', true);
-                });
+            if (confirm('האם אתה בטוח שברצונך להפעיל סנכרון מלא?')) {
+                showToast('מפעיל סנכרון מלא...');
+                apiFetch('runFullSync', 'POST')
+                    .then(response => {
+                        showToast('סנכרון מלא הושלם בהצלחה.');
+                        logToServer('AdminApp', 'INFO', 'Full sync triggered by user.', response);
+                        manualRefresh();
+                    })
+                    .catch(error => {
+                        showToast('שגיאה בהפעלת סנכרון מלא.', true);
+                    });
+            }
         }
 
         function showLoader(loaderId, show) {
@@ -824,29 +709,25 @@
             }
         }
 
-        /**
-         * v30.4: Added isError parameter
-         */
+        // v30.7: Simple Toast Function
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             toast.innerText = message;
             toast.className = 'toast show';
-            if (isError) {
-                toast.classList.add('error');
-            }
+            if (isError) toast.classList.add('error');
             setTimeout(() => {
                 toast.classList.remove('show');
             }, 3000);
         }
 
+        // --- Modal Functions (Original) ---
         async function showOrderDetails(orderId) {
             document.getElementById('modal-title').innerText = `טוען פרטי הזמנה #${orderId}...`;
-            document.getElementById('modal-content').innerHTML = '<div class="loader" style="position: relative; margin: auto;"></div>';
+            document.getElementById('modal-content').innerHTML = '<div class="loader" style="margin: auto;"></div>';
             openModal();
 
             try {
                 const order = await apiFetch(`getOrderDetails&orderId=${orderId}`);
-                
                 document.getElementById('modal-title').innerText = `פרטי הזמנה #${orderId}`;
                 
                 const driversOptions = currentDrivers
@@ -876,17 +757,14 @@
                         <div><strong>תאריך:</strong> ${order.orderDate ? new Date(order.orderDate).toLocaleDateString('he-IL') : 'N/A'}</div>
                         <div><strong>מחסן:</strong> ${order.warehouse}</div>
                     </div>
-
                     <div class="mb-4">
                         <strong>הערות הזמנה:</strong>
                         <p class="p-2 bg-gray-50 rounded border">${order.notes || 'אין'}</p>
                     </div>
-                    
                     <div class="mb-4">
                         <strong>הערה פנימית:</strong>
                         <textarea id="internalNote-${orderId}" class="w-full p-2 border rounded" rows="2" onchange="updateOrderField('${orderId}', 'internalNote', this.value)">${order.internalNote || ''}</textarea>
                     </div>
-
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">שייך לנהג:</label>
@@ -902,7 +780,6 @@
                             </select>
                         </div>
                     </div>
-
                     <div class="mb-4">
                         <h4 class="font-bold mb-2">תמונות וחתימות</h4>
                         <div class="flex space-x-4 space-x-reverse">
@@ -910,7 +787,6 @@
                             ${order.signatureUrl ? `<a href="${order.signatureUrl}" target="_blank" class="text-blue-500 hover:underline">צפה בחתימה</a>` : '<span>אין חתימה</span>'}
                         </div>
                     </div>
-
                     <div class="border-t pt-4">
                         <h4 class="font-bold mb-3">הערות לנהג / משרד</h4>
                         <div class="mb-3 max-h-40 overflow-y-auto">${commentsHtml}</div>
@@ -930,7 +806,6 @@
             document.getElementById('modal-backdrop').style.display = 'block';
             document.getElementById('modal').style.display = 'block';
         }
-
         function closeModal() {
             document.getElementById('modal-backdrop').style.display = 'none';
             document.getElementById('modal').style.display = 'none';
@@ -942,20 +817,16 @@
             try {
                 await apiFetch('updateOrder', 'POST', { orderId, field, value });
                 showToast('הזמנה עודכנה בהצלחה.');
-                // Optimistic UI update
                 const order = currentOrders.find(o => o.orderId == orderId);
                 if (order) {
                     order[field] = value;
-                    if (field === 'status') {
-                        // If status is reset, clear driver
-                        if (value === 'חדש') {
-                           order['driverId'] = ''; 
-                           const driverSelect = document.getElementById(`driverSelect-${orderId}`);
-                           if (driverSelect) driverSelect.value = '';
-                        }
+                    if (field === 'status' && value === 'חדש') {
+                       order['driverId'] = ''; 
+                       const driverSelect = document.getElementById(`driverSelect-${orderId}`);
+                       if (driverSelect) driverSelect.value = '';
                     }
                 }
-                renderOrders(); // Re-render list
+                renderOrders();
                 logToServer('AdminApp', 'INFO', `Order ${orderId} field ${field} updated.`, { value });
             } catch (error) {
                 showToast('שגיאה בעדכון הזמנה.', true);
@@ -973,18 +844,14 @@
             try {
                 await apiFetch('assignDriver', 'POST', { orderId, driverId });
                 showToast('נהג שויך בהצלחה.');
-                // Optimistic UI update
                 const order = currentOrders.find(o => o.orderId == orderId);
                 if (order) {
                     order.driverId = driverId;
                     order.status = 'שויך';
                 }
-                renderOrders(); // Re-render list
-                // Update status dropdown in modal if open
+                renderOrders();
                 const statusSelect = document.getElementById(`statusSelect-${orderId}`);
-                if (statusSelect) {
-                    statusSelect.value = 'שויך';
-                }
+                if (statusSelect) statusSelect.value = 'שויך';
                 logToServer('AdminApp', 'INFO', `Order ${orderId} assigned to ${driverId}.`, {});
             } catch (error) {
                 showToast('שגיאה בשיוך נהג.', true);
@@ -998,15 +865,12 @@
 
             showToast('שולח הערה...');
             try {
-                const newComment = await apiFetch('postComment', 'POST', {
-                    orderId: orderId,
-                    author: 'מנהל',
-                    text: text
+                await apiFetch('postComment', 'POST', {
+                    orderId: orderId, author: 'מנהל', text: text
                 });
                 showToast('הערה נשלחה.');
                 input.value = '';
-                // Re-load details to show new comment
-                showOrderDetails(orderId);
+                showOrderDetails(orderId); // Re-load details
             } catch (error) {
                 showToast('שגיאה בשליחת הערה.', true);
             }
@@ -1016,18 +880,16 @@
             logToServer('AdminApp', 'INFO', `User viewed PDF for order ${orderId}`, { orderId });
         }
 
-        // --- Utility ---
-        /**
-         * v30.5: Updated to be fire-and-forget
-         */
+        // --- v30.7: Utility (with anti-loop) ---
         function logToServer(origin, level, message, context = {}) {
-            // Don't await, don't block UI
             apiFetch('logToServer', 'POST', {
                 origin: origin,
                 level: level,
                 message: message,
                 context: context
-            }).catch(err => console.error("Silent log-to-server failed:", err)); // Log only to console
+            }).catch(err => {
+                console.error("Silent log-to-server failed:", err.message);
+            });
         }
         
         function startRefreshTimer() {
@@ -1037,20 +899,19 @@
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            console.log("DOM loaded. v30.5");
-            feather.replace(); // Initialize icons
+            console.log("DOM loaded. v30.7 (Reverted UI)");
+            feather.replace();
             
-            initializeMap(); // Call Leaflet map init directly
+            // v30.7: Call Leaflet init
+            initializeMap(); 
             
             loadDrivers();
             loadOrders();
             loadLiveMapData();
             
-            startRefreshTimer(); // Start auto-refresh
-            
-            logToServer('AdminApp', 'INFO', 'Admin App v30.5 Loaded');
+            startRefreshTimer();
+            logToServer('AdminApp', 'INFO', 'Admin App v30.7 Loaded');
         });
-
     </script>
 </body>
 </html>
