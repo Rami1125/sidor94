@@ -3,18 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v31.0</title>
+    <title>DeliveryMaster v31.1</title>
     <!-- 
-      DeliveryMaster Admin App v31.0 (Rebuild)
+      DeliveryMaster Admin App v31.1
       
       Changelog:
-      - v31.0: Complete UI and architecture rebuild as requested.
-      - Modern 3-panel dashboard layout (Nav, Map, Lists).
-      - Interactive Leaflet map with separate driver/order markers.
-      - "Assign on map" feature.
-      - "New Order" form with customer search and creation.
-      - Optimized single 'getDashboardData' API call on load.
-      - Robust 'apiFetch' wrapper for communication and logging.
+      - v31.1: CRITICAL FIX for apiFetch.
+      - The function was incorrectly sending GET parameters as part of the 
+      - 'action' string (e.g., "getLogs&limit=200").
+      - Fixed apiFetch to properly serialize parameters into the URL
+      - and updated all calling functions (loadInitialData, logToServer).
     -->
     
     <!-- TailwindCSS -->
@@ -434,12 +432,13 @@
         }
         
         async function loadInitialData() {
-            console.log("v31.0: Loading initial dashboard data...");
+            console.log("v31.1: Loading initial dashboard data...");
             showLoader('map-loader', true);
             showLoader('orders-list', true);
             showLoader('drivers-list', true);
             
             try {
+                // v31.1 FIX: Call apiFetch with correct signature
                 const data = await apiFetch('getDashboardData');
                 
                 state.orders = data.orders || [];
@@ -471,8 +470,9 @@
         function startRefreshTimer() {
             clearInterval(refreshTimer);
             refreshTimer = setInterval(async () => {
-                console.log("v31.0: Auto-refreshing data...");
+                console.log("v31.1: Auto-refreshing data...");
                 try {
+                    // v31.1 FIX: Call apiFetch with correct signature
                     const data = await apiFetch('getDashboardData');
                     state.orders = data.orders || [];
                     state.drivers = data.drivers || [];
@@ -493,11 +493,18 @@
 
         // --- COMMUNICATION CHANNEL ("מלשינון") ---
         /**
-         * v31.0: Robust API wrapper
+         * v31.1: Robust API wrapper (FIXED)
          * Handles requests, responses, errors, and logging.
+         * Separates action from params for GET requests.
          */
-        async function apiFetch(action, method = 'GET', data = null) {
-            const url = `${API_URL}?action=${action}`;
+        async function apiFetch(action, params = {}, method = 'GET', data = null) {
+            let url = `${API_URL}?action=${action}`;
+            
+            // v31.1 FIX: Properly serialize GET parameters
+            if (method === 'GET' && Object.keys(params).length > 0) {
+                url += '&' + new URLSearchParams(params).toString();
+            }
+
             const options = {
                 method: method,
                 redirect: 'follow',
@@ -510,6 +517,7 @@
             }
 
             try {
+                // For GET, use the full URL. For POST, use the base API_URL.
                 const response = await fetch(method === 'GET' ? url : API_URL, options);
                 
                 if (!response.ok) {
@@ -529,7 +537,8 @@
                 
                 // Anti-loop safety check
                 if (action !== 'logToServer') {
-                    logToServer('AdminApp v31.0', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
+                    // v31.1 FIX: Update logToServer call
+                    logToServer('AdminApp v31.1', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
                 }
                 
                 throw error; // Re-throw for the calling function to handle
@@ -537,10 +546,11 @@
         }
         
         /**
-         * v31.0: Fire-and-forget logger
+         * v31.1: Fire-and-forget logger (FIXED)
          */
         function logToServer(origin, level, message, context = {}) {
-            apiFetch('logToServer', 'POST', {
+            // v31.1 FIX: Call apiFetch with correct signature
+            apiFetch('logToServer', {}, 'POST', {
                 origin: origin,
                 level: level,
                 message: message,
@@ -793,7 +803,8 @@
             if (btn) btn.innerText = 'משייך...';
             
             try {
-                await apiFetch('assignDriver', 'POST', { orderId: orderId, driverId: driverId });
+                // v31.1 FIX: Call apiFetch with correct signature
+                await apiFetch('assignDriver', {}, 'POST', { orderId: orderId, driverId: driverId });
                 showToast(`הזמנה #${orderId} שויכה לנהג ${driverId}`, 'success');
                 
                 // Refresh data
@@ -802,7 +813,7 @@
                 // Close popup
                 map.closePopup();
                 
-                logToServer('AdminApp v31.0', 'INFO', `Order ${orderId} assigned to ${driverId}`, { orderId, driverId });
+                logToServer('AdminApp v31.1', 'INFO', `Order ${orderId} assigned to ${driverId}`, { orderId, driverId });
                 
             } catch (error) {
                 showToast(`שגיאה בשיוך הזמנה: ${error.message}`, 'error');
@@ -921,7 +932,8 @@
             };
             
             try {
-                const newOrder = await apiFetch('createNewOrder', 'POST', { orderData, customerData });
+                // v31.1 FIX: Call apiFetch with correct signature
+                const newOrder = await apiFetch('createNewOrder', {}, 'POST', { orderData, customerData });
                 showToast(`הזמנה #${newOrder.orderId} נוצרה בהצלחה`, 'success');
                 closeNewOrderForm();
                 
