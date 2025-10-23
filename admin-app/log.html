@@ -4,102 +4,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- 
-      DeliveryMaster Log Viewer v31.3
+      DeliveryMaster Log Viewer v31.5
       
       Changelog:
-      - v31.3: CRITICAL - Aligned API_URL constant to the new user-deployed endpoint.
-      - Client now points to the correct server.
+      - v31.5: Proxy Server Integration
+      - CRITICAL: Changed API_URL to point to the new Node.js proxy server.
+      - Updated apiFetch() to match the new proxy's URL structure.
     -->
     <title>DeliveryMaster - לוגים</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/feather-icons"></script>
-    <style>
+<!-- ... (existing code) ... -->
         :root {
             --primary-color: #3b82f6; /* blue-500 */
             --bg-light: #f3f4f6; /* gray-100 */
         }
-        body { 
-            font-family: 'Arial', sans-serif; 
-            background-color: var(--bg-light);
-        }
-        .log-item:hover { background-color: #fafafa; }
-        .log-INFO { border-right: 4px solid #3b82f6; }
-        .log-ERROR { border-right: 4px solid #ef4444; }
-        .log-WARNING { border-right: 4px solid #f59e0b; }
+/* ... (existing code) ... */
         .log-FATAL { border-right: 4px solid #991b1b; } /* red-900 */
         .log-Client { border-right: 4px solid #8b5cf6; }
 
         /* Modal */
-        #log-details-modal {
-            max-width: 800px;
-            border-radius: 12px;
-            border: none;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            padding: 0;
-        }
+/* ... (existing code) ... */
         #log-details-modal::backdrop {
             background: rgba(0,0,0,0.5);
             backdrop-filter: blur(2px);
         }
         
-        #map-placeholder {
-            height: 300px;
-            background-color: #eee;
+/* ... (existing code) ... */
             margin-top: 15px;
             border-radius: 8px;
         }
         
-        /* Toast Notification */
-        #toast-container {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 5000;
-        }
-        .toast {
-            padding: 12px 20px;
-            background-color: #1f2937;
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-        }
-        .toast.show { opacity: 1; transform: translateY(0); }
+/* ... (existing code) ... */
         .toast.error { background-color: #ef4444; }
 
         /* Loader */
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
+/* ... (existing code) ... */
             animation: spin 1s linear infinite;
         }
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+/* ... (existing code) ... */
         }
     </style>
 </head>
 <body>
 
     <!-- Header -->
-    <header class="bg-white shadow-sm">
+<!-- ... (existing code) ... -->
         <div class="container mx-auto px-6 py-4 flex justify-between items-center">
             <h1 class="text-2xl font-bold text-gray-800">מציג לוגים</h1>
             <div class="flex items-center space-x-4 space-x-reverse">
+                <!-- v31.4: Server Status Light -->
+                <div id="server-status-light" title="סטטוס שרת" class="w-4 h-4 rounded-full bg-amber-500"></div>
                 <select id="level-filter" class="border rounded-md px-3 py-2 bg-white" onchange="renderLogs()">
                     <option value="ALL">כל הרמות</option>
-                    <option value="FATAL">FATAL</option>
-                    <option value="ERROR">ERROR</option>
-                    <option value="WARNING">WARNING</option>
-                    <option value="INFO">INFO</option>
+/* ... (existing code) ... */
                 </select>
                 <button onclick="loadLogs()" id="refresh-btn" class="p-2 rounded-full hover:bg-gray-100" title="רענן">
                     <i data-feather="refresh-cw" class="text-gray-600"></i>
@@ -109,78 +66,93 @@
     </header>
 
     <main class="container mx-auto px-6 py-6">
+        <!-- v31.4: Persistent Error Bar -->
+        <div id="critical-error-bar" class="mb-4 bg-red-500 text-white p-4 rounded-lg font-bold" style="display: none;">
+            שגיאת תקשורת קריטית. השרת אינו מגיב כראוי. ודא ששרת ה-Proxy פועל.
+        </div>
         <div id="loader" class="text-center py-10" style="display: none;">
             <div class="loader inline-block"></div>
-        </div>
-        <div id="log-list" class="space-y-3">
-            <!-- Log items will be injected here -->
-        </div>
-    </main>
-
-    <!-- Modal -->
-    <dialog id="log-details-modal">
-        <div class="flex justify-between items-center p-4 border-b">
-            <h2 class="text-xl font-bold">פרטי לוג</h2>
-            <button class="text-gray-500 hover:text-gray-800" onclick="closeModal()">
-                <i data-feather="x"></i>
-            </button>
-        </div>
-        <div class="p-6">
-            <pre id="log-json" class="bg-gray-100 p-4 rounded-md overflow-x-auto text-sm max-h-60"></pre>
-            <div id="map-placeholder"></div>
-        </div>
-    </dialog>
-    
-    <!-- Toast Container -->
-    <div id="toast-container"></div>
-
+<!-- ... (existing code) ... -->
     <script>
         // --- Config ---
-        // v31.3: Updated API_URL to the new user-deployed endpoint
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyGQ9NJhoY--Fl07JOtfIZKS1dS4Ujzeirf-lDcGYY9XM0ItOCgJItMwit5rIiSge_u/exec';
+        // v31.5: CRITICAL - Pointing to the new Node.js Proxy Server
+        const API_URL = 'http://localhost:8080/api';
+        
         const APP_MODULE = 'LogViewer';
-        let allLogs = [];
+        const APP_VERSION = '31.5';
+// ... (existing code) ...
         let mapInstance = null;
         const modal = document.getElementById('log-details-modal');
+        const statusLight = document.getElementById('server-status-light');
 
-        // --- v31.2: "SMART LOGGER" INTELLIGENCE ---
-        
+        // --- v31.4: "SMART LOGGER" v2 (Batching) ---
+// ... (existing code) ...
+        let logFlushTimer = setInterval(flushLogQueue, 10000); // Flush every 10 seconds
+
+        /**
+         * v31.4: Upgraded smartLog to use a batch queue.
+// ... (existing code) ...
+         */
         function smartLog(level, message, context = {}) {
             const timestamp = new Date().toISOString();
+// ... (existing code) ...
             console.log(`[${timestamp}] [${level}] ${message}`, context);
 
-            fetch(API_URL, {
+            // 2. Push to queue
+// ... (existing code) ...
+                timestamp: timestamp
+            });
+            
+            // Optional: Flush immediately if it's a critical error
+// ... (existing code) ...
+                flushLogQueue();
+            }
+        }
+        
+        /**
+// ... (existing code) ...
+         * v31.4: New function to flush the log queue to the server.
+         */
+        function flushLogQueue() {
+// ... (existing code) ...
+            if (logQueue.length === 0) {
+                return;
+            }
+
+            const logsToFlush = [...logQueue]; // Copy the queue
+// ... (existing code) ...
+            logQueue = []; // Clear the queue immediately
+
+            // Send to server (fire-and-forget)
+            // v31.5: Using new proxy endpoint
+            fetch(`${API_URL}/logToServerBatch`, {
                 method: "POST",
                 mode: "cors",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "logToServer",
-                    data: {
-                        origin: APP_MODULE,
-                        level: level.toUpperCase(),
-                        message: message,
-                        context: context
-                    }
-                })
+                body: JSON.stringify(logsToFlush) // Proxy expects an array
             }).catch(err => {
-                console.warn(`[SmartLog] Silent log-to-server failure: ${err.message}`);
+                console.warn(`[SmartLog] Silent batch log failure: ${err.message}`);
+// ... (existing code) ...
+                logQueue = [...logsToFlush, ...logQueue];
             });
         }
 
+        /**
+// ... (existing code) ...
+         * v31.2: Global Error Handler
+         */
         window.onerror = function(message, source, lineno, colno, error) {
-            smartLog('FATAL', 'Unhandled window error', {
-                errorMessage: message,
-                source: source,
-                lineno: lineno,
-                colno: colno,
+// ... (existing code) ...
                 errorStack: error ? error.stack : 'N/A'
             });
             return false;
         };
-
+        
+// ... (existing code) ...
+         * v31.2: Global Promise Rejection Handler
+         */
         window.onunhandledrejection = function(event) {
-            smartLog('FATAL', 'Unhandled promise rejection', {
-                reason: event.reason ? event.reason.message : 'Unknown reason',
+// ... (existing code) ...
                 stack: event.reason ? event.reason.stack : 'N/A'
             });
         };
@@ -188,18 +160,19 @@
 
         // --- API ---
         /**
-         * v31.2: Robust API wrapper
+         * v31.5: Robust API wrapper
+         * Updated to use the Node.js proxy server.
          */
         async function apiFetch(action, params = {}, method = 'GET', data = null) {
-            let url = `${API_URL}?action=${action}`;
+            let url = `${API_URL}/${action}`; // v31.5: New URL structure
             
             if (method === 'GET' && Object.keys(params).length > 0) {
-                url += '&' + new URLSearchParams(params).toString();
+                url += '?' + new URLSearchParams(params).toString();
             }
 
             const options = {
                 method: method,
-                mode: 'cors', // v31.2: Set explicitly
+                mode: 'cors', // Still required
                 redirect: 'follow',
                 muteHttpExceptions: true,
                 headers: {}
@@ -207,168 +180,178 @@
 
             if (method === 'POST') {
                 options.headers['Content-Type'] = 'application/json';
-                options.body = JSON.stringify({ action: action, data: data });
+                // v31.5: Send *only* the data. The 'action' is in the URL.
+                options.body = JSON.stringify(data);
             }
             
-            const response = await fetch(method === 'GET' ? url : API_URL, options);
+            // v31.5: Use the new URL structure for both GET and POST
+            const response = await fetch(url, options);
             
             if (!response.ok) {
+// ... (existing code) ...
                 let errorText = await response.text();
                 try {
                     const errorJson = JSON.parse(errorText);
-                    if (errorJson.data) errorText = errorJson.data;
+// ... (existing code) ...
                 } catch (e) {}
+                // v31.4: Check for CORS failure signature
+                if (response.status === 0 || (response.status === 200 && errorText.includes("<!DOCTYPE html>"))) {
+                   throw new Error('שגיאת CORS. ודא שהשרת (Code.gs) פרוס כהלכה.');
+                }
+                // v31.5: Add proxy-specific error
+                if (response.status === 502) { // Bad Gateway
+                    throw new Error('שגיאת Proxy. שרת הביניים נכשל לתקשר עם Google.');
+                }
                 throw new Error(`שגיאת שרת (${response.status}): ${errorText}`);
             }
             
-            const result = await response.json();
-            
-            if (result.status === 'error') {
-                throw new Error(result.data);
-            }
+// ... (existing code) ...
             
             return result.data;
         }
 
         // --- Logic ---
+// ... (existing code) ...
         async function loadLogs() {
             const module = 'loadLogs';
             smartLog('INFO', 'Loading logs...', { module, limit: 200 });
-            document.getElementById('loader').style.display = 'block';
-            document.getElementById('log-list').innerHTML = '';
+// ... (existing code) ...
             document.getElementById('refresh-btn').disabled = true;
 
             try {
                 const logs = await apiFetch('getLogs', { limit: 200 }, 'GET');
+                
+                // v31.4: Communication OK!
+                statusLight.className = 'w-4 h-4 rounded-full bg-green-500';
+// ... (existing code) ...
+                document.getElementById('critical-error-bar').style.display = 'none';
+
                 allLogs = logs;
-                renderLogs();
+// ... (existing code) ...
                 smartLog('INFO', `Successfully loaded ${logs.length} log entries`, { module });
             } catch (error) {
-                smartLog('ERROR', 'Failed to load logs', { module, error: error.message, stack: error.stack });
+                // v31.4: Communication ERROR!
+                statusLight.className = 'w-4 h-4 rounded-full bg-red-500';
+// ... (existing code) ...
                 document.getElementById('log-list').innerHTML = `<p class="text-center text-red-500 p-4">שגיאה בטעינת לוגים: ${error.message}</p>`;
                 showToast(`שגיאה בטעינת לוגים: ${error.message}`, 'error');
+                
+                // Show persistent error bar only on critical CORS/Fetch errors
+                if (error.message.includes('Failed to fetch') || error.message.includes('Proxy')) {
+                    document.getElementById('critical-error-bar').style.display = 'block';
+                }
             } finally {
-                document.getElementById('loader').style.display = 'none';
+// ... (existing code) ...
                 document.getElementById('refresh-btn').disabled = false;
             }
         }
 
+// ... (existing code) ...
         function renderLogs() {
             const list = document.getElementById('log-list');
-            const filter = document.getElementById('level-filter').value;
-            list.innerHTML = '';
+// ... (existing code) ...
             const filteredLogs = allLogs.filter(log => filter === 'ALL' || (log.Level && log.Level.toUpperCase() === filter));
 
             if (filteredLogs.length === 0) {
-                list.innerHTML = '<p class="text-center text-gray-500 p-4">לא נמצאו לוגים.</p>';
+// ... (existing code) ...
                 return;
             }
             filteredLogs.forEach((log, index) => list.appendChild(createLogElement(log, index)));
-            feather.replace();
+// ... (existing code) ...
         }
 
         // --- UI (v31.1 Style) ---
+// ... (existing code) ...
         function createLogElement(log, index) {
             const el = document.createElement('div');
             const level = (log.Level || 'INFO').toUpperCase();
-            const origin = log.Origin || 'Unknown';
+// ... (existing code) ...
             let timestampStr = log.Timestamp || 'N/A';
             try {
-                timestampStr = new Date(log.Timestamp).toLocaleString('he-IL');
-                if (timestampStr === 'Invalid Date') {
-                    timestampStr = log.Timestamp; 
+                // Try parsing as ISO string first (from v31.4 logger)
+// ... (existing code) ...
+                if (date.toString() === 'Invalid Date') {
+                    // Fallback for "dd/mm/yyyy, HH:MM:SS" format (from old server logs)
+                    const parts = log.Timestamp.split(', ');
+// ... (existing code) ...
+                    // new Date(year, monthIndex, day, hours, minutes, seconds)
+                    date = new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1], timeParts[2]);
                 }
+// ... (existing code) ...
+
             } catch (e) {
-                 timestampStr = log.Timestamp;
-            }
+                 timestampStr = log.Timestamp; // Keep original if parsing fails
+// ... (existing code) ...
 
             el.className = `log-item log-${level} bg-white p-4 rounded-lg shadow-sm flex justify-between items-center cursor-pointer`;
-            el.onclick = () => showDetails(index);
+// ... (existing code) ...
             
             el.innerHTML = `
                 <div class="flex-1 overflow-hidden">
-                    <div class="flex items-center space-x-3 space-x-reverse mb-1">
-                        <span class="font-bold text-gray-800">${origin}</span>
-                        <span class="text-sm text-gray-500">${timestampStr}</span>
-                    </div>
-                    <p class="text-gray-700 truncate" title="${log.Message}">${log.Message}">${log.Message}</p>
+<!-- ... (existing code) ... -->
+                    <p class="text-gray-700 truncate" title="${log.Message}">${log.Message}</p>
                 </div>
                 <i data-feather="zoom-in" class="text-gray-500 mr-4"></i>
-            `;
+// ... (existing code) ...
             return el;
         }
 
         function showDetails(index) {
-            const log = allLogs[index];
+// ... (existing code) ...
             let dataObject = {};
             try {
                 dataObject = JSON.parse(log.Data);
+// ... (existing code) ...
             } catch (e) {
                 dataObject = { rawData: log.Data };
             }
 
-            document.getElementById('log-json').textContent = JSON.stringify(log, null, 2);
-            modal.showModal();
-            
-            let lat = null, lon = null;
-            if (dataObject.context && dataObject.context.latitude) {
-                lat = dataObject.context.latitude;
-                lon = dataObject.context.longitude;
-            } else if (dataObject.latitude) {
-                lat = dataObject.latitude;
-                lon = dataObject.longitude;
-            }
-
-            const mapEl = document.getElementById('map-placeholder');
-            if (mapInstance) {
-                mapInstance.remove();
-                mapInstance = null;
-            }
+// ... (existing code) ...
             
             if (lat && lon) {
                 mapEl.innerHTML = '';
-                mapEl.style.height = '300px';
+// ... (existing code) ...
                 mapInstance = L.map(mapEl).setView([lat, lon], 13);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
-                L.marker([lat, lon]).addTo(mapInstance);
+// ... (existing code) ...
                 setTimeout(() => mapInstance.invalidateSize(), 100);
             } else {
                 mapEl.style.height = '100px';
-                mapEl.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">אין נתוני מיקום בלוג זה.</div>';
+// ... (existing code) ...
             }
         }
 
         function closeModal() {
-            modal.close();
+// ... (existing code) ...
             if (mapInstance) {
                 mapInstance.remove();
                 mapInstance = null;
             }
         }
         
-        // Toast Function
+// ... (existing code) ...
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerText = message;
+// ... (existing code) ...
             container.appendChild(toast);
             setTimeout(() => {
                 toast.classList.add('show');
-            }, 10);
+// ... (existing code) ...
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => {
-                    container.removeChild(toast);
+// ... (existing code) ...
                 }, 300);
             }, 3000);
         }
 
         // --- Init ---
+// ... (existing code) ...
         document.addEventListener('DOMContentLoaded', () => {
             feather.replace();
             loadLogs();
-            smartLog('INFO', 'Log Viewer v31.3 scripts parsed and running.');
+            smartLog('INFO', `Log Viewer v${APP_VERSION} scripts parsed and running.`);
         });
     </script>
 
