@@ -3,19 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v31.1</title>
+    <title>DeliveryMaster v31.2</title>
     <!-- 
-      DeliveryMaster Admin App v31.1
+      DeliveryMaster Admin App v31.2
       
       Changelog:
-      - v31.1: CRITICAL FIX for apiFetch.
-      - The function was incorrectly sending GET parameters as part of the 
-      - 'action' string (e.g., "getLogs&limit=200").
-      - Fixed apiFetch to properly serialize parameters into the URL
-      - and updated all calling functions (loadInitialData, logToServer).
+      - v31.2: "Smart Logger" Intelligence & CORS Fix
+      - Implemented smartLog() function as requested (no new file).
+      - Added global error handlers (window.onerror, onunhandledrejection)
+        to catch all JS errors and report them to the server.
+      - Integrated smartLog() into all key operations (load, assign, create).
+      - Added 'mode: "cors"' to apiFetch options as requested.
+      - Added hidden warning about Tailwind CDN.
     -->
     
-    <!-- TailwindCSS -->
+    <!-- 
+      v31.2 WARNING: Using Tailwind CDN for development. 
+      For production, a compiled build is required.
+    -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- LeafletJS (Map) -->
@@ -373,8 +378,9 @@
 
     <script>
         // --- CONFIG & STATE ---
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxSPwa-EW4amB-jyRCv_B1QXeftyP9b7pz2EO_f9t4B4ri3oJMkcbxSE9DkUu_rP7cL/exec';
-        const REFRESH_INTERVAL = 45000; // 45 seconds
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyGQ9NJhoY--Fl07JOtfIZKS1dS4Ujzeirf-lDcGYY9XM0ItOCgJItMwit5rIiSge_u/exec';
+        const APP_MODULE = 'AdminDashboard';
+        const REFRESH_INTERVAL = 45000;
         const ISRAEL_CENTER = [32.0853, 34.7818];
 
         let state = {
@@ -388,6 +394,65 @@
         let driverMarkers = {};
         let orderMarkers = {};
         let refreshTimer;
+        
+        // --- v31.2: "SMART LOGGER" INTELLIGENCE ---
+        
+        /**
+         * v31.2: New smartLog function as requested.
+         * Logs to console and *silently* logs to server.
+         */
+        function smartLog(level, message, context = {}) {
+            // 1. Log to console
+            const timestamp = new Date().toISOString();
+            console.log(`[${timestamp}] [${level}] ${message}`, context);
+
+            // 2. Send to server (fire-and-forget)
+            // This uses the *base* fetch, not apiFetch, to avoid loops
+            fetch(API_URL, {
+                method: "POST",
+                mode: "cors", // Explicitly set as requested
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "logToServer",
+                    data: {
+                        origin: APP_MODULE,
+                        level: level.toUpperCase(),
+                        message: message,
+                        context: context
+                    }
+                })
+            }).catch(err => {
+                // This is the "silent" catch to prevent loops
+                console.warn(`[SmartLog] Silent log-to-server failure: ${err.message}`);
+            });
+        }
+
+        /**
+         * v31.2: Global Error Handler
+         * Catches all unhandled JS errors on the page.
+         */
+        window.onerror = function(message, source, lineno, colno, error) {
+            smartLog('FATAL', 'Unhandled window error', {
+                errorMessage: message,
+                source: source,
+                lineno: lineno,
+                colno: colno,
+                errorStack: error ? error.stack : 'N/A'
+            });
+            // Don't suppress the default browser error console
+            return false;
+        };
+
+        /**
+         * v31.2: Global Promise Rejection Handler
+         * Catches unhandled promise rejections.
+         */
+        window.onunhandledrejection = function(event) {
+            smartLog('FATAL', 'Unhandled promise rejection', {
+                reason: event.reason ? event.reason.message : 'Unknown reason',
+                stack: event.reason ? event.reason.stack : 'N/A'
+            });
+        };
         
         // --- ICONS (Leaflet) ---
         const driverIconActive = L.icon({
@@ -409,12 +474,11 @@
         
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
+            smartLog('INFO', 'DOM content loaded. Initializing v31.2...');
             feather.replace();
             initMap();
             loadInitialData();
             startRefreshTimer();
-            
-            // Set default date for new order
             document.getElementById('order-date').value = new Date().toISOString().split('T')[0];
         });
 
@@ -425,20 +489,25 @@
                     maxZoom: 19,
                     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 }).addTo(map);
+                smartLog('INFO', 'Map initialized successfully');
             } catch (error) {
-                console.error("Map initialization failed:", error);
-                document.getElementById('map').innerHTML = `<div class="p-8 text-center text-red-600">שגיאה בטעינת המפה.</div>`;
+                smartLog('FATAL', 'Map initialization failed', { error: error.message, stack: error.stack });
+                document.getElementById('map').innerHTML = `<div class="p-8 text-center text-red-600">שגיאה קריטית בטעינת המפה.</div>`;
             }
         }
         
-        async function loadInitialData() {
-            console.log("v31.1: Loading initial dashboard data...");
-            showLoader('map-loader', true);
-            showLoader('orders-list', true);
-            showLoader('drivers-list', true);
+        async function loadInitialData(isRefresh = false) {
+            const module = 'loadInitialData';
+            if (!isRefresh) {
+                smartLog('INFO', 'v31.2: Loading initial dashboard data...', { module });
+                showLoader('map-loader', true);
+                showLoader('orders-list', true);
+                showLoader('drivers-list', true);
+            } else {
+                smartLog('INFO', 'v31.2: Auto-refreshing data...', { module });
+            }
             
             try {
-                // v31.1 FIX: Call apiFetch with correct signature
                 const data = await apiFetch('getDashboardData');
                 
                 state.orders = data.orders || [];
@@ -451,127 +520,101 @@
                 renderMapMarkers();
                 populateCustomerDatalist();
                 
-                document.getElementById('last-updated').innerText = `עודכן: ${new Date().toLocaleTimeString('he-IL')}`;
-                showToast('נתונים סונכרנו בהצלחה', 'success');
+                const timestamp = new Date().toLocaleTimeString('he-IL');
+                document.getElementById('last-updated').innerText = `עודכן: ${timestamp}`;
+                
+                if (isRefresh) {
+                    smartLog('INFO', 'Auto-refresh successful', { module });
+                } else {
+                    showToast('נתונים סונכרנו בהצלחה', 'success');
+                    smartLog('INFO', 'Initial data loaded and rendered', { module, count: { orders: state.orders.length, drivers: state.drivers.length } });
+                }
                 
             } catch (error) {
-                console.error("Failed to load initial data:", error);
-                showToast('טעינת נתונים ראשונית נכשלה', 'error');
-                // Show errors in lists
-                document.getElementById('orders-list').innerHTML = `<div class="p-4 text-red-600">${error.message}</div>`;
-                document.getElementById('drivers-list').innerHTML = `<div class="p-4 text-red-600">${error.message}</div>`;
+                smartLog('ERROR', 'Failed to load dashboard data', { module, error: error.message, stack: error.stack });
+                showToast('טעינת נתונים נכשלה', 'error');
+                
+                if (!isRefresh) {
+                    document.getElementById('orders-list').innerHTML = `<div class="p-4 text-red-600">${error.message}</div>`;
+                    document.getElementById('drivers-list').innerHTML = `<div class="p-4 text-red-600">${error.message}</div>`;
+                }
             } finally {
-                showLoader('map-loader', false);
-                showLoader('orders-list', false);
-                showLoader('drivers-list', false);
+                if (!isRefresh) {
+                    showLoader('map-loader', false);
+                    showLoader('orders-list', false);
+                    showLoader('drivers-list', false);
+                }
             }
         }
         
         function startRefreshTimer() {
             clearInterval(refreshTimer);
-            refreshTimer = setInterval(async () => {
-                console.log("v31.1: Auto-refreshing data...");
-                try {
-                    // v31.1 FIX: Call apiFetch with correct signature
-                    const data = await apiFetch('getDashboardData');
-                    state.orders = data.orders || [];
-                    state.drivers = data.drivers || [];
-                    state.liveLocations = data.liveLocations || {};
-                    state.customers = data.customers || [];
-                    
-                    renderDrivers();
-                    renderOrders();
-                    renderMapMarkers();
-                    populateCustomerDatalist(); // Keep customer list fresh
-                    
-                    document.getElementById('last-updated').innerText = `עודכן: ${new Date().toLocaleTimeString('he-IL')}`;
-                } catch (error) {
-                    showToast('רענון אוטומטי נכשל', 'error');
-                }
-            }, REFRESH_INTERVAL);
+            refreshTimer = setInterval(() => loadInitialData(true), REFRESH_INTERVAL);
         }
 
         // --- COMMUNICATION CHANNEL ("מלשינון") ---
+        
         /**
-         * v31.1: Robust API wrapper (FIXED)
-         * Handles requests, responses, errors, and logging.
-         * Separates action from params for GET requests.
+         * v31.2: Robust API wrapper
+         * Updated to use explicit 'mode: cors' as requested.
+         * Note: Smart logging is now handled *by the calling function* (e.g., loadInitialData)
+         * to provide better context, rather than being inside apiFetch itself.
          */
         async function apiFetch(action, params = {}, method = 'GET', data = null) {
             let url = `${API_URL}?action=${action}`;
             
-            // v31.1 FIX: Properly serialize GET parameters
             if (method === 'GET' && Object.keys(params).length > 0) {
                 url += '&' + new URLSearchParams(params).toString();
             }
 
             const options = {
                 method: method,
+                mode: 'cors', // v31.2: Set explicitly as requested
                 redirect: 'follow',
                 muteHttpExceptions: true,
+                headers: {}
             };
 
             if (method === 'POST') {
-                options.headers = { 'Content-Type': 'application/json' };
+                options.headers['Content-Type'] = 'application/json';
                 options.body = JSON.stringify({ action: action, data: data });
             }
 
-            try {
-                // For GET, use the full URL. For POST, use the base API_URL.
-                const response = await fetch(method === 'GET' ? url : API_URL, options);
-                
-                if (!response.ok) {
-                    throw new Error(`שגיאת שרת (${response.status})`);
+            // We let the calling function handle the try/catch
+            // so it can provide specific context to smartLog.
+            const response = await fetch(method === 'GET' ? url : API_URL, options);
+            
+            if (!response.ok) {
+                // Try to get error text from server, or use status
+                let errorText = await response.text();
+                try {
+                    // See if the error is JSON
+                    const errorJson = JSON.parse(errorText);
+                    if (errorJson.data) errorText = errorJson.data;
+                } catch (e) {
+                    // Not JSON, just use the text
                 }
-                
-                const result = await response.json();
-                
-                if (result.status === 'error') {
-                    throw new Error(result.data);
-                }
-                
-                return result.data;
-                
-            } catch (error) {
-                console.error(`API Fetch Error (${action}):`, error);
-                
-                // Anti-loop safety check
-                if (action !== 'logToServer') {
-                    // v31.1 FIX: Update logToServer call
-                    logToServer('AdminApp v31.1', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
-                }
-                
-                throw error; // Re-throw for the calling function to handle
+                throw new Error(`שגיאת שרת (${response.status}): ${errorText}`);
             }
+            
+            const result = await response.json();
+            
+            if (result.status === 'error') {
+                throw new Error(result.data);
+            }
+            
+            return result.data;
         }
-        
-        /**
-         * v31.1: Fire-and-forget logger (FIXED)
-         */
-        function logToServer(origin, level, message, context = {}) {
-            // v31.1 FIX: Call apiFetch with correct signature
-            apiFetch('logToServer', {}, 'POST', {
-                origin: origin,
-                level: level,
-                message: message,
-                context: context
-            }).catch(err => {
-                console.error("CRITICAL: Silent log-to-server failed:", err.message);
-            });
-        }
-        
         
         // --- RENDER FUNCTIONS ---
         
         function renderDrivers() {
             const list = document.getElementById('drivers-list');
-            list.innerHTML = ''; // Clear
-            
+            list.innerHTML = '';
             if (state.drivers.length === 0) {
                 list.innerHTML = `<div class="p-4 text-center text-gray-500">לא נמצאו נהגים פעילים.</div>`;
                 return;
             }
-            
             state.drivers.forEach(driver => {
                 const location = state.liveLocations[driver.driverId];
                 list.appendChild(createDriverCard(driver, location));
@@ -584,15 +627,12 @@
             el.id = `driver-card-${driver.driverId}`;
             el.setAttribute('data-search', driver.name.toLowerCase());
             el.onclick = () => focusOnMapItem(driver.driverId, 'driver');
-            
             let statusClass = 'status-inactive';
             let statusText = 'לא מחובר';
-            
             if (location) {
                 statusClass = location.isStuck ? 'status-stuck' : 'status-active';
                 statusText = location.isStuck ? `תקוע (${location.minutesAgo}ד')` : 'פעיל';
             }
-            
             el.innerHTML = `
                 <div class="flex justify-between items-center">
                     <span class="font-semibold">${driver.name}</span>
@@ -610,17 +650,14 @@
         
         function renderOrders() {
             const list = document.getElementById('orders-list');
-            list.innerHTML = ''; // Clear
-            
+            list.innerHTML = '';
             const unassignedOrders = state.orders.filter(o => o.status === 'חדש');
-            
             if (unassignedOrders.length === 0) {
                 list.innerHTML = `<div class="p-4 text-center text-gray-500">אין הזמנות חדשות לשיבוץ.</div>`;
                 return;
             }
-            
             unassignedOrders
-                .sort((a,b) => new Date(a.orderDate) - new Date(b.orderDate)) // Oldest first
+                .sort((a,b) => new Date(a.orderDate) - new Date(b.orderDate))
                 .forEach(order => {
                     list.appendChild(createOrderCard(order));
                 });
@@ -632,9 +669,7 @@
             el.id = `order-card-${order.orderId}`;
             el.setAttribute('data-search', `${order.orderId} ${order.customerName.toLowerCase()} ${order.address.toLowerCase()}`);
             el.onclick = () => focusOnMapItem(order.orderId, 'order');
-            
             const orderDate = new Date(order.orderDate).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
-
             el.innerHTML = `
                 <div class="flex justify-between items-center mb-1">
                     <span class="font-bold text-blue-600">#${order.orderId}</span>
@@ -649,41 +684,26 @@
         
         function renderMapMarkers() {
             if (!map) return;
-
             const bounds = L.latLngBounds();
-
-            // Render Drivers
             Object.values(state.liveLocations).forEach(driver => {
                 if (!driver.latitude || !driver.longitude) return;
-                
                 const latLng = [driver.latitude, driver.longitude];
                 const icon = driver.isStuck ? driverIconStuck : driverIconActive;
-                const popupContent = `
-                    <h4>${driver.name}</h4>
-                    <p>${driver.isStuck ? 'תקוע' : 'פעיל'} | עדכון לפני ${driver.minutesAgo} דקות</p>
-                `;
-                
+                const popupContent = `<h4>${driver.name}</h4><p>${driver.isStuck ? 'תקוע' : 'פעיל'} | עדכון לפני ${driver.minutesAgo} דקות</p>`;
                 if (driverMarkers[driver.id]) {
                     driverMarkers[driver.id].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
                 } else {
-                    driverMarkers[driver.id] = L.marker(latLng, { icon: icon })
-                        .addTo(map)
-                        .bindPopup(popupContent);
+                    driverMarkers[driver.id] = L.marker(latLng, { icon: icon }).addTo(map).bindPopup(popupContent);
                 }
                 bounds.extend(latLng);
             });
-            
-            // Render Unassigned Orders
             const unassignedOrders = state.orders.filter(o => o.status === 'חדש' && o.latitude && o.longitude);
-            
-            // Clear old order markers
             Object.keys(orderMarkers).forEach(orderId => {
                 if (!unassignedOrders.some(o => o.orderId == orderId)) {
                     map.removeLayer(orderMarkers[orderId]);
                     delete orderMarkers[orderId];
                 }
             });
-
             unassignedOrders.forEach(order => {
                 const latLng = [order.latitude, order.longitude];
                 const popupContent = `
@@ -695,17 +715,13 @@
                         שייך נהג
                     </button>
                 `;
-                
                 if (orderMarkers[order.orderId]) {
                     orderMarkers[order.orderId].setLatLng(latLng).setPopupContent(popupContent);
                 } else {
-                    orderMarkers[order.orderId] = L.marker(latLng, { icon: orderIconNew })
-                        .addTo(map)
-                        .bindPopup(popupContent);
+                    orderMarkers[order.orderId] = L.marker(latLng, { icon: orderIconNew }).addTo(map).bindPopup(popupContent);
                 }
                 bounds.extend(latLng);
             });
-
             if (bounds.isValid()) {
                 map.fitBounds(bounds, { padding: [50, 50] });
             }
@@ -717,12 +733,10 @@
         function showPanelTab(tabName) {
             document.getElementById('orders-list').style.display = (tabName === 'orders') ? 'block' : 'none';
             document.getElementById('drivers-list').style.display = (tabName === 'drivers') ? 'block' : 'none';
-            
             document.getElementById('tab-orders').classList.toggle('border-blue-500', tabName === 'orders');
             document.getElementById('tab-orders').classList.toggle('text-blue-500', tabName === 'orders');
             document.getElementById('tab-orders').classList.toggle('text-gray-500', tabName !== 'orders');
             document.getElementById('tab-orders').classList.toggle('border-transparent', tabName !== 'orders');
-
             document.getElementById('tab-drivers').classList.toggle('border-blue-500', tabName === 'drivers');
             document.getElementById('tab-drivers').classList.toggle('text-blue-500', tabName === 'drivers');
             document.getElementById('tab-drivers').classList.toggle('text-gray-500', tabName !== 'drivers');
@@ -731,22 +745,16 @@
         
         function filterLists() {
             const query = document.getElementById('search-input').value.toLowerCase();
-            
-            // Filter Drivers
             document.querySelectorAll('.driver-card').forEach(card => {
-                const search = card.getAttribute('data-search');
-                card.style.display = search.includes(query) ? 'block' : 'none';
+                card.style.display = card.getAttribute('data-search').includes(query) ? 'block' : 'none';
             });
-            // Filter Orders
             document.querySelectorAll('.order-card').forEach(card => {
-                const search = card.getAttribute('data-search');
-                card.style.display = search.includes(query) ? 'block' : 'none';
+                card.style.display = card.getAttribute('data-search').includes(query) ? 'block' : 'none';
             });
         }
         
         function focusOnMapItem(id, type) {
             let marker, card, list;
-            
             if (type === 'driver') {
                 marker = driverMarkers[id];
                 card = document.getElementById(`driver-card-${id}`);
@@ -758,7 +766,6 @@
                 list = document.getElementById('orders-list');
                 document.querySelectorAll('.order-card').forEach(c => c.classList.remove('active'));
             }
-            
             if (marker) {
                 map.setView(marker.getLatLng(), 15);
                 marker.openPopup();
@@ -769,54 +776,42 @@
             }
         }
 
-        /**
-         * v31.0: New feature "Assign on Map"
-         */
         function showAssignDriverModal(orderId) {
             const order = state.orders.find(o => o.orderId == orderId);
             if (!order) return;
-            
-            // Find drivers who are active
             const availableDrivers = state.drivers.filter(d => state.liveLocations[d.driverId] && !state.liveLocations[d.driverId].isStuck);
-
             if (availableDrivers.length === 0) {
                 showToast('אין נהגים זמינים כרגע', 'error');
+                smartLog('WARN', 'Assign driver modal opened, but no drivers available', { module: 'showAssignDriverModal', orderId });
                 return;
             }
-
-            // Create a simple prompt
             let driverOptions = availableDrivers.map(d => `${d.driverId}: ${d.name}`).join('\n');
             let driverId = prompt(`שייך הזמנה #${orderId} לנהג:\n(הזן מספר נהג)\n\n${driverOptions}`);
-
             if (driverId) {
                 const driverExists = availableDrivers.some(d => d.driverId == driverId.trim());
                 if (driverExists) {
                     assignOrderToDriver(orderId, driverId.trim());
                 } else {
                     showToast('מספר נהג לא תקין או שהנהג לא זמין', 'error');
+                    smartLog('WARN', 'Invalid driver ID entered for assignment', { module: 'showAssignDriverModal', enteredId: driverId });
                 }
             }
         }
         
         async function assignOrderToDriver(orderId, driverId) {
+            const module = 'assignOrderToDriver';
             const btn = document.querySelector(`.leaflet-popup-content button[onclick="showAssignDriverModal('${orderId}')"]`);
             if (btn) btn.innerText = 'משייך...';
             
             try {
-                // v31.1 FIX: Call apiFetch with correct signature
                 await apiFetch('assignDriver', {}, 'POST', { orderId: orderId, driverId: driverId });
                 showToast(`הזמנה #${orderId} שויכה לנהג ${driverId}`, 'success');
-                
-                // Refresh data
-                loadInitialData();
-                
-                // Close popup
+                smartLog('INFO', `Order ${orderId} assigned to ${driverId}`, { module, orderId, driverId });
+                loadInitialData(true); // Refresh data
                 map.closePopup();
-                
-                logToServer('AdminApp v31.1', 'INFO', `Order ${orderId} assigned to ${driverId}`, { orderId, driverId });
-                
             } catch (error) {
                 showToast(`שגיאה בשיוך הזמנה: ${error.message}`, 'error');
+                smartLog('ERROR', 'Failed to assign order', { module, orderId, driverId, error: error.message });
                 if (btn) btn.innerText = 'שייך נהג';
             }
         }
@@ -836,12 +831,12 @@
         }
         
         function openNewOrderForm() {
+            smartLog('INFO', 'New order form opened', { module: 'openNewOrderForm' });
             document.getElementById('new-order-modal').showModal();
         }
 
         function closeNewOrderForm() {
             document.getElementById('new-order-modal').close();
-            // Reset form
             document.getElementById('new-order-modal').querySelector('form').reset();
             document.getElementById('order-date').value = new Date().toISOString().split('T')[0];
             document.getElementById('new-customer-fields').style.display = 'none';
@@ -851,13 +846,11 @@
         function handleCustomerSearch(value) {
             const options = document.querySelectorAll('#customer-list option');
             let found = false;
-            
             for (let option of options) {
                 if (option.value === value) {
                     const customerId = option.dataset.customerId;
                     const customer = state.customers.find(c => c.customerId == customerId);
                     if (customer) {
-                        // Show existing customer details
                         document.getElementById('existing-customer-display').style.display = 'block';
                         document.getElementById('new-customer-fields').style.display = 'none';
                         document.getElementById('customer-id-existing').value = customer.customerId;
@@ -869,14 +862,12 @@
                     break;
                 }
             }
-            
             if (!found) {
-                // No match, show new customer fields
                 document.getElementById('existing-customer-display').style.display = 'none';
-                if (value.length > 2) { // Only show if user typed something
+                if (value.length > 2) {
                     document.getElementById('new-customer-fields').style.display = 'block';
-                    document.getElementById('customer-name-new').value = value; // Pre-fill name
-                    document.getElementById('customer-id-new').value = `C${Date.now().toString().slice(-6)}`; // Temp ID
+                    document.getElementById('customer-name-new').value = value;
+                    document.getElementById('customer-id-new').value = `C${Date.now().toString().slice(-6)}`;
                 } else {
                     document.getElementById('new-customer-fields').style.display = 'none';
                 }
@@ -885,6 +876,7 @@
         
         async function submitNewOrder(event) {
             event.preventDefault();
+            const module = 'submitNewOrder';
             const btn = document.getElementById('submit-order-btn');
             btn.disabled = true;
             btn.innerText = 'יוצר הזמנה...';
@@ -892,56 +884,49 @@
             let customerData = {};
             let orderData = {};
             
-            // Check if new or existing customer
-            if (document.getElementById('new-customer-fields').style.display === 'block') {
-                customerData = {
-                    isNew: true,
-                    customerId: document.getElementById('customer-id-new').value,
-                    name: document.getElementById('customer-name-new').value,
-                    phone: document.getElementById('customer-phone-new').value,
-                    address: document.getElementById('customer-address-new').value,
-                    contactPerson: document.getElementById('customer-contact-new').value
-                };
-            } else if (document.getElementById('existing-customer-display').style.display === 'block') {
-                const customerId = document.getElementById('customer-id-existing').value;
-                const customer = state.customers.find(c => c.customerId == customerId);
-                customerData = {
-                    isNew: false,
-                    customerId: customer.customerId,
-                    name: customer.name,
-                    phone: customer.phone,
-                    address: customer.defaultAddress
-                };
-            } else {
-                showToast('יש לבחור לקוח קיים או ליצור לקוח חדש', 'error');
-                btn.disabled = false;
-                btn.innerText = 'צור הזמנה';
-                return;
-            }
-            
-            // Gather order data
-            orderData = {
-                internalId: document.getElementById('order-internal-id').value,
-                orderDate: document.getElementById('order-date').value,
-                deliveryType: document.getElementById('order-delivery-type').value,
-                warehouse: document.getElementById('order-warehouse').value,
-                notes: document.getElementById('order-notes').value,
-                // We'll let the backend generate coords if possible, or leave empty
-                latitude: '', 
-                longitude: ''
-            };
-            
             try {
-                // v31.1 FIX: Call apiFetch with correct signature
+                if (document.getElementById('new-customer-fields').style.display === 'block') {
+                    customerData = {
+                        isNew: true,
+                        customerId: document.getElementById('customer-id-new').value,
+                        name: document.getElementById('customer-name-new').value,
+                        phone: document.getElementById('customer-phone-new').value,
+                        address: document.getElementById('customer-address-new').value,
+                        contactPerson: document.getElementById('customer-contact-new').value
+                    };
+                } else if (document.getElementById('existing-customer-display').style.display === 'block') {
+                    const customerId = document.getElementById('customer-id-existing').value;
+                    const customer = state.customers.find(c => c.customerId == customerId);
+                    customerData = {
+                        isNew: false,
+                        customerId: customer.customerId,
+                        name: customer.name,
+                        phone: customer.phone,
+                        address: customer.defaultAddress
+                    };
+                } else {
+                    throw new Error('יש לבחור לקוח קיים או ליצור לקוח חדש');
+                }
+                
+                orderData = {
+                    internalId: document.getElementById('order-internal-id').value,
+                    orderDate: document.getElementById('order-date').value,
+                    deliveryType: document.getElementById('order-delivery-type').value,
+                    warehouse: document.getElementById('order-warehouse').value,
+                    notes: document.getElementById('order-notes').value,
+                    latitude: '', longitude: ''
+                };
+            
+                smartLog('INFO', 'Submitting new order...', { module, customer: customerData.name });
                 const newOrder = await apiFetch('createNewOrder', {}, 'POST', { orderData, customerData });
                 showToast(`הזמנה #${newOrder.orderId} נוצרה בהצלחה`, 'success');
+                smartLog('INFO', `New order created successfully: ${newOrder.orderId}`, { module, orderId: newOrder.orderId });
                 closeNewOrderForm();
-                
-                // Refresh data to show new order
-                loadInitialData();
+                loadInitialData(true); // Refresh
                 
             } catch (error) {
                 showToast(`שגיאה ביצירת הזמנה: ${error.message}`, 'error');
+                smartLog('ERROR', 'Failed to create new order', { module, error: error.message, stack: error.stack });
             } finally {
                 btn.disabled = false;
                 btn.innerText = 'צור הזמנה';
@@ -954,7 +939,6 @@
         function showLoader(elementId, show) {
             const container = document.getElementById(elementId);
             if (!container) return;
-            
             let loader = container.querySelector('.loader-container');
             if (show) {
                 if (!loader) {
@@ -983,15 +967,10 @@
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.innerText = message;
-            
             container.appendChild(toast);
-            
-            // Trigger transition
             setTimeout(() => {
                 toast.classList.add('show');
             }, 10);
-            
-            // Remove after 3 seconds
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => {
@@ -999,6 +978,9 @@
                 }, 300);
             }, 3000);
         }
+
+        // Final log to confirm script parse
+        smartLog('INFO', 'Admin App v31.2 scripts parsed and running.');
 
     </script>
 </body>
