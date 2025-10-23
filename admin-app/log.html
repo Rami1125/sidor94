@@ -4,14 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- 
-      DeliveryMaster Log Viewer v31.2
+      DeliveryMaster Log Viewer v31.3
       
       Changelog:
-      - v31.2: "Smart Logger" Intelligence & CORS Fix
-      - Implemented smartLog() function (in-page).
-      - Added global error handlers (window.onerror, onunhandledrejection).
-      - Integrated smartLog() into key operations (loadLogs).
-      - Added 'mode: "cors"' to apiFetch options.
+      - v31.3: CRITICAL - Aligned API_URL constant to the new user-deployed endpoint.
+      - Client now points to the correct server.
     -->
     <title>DeliveryMaster - לוגים</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -139,6 +136,7 @@
 
     <script>
         // --- Config ---
+        // v31.3: Updated API_URL to the new user-deployed endpoint
         const API_URL = 'https://script.google.com/macros/s/AKfycbyGQ9NJhoY--Fl07JOtfIZKS1dS4Ujzeirf-lDcGYY9XM0ItOCgJItMwit5rIiSge_u/exec';
         const APP_MODULE = 'LogViewer';
         let allLogs = [];
@@ -212,8 +210,6 @@
                 options.body = JSON.stringify({ action: action, data: data });
             }
             
-            // Let the calling function (loadLogs) handle the try/catch
-            // so it can use smartLog with proper context.
             const response = await fetch(method === 'GET' ? url : API_URL, options);
             
             if (!response.ok) {
@@ -276,17 +272,14 @@
             const el = document.createElement('div');
             const level = (log.Level || 'INFO').toUpperCase();
             const origin = log.Origin || 'Unknown';
-            // Handle potential variations in timestamp format
             let timestampStr = log.Timestamp || 'N/A';
             try {
-                // Try parsing as ISO string first
                 timestampStr = new Date(log.Timestamp).toLocaleString('he-IL');
                 if (timestampStr === 'Invalid Date') {
-                    // Fallback for "dd/mm/yyyy, HH:MM:SS" format
                     timestampStr = log.Timestamp; 
                 }
             } catch (e) {
-                 timestampStr = log.Timestamp; // Keep original if parsing fails
+                 timestampStr = log.Timestamp;
             }
 
             el.className = `log-item log-${level} bg-white p-4 rounded-lg shadow-sm flex justify-between items-center cursor-pointer`;
@@ -298,7 +291,7 @@
                         <span class="font-bold text-gray-800">${origin}</span>
                         <span class="text-sm text-gray-500">${timestampStr}</span>
                     </div>
-                    <p class="text-gray-700 truncate" title="${log.Message}">${log.Message}</p>
+                    <p class="text-gray-700 truncate" title="${log.Message}">${log.Message}">${log.Message}</p>
                 </div>
                 <i data-feather="zoom-in" class="text-gray-500 mr-4"></i>
             `;
@@ -375,7 +368,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             feather.replace();
             loadLogs();
-            smartLog('INFO', 'Log Viewer v31.2 scripts parsed and running.');
+            smartLog('INFO', 'Log Viewer v31.3 scripts parsed and running.');
         });
     </script>
 
