@@ -188,11 +188,10 @@
             const response = await fetch(url, options);
             
             if (!response.ok) {
-// ... (existing code) ...
                 let errorText = await response.text();
                 try {
-                    const errorJson = JSON.parse(errorText);
-// ... (existing code) ...
+                    const errorJson = JSON.parse(errorText); // v31.6: Removed extra parenthesis
+                    if (errorJson.data) errorText = errorJson.data;
                 } catch (e) {}
                 // v31.4: Check for CORS failure signature
                 if (response.status === 0 || (response.status === 200 && errorText.includes("<!DOCTYPE html>"))) {
@@ -357,4 +356,5 @@
 
 </body>
 </html>
+
 
