@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- 
-      DeliveryMaster Log Viewer v31.1
+      DeliveryMaster Log Viewer v31.2
       
       Changelog:
-      - v31.1: CRITICAL FIX for apiFetch.
-      - Fixed apiFetch to properly serialize parameters into the URL.
-      - Updated loadLogs to use the new apiFetch signature.
-      - Re-styled to match the v31.0 admin panel theme.
+      - v31.2: "Smart Logger" Intelligence & CORS Fix
+      - Implemented smartLog() function (in-page).
+      - Added global error handlers (window.onerror, onunhandledrejection).
+      - Integrated smartLog() into key operations (loadLogs).
+      - Added 'mode: "cors"' to apiFetch options.
     -->
     <title>DeliveryMaster - לוגים</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -30,6 +31,7 @@
         .log-INFO { border-right: 4px solid #3b82f6; }
         .log-ERROR { border-right: 4px solid #ef4444; }
         .log-WARNING { border-right: 4px solid #f59e0b; }
+        .log-FATAL { border-right: 4px solid #991b1b; } /* red-900 */
         .log-Client { border-right: 4px solid #8b5cf6; }
 
         /* Modal */
@@ -97,10 +99,10 @@
             <div class="flex items-center space-x-4 space-x-reverse">
                 <select id="level-filter" class="border rounded-md px-3 py-2 bg-white" onchange="renderLogs()">
                     <option value="ALL">כל הרמות</option>
+                    <option value="FATAL">FATAL</option>
                     <option value="ERROR">ERROR</option>
                     <option value="WARNING">WARNING</option>
                     <option value="INFO">INFO</option>
-                    <option value="Client">Client</option>
                 </select>
                 <button onclick="loadLogs()" id="refresh-btn" class="p-2 rounded-full hover:bg-gray-100" title="רענן">
                     <i data-feather="refresh-cw" class="text-gray-600"></i>
@@ -137,106 +139,129 @@
 
     <script>
         // --- Config ---
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxSPwa-EW4amB-jyRCv_B1QXeftyP9b7pz2EO_f9t4B4ri3oJMkcbxSE9DkUu_rP7cL/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyGQ9NJhoY--Fl07JOtfIZKS1dS4Ujzeirf-lDcGYY9XM0ItOCgJItMwit5rIiSge_u/exec';
+        const APP_MODULE = 'LogViewer';
         let allLogs = [];
         let mapInstance = null;
         const modal = document.getElementById('log-details-modal');
 
+        // --- v31.2: "SMART LOGGER" INTELLIGENCE ---
+        
+        function smartLog(level, message, context = {}) {
+            const timestamp = new Date().toISOString();
+            console.log(`[${timestamp}] [${level}] ${message}`, context);
+
+            fetch(API_URL, {
+                method: "POST",
+                mode: "cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "logToServer",
+                    data: {
+                        origin: APP_MODULE,
+                        level: level.toUpperCase(),
+                        message: message,
+                        context: context
+                    }
+                })
+            }).catch(err => {
+                console.warn(`[SmartLog] Silent log-to-server failure: ${err.message}`);
+            });
+        }
+
+        window.onerror = function(message, source, lineno, colno, error) {
+            smartLog('FATAL', 'Unhandled window error', {
+                errorMessage: message,
+                source: source,
+                lineno: lineno,
+                colno: colno,
+                errorStack: error ? error.stack : 'N/A'
+            });
+            return false;
+        };
+
+        window.onunhandledrejection = function(event) {
+            smartLog('FATAL', 'Unhandled promise rejection', {
+                reason: event.reason ? event.reason.message : 'Unknown reason',
+                stack: event.reason ? event.reason.stack : 'N/A'
+            });
+        };
+        
+
         // --- API ---
         /**
-         * v31.1: Robust API wrapper (FIXED)
-         * Handles requests, responses, errors, and logging.
-         * Separates action from params for GET requests.
+         * v31.2: Robust API wrapper
          */
         async function apiFetch(action, params = {}, method = 'GET', data = null) {
             let url = `${API_URL}?action=${action}`;
             
-            // v31.1 FIX: Properly serialize GET parameters
             if (method === 'GET' && Object.keys(params).length > 0) {
                 url += '&' + new URLSearchParams(params).toString();
             }
 
             const options = {
                 method: method,
+                mode: 'cors', // v31.2: Set explicitly
                 redirect: 'follow',
                 muteHttpExceptions: true,
+                headers: {}
             };
 
             if (method === 'POST') {
-                options.headers = { 'Content-Type': 'application/json' };
+                options.headers['Content-Type'] = 'application/json';
                 options.body = JSON.stringify({ action: action, data: data });
             }
-
-            try {
-                const response = await fetch(method === 'GET' ? url : API_URL, options);
-                
-                if (!response.ok) {
-                    throw new Error(`שגיאת שרת (${response.status})`);
-                }
-                
-                const result = await response.json();
-                
-                if (result.status === 'error') {
-                    throw new Error(result.data);
-                }
-                
-                return result.data;
-                
-            } catch (error) {
-                console.error(`API Fetch Error (${action}):`, error);
-                showToast(`שגיאת תקשורת: ${error.message}`, 'error');
-                
-                // Anti-loop safety check
-                if (action !== 'logToServer') {
-                    // v31.1 FIX: Update logToServer call
-                    logToServer('LogViewerApp v31.1', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
-                }
-                
-                throw error; // Re-throw for the calling function to handle
+            
+            // Let the calling function (loadLogs) handle the try/catch
+            // so it can use smartLog with proper context.
+            const response = await fetch(method === 'GET' ? url : API_URL, options);
+            
+            if (!response.ok) {
+                let errorText = await response.text();
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    if (errorJson.data) errorText = errorJson.data;
+                } catch (e) {}
+                throw new Error(`שגיאת שרת (${response.status}): ${errorText}`);
             }
-        }
-        
-        /**
-         * v31.1: Fire-and-forget logger (FIXED)
-         */
-        function logToServer(origin, level, message, context = {}) {
-            // v31.1 FIX: Call apiFetch with correct signature
-            apiFetch('logToServer', {}, 'POST', {
-                origin: origin,
-                level: level,
-                message: message,
-                context: context
-            }).catch(err => {
-                console.error("CRITICAL: Silent log-to-server failed:", err.message);
-            });
+            
+            const result = await response.json();
+            
+            if (result.status === 'error') {
+                throw new Error(result.data);
+            }
+            
+            return result.data;
         }
 
         // --- Logic ---
-        function loadLogs() {
+        async function loadLogs() {
+            const module = 'loadLogs';
+            smartLog('INFO', 'Loading logs...', { module, limit: 200 });
             document.getElementById('loader').style.display = 'block';
             document.getElementById('log-list').innerHTML = '';
             document.getElementById('refresh-btn').disabled = true;
 
-            // v31.1 FIX: Call apiFetch with new signature
-            apiFetch('getLogs', { limit: 200 }, 'GET')
-                .then(logs => {
-                    allLogs = logs;
-                    renderLogs();
-                })
-                .catch(error => {
-                    document.getElementById('log-list').innerHTML = `<p class="text-center text-red-500 p-4">שגיאה בטעינת לוגים: ${error.message}</p>`;
-                })
-                .finally(() => {
-                    document.getElementById('loader').style.display = 'none';
-                    document.getElementById('refresh-btn').disabled = false;
-                });
+            try {
+                const logs = await apiFetch('getLogs', { limit: 200 }, 'GET');
+                allLogs = logs;
+                renderLogs();
+                smartLog('INFO', `Successfully loaded ${logs.length} log entries`, { module });
+            } catch (error) {
+                smartLog('ERROR', 'Failed to load logs', { module, error: error.message, stack: error.stack });
+                document.getElementById('log-list').innerHTML = `<p class="text-center text-red-500 p-4">שגיאה בטעינת לוגים: ${error.message}</p>`;
+                showToast(`שגיאה בטעינת לוגים: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('refresh-btn').disabled = false;
+            }
         }
 
         function renderLogs() {
             const list = document.getElementById('log-list');
             const filter = document.getElementById('level-filter').value;
             list.innerHTML = '';
-            const filteredLogs = allLogs.filter(log => filter === 'ALL' || log.Level === filter);
+            const filteredLogs = allLogs.filter(log => filter === 'ALL' || (log.Level && log.Level.toUpperCase() === filter));
 
             if (filteredLogs.length === 0) {
                 list.innerHTML = '<p class="text-center text-gray-500 p-4">לא נמצאו לוגים.</p>';
@@ -249,9 +274,20 @@
         // --- UI (v31.1 Style) ---
         function createLogElement(log, index) {
             const el = document.createElement('div');
-            const level = log.Level || 'INFO';
+            const level = (log.Level || 'INFO').toUpperCase();
             const origin = log.Origin || 'Unknown';
-            const timestampStr = log.Timestamp ? new Date(log.Timestamp).toLocaleString('he-IL') : 'N/A';
+            // Handle potential variations in timestamp format
+            let timestampStr = log.Timestamp || 'N/A';
+            try {
+                // Try parsing as ISO string first
+                timestampStr = new Date(log.Timestamp).toLocaleString('he-IL');
+                if (timestampStr === 'Invalid Date') {
+                    // Fallback for "dd/mm/yyyy, HH:MM:SS" format
+                    timestampStr = log.Timestamp; 
+                }
+            } catch (e) {
+                 timestampStr = log.Timestamp; // Keep original if parsing fails
+            }
 
             el.className = `log-item log-${level} bg-white p-4 rounded-lg shadow-sm flex justify-between items-center cursor-pointer`;
             el.onclick = () => showDetails(index);
@@ -323,13 +359,10 @@
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.innerText = message;
-            
             container.appendChild(toast);
-            
             setTimeout(() => {
                 toast.classList.add('show');
             }, 10);
-            
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => {
@@ -342,7 +375,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             feather.replace();
             loadLogs();
-            logToServer('LogViewerApp v31.1', 'INFO', 'Log viewer app loaded');
+            smartLog('INFO', 'Log Viewer v31.2 scripts parsed and running.');
         });
     </script>
 
