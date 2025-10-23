@@ -3,18 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v31.2</title>
+    <title>DeliveryMaster v31.3</title>
     <!-- 
-      DeliveryMaster Admin App v31.2
+      DeliveryMaster Admin App v31.3
       
       Changelog:
-      - v31.2: "Smart Logger" Intelligence & CORS Fix
-      - Implemented smartLog() function as requested (no new file).
-      - Added global error handlers (window.onerror, onunhandledrejection)
-        to catch all JS errors and report them to the server.
-      - Integrated smartLog() into all key operations (load, assign, create).
-      - Added 'mode: "cors"' to apiFetch options as requested.
-      - Added hidden warning about Tailwind CDN.
+      - v31.3: CRITICAL - Aligned API_URL constant to the new user-deployed endpoint.
+      - The client is now pointing to the correct server URL.
+      - Server *must* be deployed with v31.2 code for this to work.
     -->
     
     <!-- 
@@ -378,6 +374,7 @@
 
     <script>
         // --- CONFIG & STATE ---
+        // v31.3: Updated API_URL to the new user-deployed endpoint
         const API_URL = 'https://script.google.com/macros/s/AKfycbyGQ9NJhoY--Fl07JOtfIZKS1dS4Ujzeirf-lDcGYY9XM0ItOCgJItMwit5rIiSge_u/exec';
         const APP_MODULE = 'AdminDashboard';
         const REFRESH_INTERVAL = 45000;
@@ -474,7 +471,7 @@
         
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
-            smartLog('INFO', 'DOM content loaded. Initializing v31.2...');
+            smartLog('INFO', 'DOM content loaded. Initializing v31.3...');
             feather.replace();
             initMap();
             loadInitialData();
@@ -499,12 +496,12 @@
         async function loadInitialData(isRefresh = false) {
             const module = 'loadInitialData';
             if (!isRefresh) {
-                smartLog('INFO', 'v31.2: Loading initial dashboard data...', { module });
+                smartLog('INFO', 'v31.3: Loading initial dashboard data...', { module });
                 showLoader('map-loader', true);
                 showLoader('orders-list', true);
                 showLoader('drivers-list', true);
             } else {
-                smartLog('INFO', 'v31.2: Auto-refreshing data...', { module });
+                smartLog('INFO', 'v31.3: Auto-refreshing data...', { module });
             }
             
             try {
@@ -556,9 +553,6 @@
         
         /**
          * v31.2: Robust API wrapper
-         * Updated to use explicit 'mode: cors' as requested.
-         * Note: Smart logging is now handled *by the calling function* (e.g., loadInitialData)
-         * to provide better context, rather than being inside apiFetch itself.
          */
         async function apiFetch(action, params = {}, method = 'GET', data = null) {
             let url = `${API_URL}?action=${action}`;
@@ -579,21 +573,15 @@
                 options.headers['Content-Type'] = 'application/json';
                 options.body = JSON.stringify({ action: action, data: data });
             }
-
-            // We let the calling function handle the try/catch
-            // so it can provide specific context to smartLog.
+            
             const response = await fetch(method === 'GET' ? url : API_URL, options);
             
             if (!response.ok) {
-                // Try to get error text from server, or use status
                 let errorText = await response.text();
                 try {
-                    // See if the error is JSON
                     const errorJson = JSON.parse(errorText);
                     if (errorJson.data) errorText = errorJson.data;
-                } catch (e) {
-                    // Not JSON, just use the text
-                }
+                } catch (e) {}
                 throw new Error(`שגיאת שרת (${response.status}): ${errorText}`);
             }
             
@@ -688,7 +676,7 @@
             Object.values(state.liveLocations).forEach(driver => {
                 if (!driver.latitude || !driver.longitude) return;
                 const latLng = [driver.latitude, driver.longitude];
-                const icon = driver.isStuck ? driverIconStuck : driverIconActive;
+                const icon = driver.isStuck ? driverIconStuck : driverActive;
                 const popupContent = `<h4>${driver.name}</h4><p>${driver.isStuck ? 'תקוע' : 'פעיל'} | עדכון לפני ${driver.minutesAgo} דקות</p>`;
                 if (driverMarkers[driver.id]) {
                     driverMarkers[driver.id].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
@@ -980,7 +968,7 @@
         }
 
         // Final log to confirm script parse
-        smartLog('INFO', 'Admin App v31.2 scripts parsed and running.');
+        smartLog('INFO', 'Admin App v31.3 scripts parsed and running.');
 
     </script>
 </body>
