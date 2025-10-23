@@ -3,490 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v31.3</title>
+    <title>DeliveryMaster v31.5</title>
     <!-- 
-      DeliveryMaster Admin App v31.3
+      DeliveryMaster Admin App v31.5
       
       Changelog:
-      - v31.3: CRITICAL - Aligned API_URL constant to the new user-deployed endpoint.
-      - The client is now pointing to the correct server URL.
-      - Server *must* be deployed with v31.2 code for this to work.
+      - v31.5: Proxy Server Integration
+      - CRITICAL: Changed API_URL to point to the new Node.js proxy server.
+      - Updated apiFetch() to match the new proxy's URL structure:
+        - GET: /api/[action]
+        - POST: /api/[action] (with data as raw body)
+      - All communication is now stabilized and logged by the proxy.
     -->
     
     <!-- 
       v31.2 WARNING: Using Tailwind CDN for development. 
       For production, a compiled build is required.
     -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- LeafletJS (Map) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- Icons (Feather) -->
-    <script src="https://unpkg.com/feather-icons"></script>
-
+<!-- ... (existing code) ... -->
     <style>
         :root {
-            --primary-color: #3b82f6; /* blue-500 */
-            --primary-dark: #2563eb; /* blue-600 */
-            --bg-light: #f3f4f6; /* gray-100 */
-            --bg-white: #ffffff;
-            --border-color: #e5e7eb; /* gray-200 */
-            --text-dark: #1f2937; /* gray-800 */
+/* ... (existing code) ... */
             --text-light: #6b7280; /* gray-500 */
         }
         body {
-            font-family: 'Arial', sans-serif;
-            background-color: var(--bg-light);
+/* ... (existing code) ... */
             color: var(--text-dark);
             overflow: hidden;
         }
         
+/* ... (existing code) ... */
+        #server-status-light {
+            width: 12px;
+            height: 12px;
+/* ... (existing code) ... */
+            transition: background-color 0.3s;
+        }
+        #server-status-light.ok {
+/* ... (existing code) ... */
+        }
+        #server-status-light.error {
+            background-color: #ef4444; /* red-500 (Error) */
+        }
+        
+/* ... (existing code) ... */
+        #critical-error-bar {
+            background-color: #ef4444; /* red-500 */
+            color: white;
+/* ... (existing code) ... */
+            display: none;
+            position: fixed;
+            top: 0;
+/* ... (existing code) ... */
+            z-index: 10000;
+        }
+
         /* Layout */
-        .app-layout {
-            display: grid;
+/* ... (existing code) ... */
             grid-template-columns: auto 1fr;
             height: 100vh;
         }
         #main-content {
-            display: grid;
+/* ... (existing code) ... */
             grid-template-columns: 1fr 350px;
             height: 100vh;
             overflow: hidden;
         }
-        #map-container {
-            position: relative;
-            background-color: #e0e0e0;
-        }
-        #map {
-            height: 100%;
-            width: 100%;
-        }
-        #side-panel {
-            background-color: var(--bg-white);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        
-        /* Navbar */
-        #navbar {
-            background-color: var(--bg-white);
-            border-left: 1px solid var(--border-color);
-        }
-        .nav-link {
-            transition: all 0.2s;
-        }
-        .nav-link:hover, .nav-link.active {
-            background-color: var(--bg-light);
-            color: var(--primary-color);
-        }
-        .nav-link.active {
-            border-right: 3px solid var(--primary-color);
-        }
-
-        /* Side Panel */
-        .panel-list {
-            flex: 1;
-            overflow-y: auto;
-            position: relative; /* For loader */
-        }
-        .order-card, .driver-card {
-            border-bottom: 1px solid var(--border-color);
-            transition: background-color 0.2s;
-        }
-        .order-card:hover, .driver-card:hover {
-            background-color: #fafafa;
-        }
-        .order-card.active, .driver-card.active {
-            background-color: #eff6ff; /* blue-50 */
-            border-right: 3px solid var(--primary-color);
-        }
-        
-        /* Status Colors */
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; }
-        .status-active { background-color: #22c55e; } /* green-500 */
-        .status-stuck { background-color: #ef4444; } /* red-500 */
-        .status-inactive { background-color: #9ca3af; } /* gray-400 */
-        
-        /* Leaflet Customizations */
-        .leaflet-popup-content-wrapper {
-            border-radius: 8px;
-        }
-        .leaflet-popup-content {
-            margin: 13px 20px;
-            font-family: 'Arial', sans-serif;
-        }
-        .leaflet-popup-content h4 {
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-        .leaflet-popup-content p {
-            margin: 4px 0;
-            color: var(--text-light);
-        }
-        
-        /* Loader */
-        .loader-container {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-        }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Toast Notification */
-        #toast-container {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 5000;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .toast {
-            padding: 12px 20px;
-            background-color: var(--text-dark);
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-        }
-        .toast.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        .toast.success { background-color: #22c55e; }
-        .toast.error { background-color: #ef4444; }
-        
-        /* Modal Dialog */
-        #new-order-modal {
-            max-width: 600px;
-            border-radius: 12px;
-            border: none;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+/* ... (existing code) ... */
             padding: 0;
         }
         #new-order-modal::backdrop {
-            background: rgba(0,0,0,0.5);
+/* ... (existing code) ... */
             backdrop-filter: blur(2px);
         }
         
         /* Responsive */
-        @media (max-width: 1024px) {
-            #main-content {
-                grid-template-columns: 1fr; /* Stack map and list */
-            }
-            #side-panel {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: 40vh; /* Show panel at bottom */
-                z-index: 2000;
-                border-right: none;
-                border-top: 1px solid var(--border-color);
-                transform: translateY(100%);
-                transition: transform 0.3s ease;
-            }
-            #side-panel.open {
-                transform: translateY(0);
-            }
-            #navbar {
-                display: flex;
-                width: 100%;
-                z-index: 2001;
-                border-left: none;
-                border-bottom: 1px solid var(--border-color);
-            }
-            .app-layout {
-                grid-template-columns: 1fr;
-                grid-template-rows: auto 1fr;
-            }
-            .nav-link { flex: 1; justify-content: center; }
-            .nav-link span { display: none; }
+/* ... (existing code) ... */
             .nav-link.active { border-right: none; border-bottom: 3px solid var(--primary-color); }
         }
     </style>
 </head>
 <body class="antialiased">
 
+    <!-- v31.4: Persistent Error Bar -->
+    <div id="critical-error-bar">
+        שגיאת תקשורת קריטית. השרת אינו מגיב כראוי. ודא ששרת ה-Proxy פועל.
+    </div>
+
     <div class="app-layout">
         <!-- Navbar -->
-        <nav id="navbar" class="w-20 lg:w-64 flex flex-col p-4 space-y-4">
-            <div class="hidden lg:flex items-center space-x-2 space-x-reverse px-2 mb-4">
-                <i data-feather="truck" class="w-8 h-8 text-blue-500"></i>
-                <span class="text-xl font-bold">DeliveryMaster</span>
-            </div>
-            
-            <a href="#" class="nav-link active flex items-center p-3 space-x-4 space-x-reverse rounded-lg" onclick="showView('dashboard')">
-                <i data-feather="map" class="w-6 h-6"></i>
-                <span class="font-semibold text-lg hidden lg:block">דשבורד</span>
-            </a>
-            <a href="#" class="nav-link flex items-center p-3 space-x-4 space-x-reverse rounded-lg" onclick="openNewOrderForm()">
-                <i data-feather="plus-circle" class="w-6 h-6"></i>
-                <span class="font-semibold text-lg hidden lg:block">הזמנה חדשה</span>
-            </a>
-            <a href="log.html" target="_blank" class="nav-link flex items-center p-3 space-x-4 space-x-reverse rounded-lg">
-                <i data-feather="file-text" class="w-6 h-6"></i>
-                <span class="font-semibold text-lg hidden lg:block">לוגים</span>
-            </a>
-            
+<!-- ... (existing code) ... -->
             <div class="flex-grow"></div> <!-- Spacer -->
             
             <div class="hidden lg:block border-t pt-4">
                 <div class="text-sm">שלום, <span class="font-semibold">מנהל</span></div>
-                <div id="last-updated" class="text-xs text-gray-500">מתחבר...</div>
+                <div class="flex items-center space-x-2 space-x-reverse mt-1">
+                    <div id="server-status-light" title="סטטוס שרת"></div>
+                    <div id="last-updated" class="text-xs text-gray-500">מתחבר...</div>
+                </div>
             </div>
         </nav>
 
         <!-- Main Content (Map + Side Panel) -->
-        <main id="main-content">
-            <!-- Map Container -->
-            <div id="map-container">
-                <div id="map"></div>
-                <div id="map-loader" class="loader-container">
-                    <div class="loader"></div>
-                    <span class="ml-4 font-semibold">טוען מפה ונתונים...</span>
-                </div>
-            </div>
-
-            <!-- Side Panel (Lists) -->
-            <aside id="side-panel">
-                <!-- Tabs -->
-                <div class="flex border-b border-gray-200">
-                    <button id="tab-orders" class="flex-1 p-4 font-semibold text-center border-b-2 border-blue-500 text-blue-500" onclick="showPanelTab('orders')">
-                        הזמנות
-                    </button>
-                    <button id="tab-drivers" class="flex-1 p-4 font-semibold text-center border-b-2 border-transparent text-gray-500" onclick="showPanelTab('drivers')">
-                        נהגים
-                    </button>
-                </div>
-                
-                <!-- Search -->
-                <div class="p-3 border-b border-gray-200">
-                    <input type="text" id="search-input" placeholder="חפש הזמנה או נהג..." class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300" onkeyup="filterLists()">
-                </div>
-                
-                <!-- Orders List -->
-                <div id="orders-list" class="panel-list">
-                    <!-- Loader will be injected here -->
-                    <!-- Order cards will be injected here -->
-                </div>
-                
-                <!-- Drivers List -->
-                <div id="drivers-list" class="panel-list" style="display: none;">
-                    <!-- Loader will be injected here -->
-                    <!-- Driver cards will be injected here -->
-                </div>
-            </aside>
-        </main>
-    </div>
-
-    <!-- Toast Container -->
-    <div id="toast-container"></div>
-
-    <!-- New Order Modal -->
-    <dialog id="new-order-modal">
-        <form onsubmit="submitNewOrder(event)">
-            <div class="flex justify-between items-center p-4 border-b">
-                <h3 class="text-xl font-bold">יצירת הזמנה חדשה</h3>
-                <button type="button" class="text-gray-500 hover:text-gray-800" onclick="closeNewOrderForm()">
-                    <i data-feather="x"></i>
-                </button>
-            </div>
-            
-            <div class="p-6 space-y-4">
-                <!-- Customer Search -->
-                <div>
-                    <label for="customer-search" class="block text-sm font-medium mb-1">חפש לקוח (הקלד שם או מספר)</label>
-                    <input type="text" id="customer-search" list="customer-list" class="w-full p-2 border rounded-md" oninput="handleCustomerSearch(this.value)" autocomplete="off">
-                    <datalist id="customer-list"></datalist>
-                </div>
-                
-                <!-- New Customer Fields (Hidden by default) -->
-                <div id="new-customer-fields" class="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3" style="display: none;">
-                    <p class="font-semibold text-blue-700">פרטי לקוח חדש</p>
-                    <input type="hidden" id="customer-id-new">
-                    <input type="text" id="customer-name-new" placeholder="שם לקוח מלא" class="w-full p-2 border rounded-md" required>
-                    <input type="text" id="customer-phone-new" placeholder="טלפון" class="w-full p-2 border rounded-md" required>
-                    <input type="text" id="customer-address-new" placeholder="כתובת ברירת מחדל" class="w-full p-2 border rounded-md" required>
-                    <input type="text" id="customer-contact-new" placeholder="איש קשר" class="w-full p-2 border rounded-md">
-                </div>
-                
-                <!-- Existing Customer Display (Hidden by default) -->
-                <div id="existing-customer-display" class="p-4 bg-gray-50 border rounded-lg" style="display: none;">
-                    <input type="hidden" id="customer-id-existing">
-                    <p><strong>לקוח:</strong> <span id="customer-name-display"></span></p>
-                    <p><strong>כתובת:</strong> <span id="customer-address-display"></span></p>
-                    <p><strong>טלפון:</strong> <span id="customer-phone-display"></span></p>
-                </div>
-                
-                <hr>
-                
-                <!-- Order Details -->
-                <div class="grid grid-cols-2 gap-4">
-                    <input type="text" id="order-internal-id" placeholder="מספר פנימי (אופציונלי)" class="w-full p-2 border rounded-md">
-                    <input type="date" id="order-date" class="w-full p-2 border rounded-md" required>
-                    <select id="order-delivery-type" class="w-full p-2 border rounded-md" required>
-                        <option value="">סוג הובלה</option>
-                        <option value="הובלת מנוף">הובלת מנוף</option>
-                        <option value="הובלת משאית">הובלת משאית</option>
-                        <option value="איסוף עצמי">איסוף עצמי</option>
-                    </select>
-                    <select id="order-warehouse" class="w-full p-2 border rounded-md" required>
-                        <option value="">בחר מחסן</option>
-                        <option value="החרש">החרש</option>
-                        <option value="התלמיד">התלמיד</option>
-                    </select>
-                </div>
-                <textarea id="order-notes" rows="3" placeholder="הערות להזמנה..." class="w-full p-2 border rounded-md"></textarea>
-            </div>
-            
-            <div class="p-4 bg-gray-50 border-t flex justify-end space-x-3 space-x-reverse">
-                <button type="button" class="px-4 py-2 bg-white border rounded-md hover:bg-gray-50" onclick="closeNewOrderForm()">
-                    ביטול
-                </button>
-                <button type="submit" id="submit-order-btn" class="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                    צור הזמנה
-                </button>
-            </div>
-        </form>
-    </dialog>
-
-
+<!-- ... (existing code) ... -->
     <script>
         // --- CONFIG & STATE ---
-        // v31.3: Updated API_URL to the new user-deployed endpoint
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyGQ9NJhoY--Fl07JOtfIZKS1dS4Ujzeirf-lDcGYY9XM0ItOCgJItMwit5rIiSge_u/exec';
+        // v31.5: CRITICAL - Pointing to the new Node.js Proxy Server
+        // This URL must be updated to your *deployed* proxy server address in production.
+        const API_URL = 'http://localhost:8080/api';
+        
         const APP_MODULE = 'AdminDashboard';
         const REFRESH_INTERVAL = 45000;
-        const ISRAEL_CENTER = [32.0853, 34.7818];
-
-        let state = {
-            orders: [],
-            drivers: [],
-            liveLocations: {},
-            customers: [],
-        };
-        
-        let map;
+// ... (existing code) ...
         let driverMarkers = {};
         let orderMarkers = {};
         let refreshTimer;
         
-        // --- v31.2: "SMART LOGGER" INTELLIGENCE ---
-        
+        // --- v31.4: "SMART LOGGER" v2 (Batching) ---
+// ... (existing code) ...
+        let logFlushTimer = setInterval(flushLogQueue, 10000); // Flush every 10 seconds
+
         /**
-         * v31.2: New smartLog function as requested.
-         * Logs to console and *silently* logs to server.
+         * v31.4: Upgraded smartLog to use a batch queue.
+// ... (existing code) ...
          */
         function smartLog(level, message, context = {}) {
-            // 1. Log to console
             const timestamp = new Date().toISOString();
+// ... (existing code) ...
             console.log(`[${timestamp}] [${level}] ${message}`, context);
 
-            // 2. Send to server (fire-and-forget)
-            // This uses the *base* fetch, not apiFetch, to avoid loops
-            fetch(API_URL, {
+            // 2. Push to queue
+// ... (existing code) ...
+                timestamp: timestamp
+            });
+            
+// ... (existing code) ...
+            if (level.toUpperCase() === 'FATAL') {
+                flushLogQueue();
+            }
+        }
+        
+// ... (existing code) ...
+         * v31.4: New function to flush the log queue to the server.
+         */
+        function flushLogQueue() {
+// ... (existing code) ...
+            if (logQueue.length === 0) {
+                return;
+            }
+
+            const logsToFlush = [...logQueue]; // Copy the queue
+// ... (existing code) ...
+            logQueue = []; // Clear the queue immediately
+
+            // Send to server (fire-and-forget)
+            // v31.5: Using new proxy endpoint
+            fetch(`${API_URL}/logToServerBatch`, {
                 method: "POST",
-                mode: "cors", // Explicitly set as requested
+                mode: "cors",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "logToServer",
-                    data: {
-                        origin: APP_MODULE,
-                        level: level.toUpperCase(),
-                        message: message,
-                        context: context
-                    }
-                })
+                body: JSON.stringify(logsToFlush) // Proxy expects an array
             }).catch(err => {
-                // This is the "silent" catch to prevent loops
-                console.warn(`[SmartLog] Silent log-to-server failure: ${err.message}`);
+                console.warn(`[SmartLog] Silent batch log failure: ${err.message}`);
+// ... (existing code) ...
+                logQueue = [...logsToFlush, ...logQueue];
             });
         }
 
+
         /**
+// ... (existing code) ...
          * v31.2: Global Error Handler
-         * Catches all unhandled JS errors on the page.
          */
         window.onerror = function(message, source, lineno, colno, error) {
-            smartLog('FATAL', 'Unhandled window error', {
-                errorMessage: message,
-                source: source,
-                lineno: lineno,
-                colno: colno,
+// ... (existing code) ...
                 errorStack: error ? error.stack : 'N/A'
             });
             // Don't suppress the default browser error console
-            return false;
+// ... (existing code) ...
         };
 
         /**
          * v31.2: Global Promise Rejection Handler
-         * Catches unhandled promise rejections.
+// ... (existing code) ...
          */
         window.onunhandledrejection = function(event) {
             smartLog('FATAL', 'Unhandled promise rejection', {
-                reason: event.reason ? event.reason.message : 'Unknown reason',
+// ... (existing code) ...
                 stack: event.reason ? event.reason.stack : 'N/A'
             });
         };
         
         // --- ICONS (Leaflet) ---
-        const driverIconActive = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
-            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41]
-        });
-        const driverIconStuck = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41]
-        });
-        const orderIconNew = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34],
+// ... (existing code) ...
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41]
         });
 
         
         // --- INITIALIZATION ---
+// ... (existing code) ...
         document.addEventListener('DOMContentLoaded', () => {
-            smartLog('INFO', 'DOM content loaded. Initializing v31.3...');
+            smartLog('INFO', 'DOM content loaded. Initializing v31.5...');
             feather.replace();
             initMap();
-            loadInitialData();
-            startRefreshTimer();
-            document.getElementById('order-date').value = new Date().toISOString().split('T')[0];
+// ... (existing code) ...
         });
 
         function initMap() {
             try {
-                map = L.map('map').setView(ISRAEL_CENTER, 9);
+// ... (existing code) ...
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
                     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                }).addTo(map);
-                smartLog('INFO', 'Map initialized successfully');
+// ... (existing code) ...
             } catch (error) {
                 smartLog('FATAL', 'Map initialization failed', { error: error.message, stack: error.stack });
                 document.getElementById('map').innerHTML = `<div class="p-8 text-center text-red-600">שגיאה קריטית בטעינת המפה.</div>`;
@@ -494,76 +223,73 @@
         }
         
         async function loadInitialData(isRefresh = false) {
-            const module = 'loadInitialData';
+// ... (existing code) ...
+            const statusLight = document.getElementById('server-status-light');
+            
             if (!isRefresh) {
-                smartLog('INFO', 'v31.3: Loading initial dashboard data...', { module });
-                showLoader('map-loader', true);
-                showLoader('orders-list', true);
-                showLoader('drivers-list', true);
+                smartLog('INFO', `v${APP_VERSION}: Loading initial dashboard data...`, { module });
+// ... (existing code) ...
             } else {
-                smartLog('INFO', 'v31.3: Auto-refreshing data...', { module });
+                smartLog('INFO', `v${APP_VERSION}: Auto-refreshing data...`, { module });
             }
             
             try {
                 const data = await apiFetch('getDashboardData');
                 
+                // v31.4: Communication OK!
+                statusLight.className = 'ok';
+// ... (existing code) ...
+                document.getElementById('critical-error-bar').style.display = 'none';
+
                 state.orders = data.orders || [];
-                state.drivers = data.drivers || [];
-                state.liveLocations = data.liveLocations || {};
-                state.customers = data.customers || [];
-                
-                renderDrivers();
-                renderOrders();
-                renderMapMarkers();
-                populateCustomerDatalist();
-                
-                const timestamp = new Date().toLocaleTimeString('he-IL');
-                document.getElementById('last-updated').innerText = `עודכן: ${timestamp}`;
-                
+// ... (existing code) ...
                 if (isRefresh) {
                     smartLog('INFO', 'Auto-refresh successful', { module });
                 } else {
-                    showToast('נתונים סונכרנו בהצלחה', 'success');
+// ... (existing code) ...
                     smartLog('INFO', 'Initial data loaded and rendered', { module, count: { orders: state.orders.length, drivers: state.drivers.length } });
                 }
                 
             } catch (error) {
+// ... (existing code) ...
+                statusLight.className = 'error';
                 smartLog('ERROR', 'Failed to load dashboard data', { module, error: error.message, stack: error.stack });
                 showToast('טעינת נתונים נכשלה', 'error');
                 
+                // Show persistent error bar only on critical CORS/Fetch errors
+                if (error.message.includes('Failed to fetch') || error.message.includes('Proxy')) {
+                    document.getElementById('critical-error-bar').style.display = 'block';
+                }
+
                 if (!isRefresh) {
-                    document.getElementById('orders-list').innerHTML = `<div class="p-4 text-red-600">${error.message}</div>`;
+// ... (existing code) ...
                     document.getElementById('drivers-list').innerHTML = `<div class="p-4 text-red-600">${error.message}</div>`;
                 }
             } finally {
-                if (!isRefresh) {
-                    showLoader('map-loader', false);
-                    showLoader('orders-list', false);
+// ... (existing code) ...
                     showLoader('drivers-list', false);
                 }
             }
         }
         
-        function startRefreshTimer() {
-            clearInterval(refreshTimer);
-            refreshTimer = setInterval(() => loadInitialData(true), REFRESH_INTERVAL);
-        }
+// ... (existing code) ...
 
         // --- COMMUNICATION CHANNEL ("מלשינון") ---
         
         /**
-         * v31.2: Robust API wrapper
+         * v31.5: Robust API wrapper
+         * Updated to use the Node.js proxy server.
          */
         async function apiFetch(action, params = {}, method = 'GET', data = null) {
-            let url = `${API_URL}?action=${action}`;
+            let url = `${API_URL}/${action}`; // v31.5: New URL structure
             
             if (method === 'GET' && Object.keys(params).length > 0) {
-                url += '&' + new URLSearchParams(params).toString();
+                url += '?' + new URLSearchParams(params).toString();
             }
 
             const options = {
                 method: method,
-                mode: 'cors', // v31.2: Set explicitly as requested
+                mode: 'cors', // Still required
                 redirect: 'follow',
                 muteHttpExceptions: true,
                 headers: {}
@@ -571,404 +297,334 @@
 
             if (method === 'POST') {
                 options.headers['Content-Type'] = 'application/json';
-                options.body = JSON.stringify({ action: action, data: data });
+                // v31.5: Send *only* the data. The 'action' is in the URL.
+                options.body = JSON.stringify(data); 
             }
             
-            const response = await fetch(method === 'GET' ? url : API_URL, options);
+            // v31.5: Use the new URL structure for both GET and POST
+            const response = await fetch(url, options);
             
             if (!response.ok) {
-                let errorText = await response.text();
-                try {
-                    const errorJson = JSON.parse(errorText);
+// ... (existing code) ...
                     if (errorJson.data) errorText = errorJson.data;
-                } catch (e) {}
+                } catch (e) {
+                    // Not JSON, just use the text
+                }
+// ... (existing code) ...
+                if (response.status === 0 || (response.status === 200 && errorText.includes("<!DOCTYPE html>"))) {
+                   throw new Error('שגיאת CORS. ודא שהשרת (Code.gs) פרוס כהלכה.');
+                }
+                // v31.5: Add proxy-specific error
+                if (response.status === 502) { // Bad Gateway
+                    throw new Error('שגיאת Proxy. שרת הביניים נכשל לתקשר עם Google.');
+                }
                 throw new Error(`שגיאת שרת (${response.status}): ${errorText}`);
             }
             
-            const result = await response.json();
-            
-            if (result.status === 'error') {
-                throw new Error(result.data);
-            }
+// ... (existing code) ...
             
             return result.data;
         }
         
         // --- RENDER FUNCTIONS ---
-        
-        function renderDrivers() {
-            const list = document.getElementById('drivers-list');
-            list.innerHTML = '';
-            if (state.drivers.length === 0) {
-                list.innerHTML = `<div class="p-4 text-center text-gray-500">לא נמצאו נהגים פעילים.</div>`;
-                return;
-            }
-            state.drivers.forEach(driver => {
-                const location = state.liveLocations[driver.driverId];
-                list.appendChild(createDriverCard(driver, location));
-            });
-        }
-        
+// ... (existing code) ...
         function createDriverCard(driver, location) {
             const el = document.createElement('div');
             el.className = 'driver-card p-4 cursor-pointer';
-            el.id = `driver-card-${driver.driverId}`;
+// ... (existing code) ...
             el.setAttribute('data-search', driver.name.toLowerCase());
             el.onclick = () => focusOnMapItem(driver.driverId, 'driver');
             let statusClass = 'status-inactive';
-            let statusText = 'לא מחובר';
-            if (location) {
-                statusClass = location.isStuck ? 'status-stuck' : 'status-active';
-                statusText = location.isStuck ? `תקוע (${location.minutesAgo}ד')` : 'פעיל';
-            }
-            el.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <span class="font-semibold">${driver.name}</span>
-                    <div class="flex items-center space-x-2 space-x-reverse">
-                        <span class="text-sm font-medium">${statusText}</span>
-                        <span class="status-dot ${statusClass}"></span>
-                    </div>
-                </div>
-                <div class="text-sm text-gray-500">
-                    <span>${driver.vehicleType}</span> | <span>${driver.phone}</span>
-                </div>
+// ... (existing code) ...
             `;
             return el;
         }
         
         function renderOrders() {
-            const list = document.getElementById('orders-list');
-            list.innerHTML = '';
+// ... (existing code) ...
             const unassignedOrders = state.orders.filter(o => o.status === 'חדש');
             if (unassignedOrders.length === 0) {
                 list.innerHTML = `<div class="p-4 text-center text-gray-500">אין הזמנות חדשות לשיבוץ.</div>`;
-                return;
-            }
+// ... (existing code) ...
             unassignedOrders
                 .sort((a,b) => new Date(a.orderDate) - new Date(b.orderDate))
                 .forEach(order => {
-                    list.appendChild(createOrderCard(order));
-                });
+// ... (existing code) ...
         }
         
         function createOrderCard(order) {
             const el = document.createElement('div');
-            el.className = 'order-card p-4 cursor-pointer';
-            el.id = `order-card-${order.orderId}`;
+// ... (existing code) ...
             el.setAttribute('data-search', `${order.orderId} ${order.customerName.toLowerCase()} ${order.address.toLowerCase()}`);
             el.onclick = () => focusOnMapItem(order.orderId, 'order');
             const orderDate = new Date(order.orderDate).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
-            el.innerHTML = `
-                <div class="flex justify-between items-center mb-1">
-                    <span class="font-bold text-blue-600">#${order.orderId}</span>
-                    <span class="text-sm font-semibold">${orderDate}</span>
-                </div>
-                <div class="font-semibold text-gray-800">${order.customerName}</div>
-                <div class="text-sm text-gray-600 truncate">${order.address}</div>
-                <div class="text-xs text-gray-500 mt-1">${order.deliveryType} | ${order.warehouse}</div>
+// ... (existing code) ...
             `;
             return el;
         }
         
         function renderMapMarkers() {
-            if (!map) return;
-            const bounds = L.latLngBounds();
+// ... (existing code) ...
             Object.values(state.liveLocations).forEach(driver => {
                 if (!driver.latitude || !driver.longitude) return;
                 const latLng = [driver.latitude, driver.longitude];
-                const icon = driver.isStuck ? driverIconStuck : driverActive;
+                const icon = driver.isStuck ? driverIconStuck : driverIconActive;
                 const popupContent = `<h4>${driver.name}</h4><p>${driver.isStuck ? 'תקוע' : 'פעיל'} | עדכון לפני ${driver.minutesAgo} דקות</p>`;
                 if (driverMarkers[driver.id]) {
-                    driverMarkers[driver.id].setLatLng(latLng).setIcon(icon).setPopupContent(popupContent);
+// ... (existing code) ...
                 } else {
                     driverMarkers[driver.id] = L.marker(latLng, { icon: icon }).addTo(map).bindPopup(popupContent);
                 }
-                bounds.extend(latLng);
+// ... (existing code) ...
             });
             const unassignedOrders = state.orders.filter(o => o.status === 'חדש' && o.latitude && o.longitude);
             Object.keys(orderMarkers).forEach(orderId => {
-                if (!unassignedOrders.some(o => o.orderId == orderId)) {
-                    map.removeLayer(orderMarkers[orderId]);
+// ... (existing code) ...
                     delete orderMarkers[orderId];
                 }
             });
             unassignedOrders.forEach(order => {
-                const latLng = [order.latitude, order.longitude];
-                const popupContent = `
-                    <h4>הזמנה #${order.orderId}</h4>
-                    <p>${order.customerName}</p>
-                    <p>${order.address}</p>
+// ... (existing code) ...
                     <button class="w-full mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600" 
                             onclick="showAssignDriverModal('${order.orderId}')">
                         שייך נהג
-                    </button>
-                `;
+// ... (existing code) ...
                 if (orderMarkers[order.orderId]) {
                     orderMarkers[order.orderId].setLatLng(latLng).setPopupContent(popupContent);
                 } else {
-                    orderMarkers[order.orderId] = L.marker(latLng, { icon: orderIconNew }).addTo(map).bindPopup(popupContent);
+// ... (existing code) ...
                 }
                 bounds.extend(latLng);
             });
-            if (bounds.isValid()) {
-                map.fitBounds(bounds, { padding: [50, 50] });
-            }
-        }
+// ... (existing code) ...
         
         
         // --- UI & MAP INTERACTIONS ---
         
+// ... (existing code) ...
         function showPanelTab(tabName) {
             document.getElementById('orders-list').style.display = (tabName === 'orders') ? 'block' : 'none';
             document.getElementById('drivers-list').style.display = (tabName === 'drivers') ? 'block' : 'none';
-            document.getElementById('tab-orders').classList.toggle('border-blue-500', tabName === 'orders');
-            document.getElementById('tab-orders').classList.toggle('text-blue-500', tabName === 'orders');
-            document.getElementById('tab-orders').classList.toggle('text-gray-500', tabName !== 'orders');
-            document.getElementById('tab-orders').classList.toggle('border-transparent', tabName !== 'orders');
-            document.getElementById('tab-drivers').classList.toggle('border-blue-500', tabName === 'drivers');
-            document.getElementById('tab-drivers').classList.toggle('text-blue-500', tabName === 'drivers');
-            document.getElementById('tab-drivers').classList.toggle('text-gray-500', tabName !== 'drivers');
+// ... (existing code) ...
             document.getElementById('tab-drivers').classList.toggle('border-transparent', tabName !== 'drivers');
         }
         
         function filterLists() {
-            const query = document.getElementById('search-input').value.toLowerCase();
+// ... (existing code) ...
             document.querySelectorAll('.driver-card').forEach(card => {
                 card.style.display = card.getAttribute('data-search').includes(query) ? 'block' : 'none';
             });
-            document.querySelectorAll('.order-card').forEach(card => {
+// ... (existing code) ...
                 card.style.display = card.getAttribute('data-search').includes(query) ? 'block' : 'none';
             });
         }
         
+// ... (existing code) ...
         function focusOnMapItem(id, type) {
             let marker, card, list;
             if (type === 'driver') {
-                marker = driverMarkers[id];
-                card = document.getElementById(`driver-card-${id}`);
-                list = document.getElementById('drivers-list');
+// ... (existing code) ...
                 document.querySelectorAll('.driver-card').forEach(c => c.classList.remove('active'));
             } else {
                 marker = orderMarkers[id];
-                card = document.getElementById(`order-card-${id}`);
-                list = document.getElementById('orders-list');
+// ... (existing code) ...
                 document.querySelectorAll('.order-card').forEach(c => c.classList.remove('active'));
             }
             if (marker) {
-                map.setView(marker.getLatLng(), 15);
+// ... (existing code) ...
                 marker.openPopup();
             }
             if (card) {
-                card.classList.add('active');
+// ... (existing code) ...
                 list.scrollTop = card.offsetTop - list.offsetTop;
             }
         }
 
         function showAssignDriverModal(orderId) {
-            const order = state.orders.find(o => o.orderId == orderId);
-            if (!order) return;
-            const availableDrivers = state.drivers.filter(d => state.liveLocations[d.driverId] && !state.liveLocations[d.driverId].isStuck);
+// ... (existing code) ...
             if (availableDrivers.length === 0) {
                 showToast('אין נהגים זמינים כרגע', 'error');
                 smartLog('WARN', 'Assign driver modal opened, but no drivers available', { module: 'showAssignDriverModal', orderId });
-                return;
-            }
+// ... (existing code) ...
             let driverOptions = availableDrivers.map(d => `${d.driverId}: ${d.name}`).join('\n');
             let driverId = prompt(`שייך הזמנה #${orderId} לנהג:\n(הזן מספר נהג)\n\n${driverOptions}`);
             if (driverId) {
-                const driverExists = availableDrivers.some(d => d.driverId == driverId.trim());
+// ... (existing code) ...
                 if (driverExists) {
                     assignOrderToDriver(orderId, driverId.trim());
                 } else {
-                    showToast('מספר נהג לא תקין או שהנהג לא זמין', 'error');
+// ... (existing code) ...
                     smartLog('WARN', 'Invalid driver ID entered for assignment', { module: 'showAssignDriverModal', enteredId: driverId });
                 }
             }
         }
         
         async function assignOrderToDriver(orderId, driverId) {
-            const module = 'assignOrderToDriver';
+// ... (existing code) ...
             const btn = document.querySelector(`.leaflet-popup-content button[onclick="showAssignDriverModal('${orderId}')"]`);
             if (btn) btn.innerText = 'משייך...';
             
             try {
+                // v31.5: Pass data directly
                 await apiFetch('assignDriver', {}, 'POST', { orderId: orderId, driverId: driverId });
                 showToast(`הזמנה #${orderId} שויכה לנהג ${driverId}`, 'success');
                 smartLog('INFO', `Order ${orderId} assigned to ${driverId}`, { module, orderId, driverId });
-                loadInitialData(true); // Refresh data
-                map.closePopup();
+// ... (existing code) ...
             } catch (error) {
                 showToast(`שגיאה בשיוך הזמנה: ${error.message}`, 'error');
                 smartLog('ERROR', 'Failed to assign order', { module, orderId, driverId, error: error.message });
-                if (btn) btn.innerText = 'שייך נהג';
+// ... (existing code) ...
             }
         }
 
         
         // --- NEW ORDER FORM (v31.0) ---
         
+// ... (existing code) ...
         function populateCustomerDatalist() {
             const datalist = document.getElementById('customer-list');
             datalist.innerHTML = '';
-            state.customers.forEach(cust => {
-                const option = document.createElement('option');
-                option.value = `${cust.name} (${cust.customerId})`;
+// ... (existing code) ...
                 option.dataset.customerId = cust.customerId;
                 datalist.appendChild(option);
             });
-        }
+// ... (existing code) ...
         
         function openNewOrderForm() {
             smartLog('INFO', 'New order form opened', { module: 'openNewOrderForm' });
-            document.getElementById('new-order-modal').showModal();
+// ... (existing code) ...
         }
 
         function closeNewOrderForm() {
             document.getElementById('new-order-modal').close();
-            document.getElementById('new-order-modal').querySelector('form').reset();
-            document.getElementById('order-date').value = new Date().toISOString().split('T')[0];
+// ... (existing code) ...
             document.getElementById('new-customer-fields').style.display = 'none';
             document.getElementById('existing-customer-display').style.display = 'none';
         }
         
+// ... (existing code) ...
         function handleCustomerSearch(value) {
             const options = document.querySelectorAll('#customer-list option');
             let found = false;
-            for (let option of options) {
+// ... (existing code) ...
                 if (option.value === value) {
                     const customerId = option.dataset.customerId;
                     const customer = state.customers.find(c => c.customerId == customerId);
-                    if (customer) {
-                        document.getElementById('existing-customer-display').style.display = 'block';
-                        document.getElementById('new-customer-fields').style.display = 'none';
-                        document.getElementById('customer-id-existing').value = customer.customerId;
-                        document.getElementById('customer-name-display').innerText = customer.name;
+// ... (existing code) ...
                         document.getElementById('customer-address-display').innerText = customer.defaultAddress;
                         document.getElementById('customer-phone-display').innerText = customer.phone;
                     }
-                    found = true;
+// ... (existing code) ...
                     break;
                 }
             }
             if (!found) {
-                document.getElementById('existing-customer-display').style.display = 'none';
+// ... (existing code) ...
                 if (value.length > 2) {
                     document.getElementById('new-customer-fields').style.display = 'block';
                     document.getElementById('customer-name-new').value = value;
-                    document.getElementById('customer-id-new').value = `C${Date.now().toString().slice(-6)}`;
+// ... (existing code) ...
                 } else {
                     document.getElementById('new-customer-fields').style.display = 'none';
                 }
-            }
-        }
+// ... (existing code) ...
         
         async function submitNewOrder(event) {
             event.preventDefault();
-            const module = 'submitNewOrder';
+// ... (existing code) ...
             const btn = document.getElementById('submit-order-btn');
             btn.disabled = true;
             btn.innerText = 'יוצר הזמנה...';
-            
+// ... (existing code) ...
             let customerData = {};
             let orderData = {};
             
-            try {
-                if (document.getElementById('new-customer-fields').style.display === 'block') {
+// ... (existing code) ...
                     customerData = {
                         isNew: true,
                         customerId: document.getElementById('customer-id-new').value,
-                        name: document.getElementById('customer-name-new').value,
-                        phone: document.getElementById('customer-phone-new').value,
-                        address: document.getElementById('customer-address-new').value,
+// ... (existing code) ...
                         contactPerson: document.getElementById('customer-contact-new').value
                     };
                 } else if (document.getElementById('existing-customer-display').style.display === 'block') {
-                    const customerId = document.getElementById('customer-id-existing').value;
-                    const customer = state.customers.find(c => c.customerId == customerId);
-                    customerData = {
-                        isNew: false,
-                        customerId: customer.customerId,
+// ... (existing code) ...
                         name: customer.name,
                         phone: customer.phone,
                         address: customer.defaultAddress
-                    };
+// ... (existing code) ...
                 } else {
                     throw new Error('יש לבחור לקוח קיים או ליצור לקוח חדש');
                 }
-                
-                orderData = {
-                    internalId: document.getElementById('order-internal-id').value,
-                    orderDate: document.getElementById('order-date').value,
-                    deliveryType: document.getElementById('order-delivery-type').value,
+// ... (existing code) ...
                     warehouse: document.getElementById('order-warehouse').value,
                     notes: document.getElementById('order-notes').value,
                     latitude: '', longitude: ''
-                };
+// ... (existing code) ...
             
                 smartLog('INFO', 'Submitting new order...', { module, customer: customerData.name });
+                // v31.5: Pass data directly
                 const newOrder = await apiFetch('createNewOrder', {}, 'POST', { orderData, customerData });
                 showToast(`הזמנה #${newOrder.orderId} נוצרה בהצלחה`, 'success');
                 smartLog('INFO', `New order created successfully: ${newOrder.orderId}`, { module, orderId: newOrder.orderId });
-                closeNewOrderForm();
+// ... (existing code) ...
                 loadInitialData(true); // Refresh
                 
             } catch (error) {
-                showToast(`שגיאה ביצירת הזמנה: ${error.message}`, 'error');
+// ... (existing code) ...
                 smartLog('ERROR', 'Failed to create new order', { module, error: error.message, stack: error.stack });
             } finally {
                 btn.disabled = false;
-                btn.innerText = 'צור הזמנה';
+// ... (existing code) ...
             }
         }
 
         
         // --- HELPERS ---
         
+// ... (existing code) ...
         function showLoader(elementId, show) {
             const container = document.getElementById(elementId);
             if (!container) return;
+// ... (existing code) ...
             let loader = container.querySelector('.loader-container');
             if (show) {
                 if (!loader) {
-                    loader = document.createElement('div');
-                    loader.className = 'loader-container';
+// ... (existing code) ...
                     loader.innerHTML = `<div class="loader"></div>`;
                     if (elementId !== 'map-loader') {
                          container.prepend(loader);
-                    } else {
-                        container.style.display = 'flex';
+// ... (existing code) ...
                     }
                 }
             } else {
                 if (loader) {
-                    if (elementId !== 'map-loader') {
-                        loader.remove();
-                    } else {
+// ... (existing code) ...
                         container.style.display = 'none';
                     }
                 }
-            }
-        }
+// ... (existing code) ...
         
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
+// ... (existing code) ...
             toast.innerText = message;
             container.appendChild(toast);
             setTimeout(() => {
-                toast.classList.add('show');
+// ... (existing code) ...
             }, 10);
             setTimeout(() => {
                 toast.classList.remove('show');
-                setTimeout(() => {
+// ... (existing code) ...
                     container.removeChild(toast);
                 }, 300);
             }, 3000);
         }
-
+        
+        // v31.4: Add version variable for logging
+        const APP_VERSION = '31.5';
+        
         // Final log to confirm script parse
-        smartLog('INFO', 'Admin App v31.3 scripts parsed and running.');
+        smartLog('INFO', `Admin App v${APP_VERSION} scripts parsed and running.`);
 
     </script>
 </body>
