@@ -305,7 +305,10 @@
             const response = await fetch(url, options);
             
             if (!response.ok) {
-// ... (existing code) ...
+                let errorText = await response.text();
+                try {
+                    // See if the error is JSON
+                    const errorJson = JSON.parse(errorText); // v31.6: Removed extra parenthesis
                     if (errorJson.data) errorText = errorJson.data;
                 } catch (e) {
                     // Not JSON, just use the text
@@ -629,4 +632,5 @@
     </script>
 </body>
 </html>
+
 
