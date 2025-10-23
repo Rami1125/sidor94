@@ -3,119 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 
+      DeliveryMaster Log Viewer v31.1
+      
+      Changelog:
+      - v31.1: CRITICAL FIX for apiFetch.
+      - Fixed apiFetch to properly serialize parameters into the URL.
+      - Updated loadLogs to use the new apiFetch signature.
+      - Re-styled to match the v31.0 admin panel theme.
+    -->
     <title>DeliveryMaster - לוגים</title>
-    <!-- DeliveryMaster Log Viewer v28.8 -->
-
-    <!-- TailwindCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- LeafletJS for Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- Icons (Feather) -->
     <script src="https://unpkg.com/feather-icons"></script>
-
     <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f9fafb;
+        :root {
+            --primary-color: #3b82f6; /* blue-500 */
+            --bg-light: #f3f4f6; /* gray-100 */
         }
-        .log-item {
-            border-right-width: 4px;
+        body { 
+            font-family: 'Arial', sans-serif; 
+            background-color: var(--bg-light);
         }
-        .log-INFO { border-right-color: #3498db; }
-        .log-ERROR { border-right-color: #e74c3c; }
-        .log-WARNING { border-right-color: #f39c12; }
-        .log-Client { border-right-color: #9b59b6; }
-        
+        .log-item:hover { background-color: #fafafa; }
+        .log-INFO { border-right: 4px solid #3b82f6; }
+        .log-ERROR { border-right: 4px solid #ef4444; }
+        .log-WARNING { border-right: 4px solid #f59e0b; }
+        .log-Client { border-right: 4px solid #8b5cf6; }
+
+        /* Modal */
         #log-details-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        #log-details-content {
-            background: white;
-            padding: 24px;
-            border-radius: 8px;
-            width: 90%;
             max-width: 800px;
-            max-height: 90vh;
-            overflow-y: auto;
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 0;
         }
+        #log-details-modal::backdrop {
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(2px);
+        }
+        
         #map-placeholder {
             height: 300px;
             background-color: #eee;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #777;
+            margin-top: 15px;
             border-radius: 8px;
-            margin-top: 16px;
+        }
+        
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5000;
+        }
+        .toast {
+            padding: 12px 20px;
+            background-color: #1f2937;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background-color: #ef4444; }
+
+        /* Loader */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body class="bg-gray-100">
+<body>
 
+    <!-- Header -->
     <header class="bg-white shadow-sm">
-        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-gray-800">מציג לוגים - v28.8</h1>
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-gray-800">מציג לוגים</h1>
             <div class="flex items-center space-x-4 space-x-reverse">
-                <select id="level-filter" class="border rounded-md px-3 py-2" onchange="renderLogs()">
+                <select id="level-filter" class="border rounded-md px-3 py-2 bg-white" onchange="renderLogs()">
                     <option value="ALL">כל הרמות</option>
                     <option value="ERROR">ERROR</option>
                     <option value="WARNING">WARNING</option>
                     <option value="INFO">INFO</option>
                     <option value="Client">Client</option>
                 </select>
-                <button onclick="loadLogs()" id="refresh-btn" class="p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                    <i data-feather="refresh-cw" class="w-5 h-5"></i>
+                <button onclick="loadLogs()" id="refresh-btn" class="p-2 rounded-full hover:bg-gray-100" title="רענן">
+                    <i data-feather="refresh-cw" class="text-gray-600"></i>
                 </button>
             </div>
         </div>
     </header>
 
-    <main class="container mx-auto px-4 py-6">
+    <main class="container mx-auto px-6 py-6">
         <div id="loader" class="text-center py-10" style="display: none;">
-            <div class="loader inline-block border-4 border-t-4 border-gray-200 border-t-blue-500 rounded-full w-12 h-12 animate-spin"></div>
+            <div class="loader inline-block"></div>
         </div>
         <div id="log-list" class="space-y-3">
             <!-- Log items will be injected here -->
         </div>
     </main>
 
-    <!-- Log Details Modal -->
-    <div id="log-details-modal" onclick="closeModal()">
-        <div id="log-details-content" onclick="event.stopPropagation()">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold">פרטי לוג</h2>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-800">
-                    <i data-feather="x"></i>
-                </button>
-            </div>
-            <pre id="log-json" class="bg-gray-100 p-4 rounded-md overflow-x-auto text-sm"></pre>
-            <div id="map-placeholder">
-                טוען מפה...
-            </div>
+    <!-- Modal -->
+    <dialog id="log-details-modal">
+        <div class="flex justify-between items-center p-4 border-b">
+            <h2 class="text-xl font-bold">פרטי לוג</h2>
+            <button class="text-gray-500 hover:text-gray-800" onclick="closeModal()">
+                <i data-feather="x"></i>
+            </button>
         </div>
-    </div>
+        <div class="p-6">
+            <pre id="log-json" class="bg-gray-100 p-4 rounded-md overflow-x-auto text-sm max-h-60"></pre>
+            <div id="map-placeholder"></div>
+        </div>
+    </dialog>
+    
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
 
     <script>
         // --- Config ---
         const API_URL = 'https://script.google.com/macros/s/AKfycbzWnjH9nlF5Yw3tpG6OygtBKRZHaB8Sfc2aw3_kY70RhE9UJUsTEjnmjf-i4OiXVK97/exec';
         let allLogs = [];
         let mapInstance = null;
+        const modal = document.getElementById('log-details-modal');
 
         // --- API ---
-        async function apiFetch(action, method = 'GET', data = null) {
-            const url = `${API_URL}?action=${action}`;
+        /**
+         * v31.1: Robust API wrapper (FIXED)
+         * Handles requests, responses, errors, and logging.
+         * Separates action from params for GET requests.
+         */
+        async function apiFetch(action, params = {}, method = 'GET', data = null) {
+            let url = `${API_URL}?action=${action}`;
+            
+            // v31.1 FIX: Properly serialize GET parameters
+            if (method === 'GET' && Object.keys(params).length > 0) {
+                url += '&' + new URLSearchParams(params).toString();
+            }
+
             const options = {
                 method: method,
                 redirect: 'follow',
@@ -129,19 +169,46 @@
 
             try {
                 const response = await fetch(method === 'GET' ? url : API_URL, options);
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error(`שגיאת שרת (${response.status})`);
                 }
+                
                 const result = await response.json();
+                
                 if (result.status === 'error') {
                     throw new Error(result.data);
                 }
+                
                 return result.data;
+                
             } catch (error) {
                 console.error(`API Fetch Error (${action}):`, error);
-                alert(`שגיאת תקשורת: ${error.message}`);
-                throw error;
+                showToast(`שגיאת תקשורת: ${error.message}`, 'error');
+                
+                // Anti-loop safety check
+                if (action !== 'logToServer') {
+                    // v31.1 FIX: Update logToServer call
+                    logToServer('LogViewerApp v31.1', 'ERROR', `API Fetch Failed: ${action}`, { error: error.message });
+                }
+                
+                throw error; // Re-throw for the calling function to handle
             }
+        }
+        
+        /**
+         * v31.1: Fire-and-forget logger (FIXED)
+         */
+        function logToServer(origin, level, message, context = {}) {
+            // v31.1 FIX: Call apiFetch with correct signature
+            apiFetch('logToServer', {}, 'POST', {
+                origin: origin,
+                level: level,
+                message: message,
+                context: context
+            }).catch(err => {
+                console.error("CRITICAL: Silent log-to-server failed:", err.message);
+            });
         }
 
         // --- Logic ---
@@ -150,13 +217,14 @@
             document.getElementById('log-list').innerHTML = '';
             document.getElementById('refresh-btn').disabled = true;
 
-            apiFetch('getLogs&limit=200')
+            // v31.1 FIX: Call apiFetch with new signature
+            apiFetch('getLogs', { limit: 200 }, 'GET')
                 .then(logs => {
                     allLogs = logs;
                     renderLogs();
                 })
                 .catch(error => {
-                    document.getElementById('log-list').innerHTML = `<p class="text-center text-red-500">שגיאה בטעינת לוגים: ${error.message}</p>`;
+                    document.getElementById('log-list').innerHTML = `<p class="text-center text-red-500 p-4">שגיאה בטעינת לוגים: ${error.message}</p>`;
                 })
                 .finally(() => {
                     document.getElementById('loader').style.display = 'none';
@@ -168,42 +236,35 @@
             const list = document.getElementById('log-list');
             const filter = document.getElementById('level-filter').value;
             list.innerHTML = '';
-
             const filteredLogs = allLogs.filter(log => filter === 'ALL' || log.Level === filter);
 
             if (filteredLogs.length === 0) {
-                list.innerHTML = '<p class="text-center text-gray-500">לא נמצאו לוגים.</p>';
+                list.innerHTML = '<p class="text-center text-gray-500 p-4">לא נמצאו לוגים.</p>';
                 return;
             }
-
-            filteredLogs.forEach((log, index) => {
-                list.appendChild(createLogElement(log, index));
-            });
-
-            feather.replace(); // Re-apply icons
+            filteredLogs.forEach((log, index) => list.appendChild(createLogElement(log, index)));
+            feather.replace();
         }
 
+        // --- UI (v31.1 Style) ---
         function createLogElement(log, index) {
             const el = document.createElement('div');
             const level = log.Level || 'INFO';
             const origin = log.Origin || 'Unknown';
-            const timestamp = new Date(log.Timestamp).toLocaleString('he-IL', {
-                hour: '2-digit', minute: '2-digit', second: '2-digit'
-            });
+            const timestampStr = log.Timestamp ? new Date(log.Timestamp).toLocaleString('he-IL') : 'N/A';
 
-            el.className = `log-item log-${level} bg-white p-4 rounded-md shadow-sm flex justify-between items-center`;
+            el.className = `log-item log-${level} bg-white p-4 rounded-lg shadow-sm flex justify-between items-center cursor-pointer`;
+            el.onclick = () => showDetails(index);
             
             el.innerHTML = `
                 <div class="flex-1 overflow-hidden">
-                    <div class="flex items-center space-x-3 space-x-reverse">
+                    <div class="flex items-center space-x-3 space-x-reverse mb-1">
                         <span class="font-bold text-gray-800">${origin}</span>
-                        <span class="text-sm text-gray-500">${timestamp}</span>
+                        <span class="text-sm text-gray-500">${timestampStr}</span>
                     </div>
                     <p class="text-gray-700 truncate" title="${log.Message}">${log.Message}</p>
                 </div>
-                <button class="mr-4 text-gray-500 hover:text-blue-500" onclick="showDetails(${index})">
-                    <i data-feather="zoom-in"></i>
-                </button>
+                <i data-feather="zoom-in" class="text-gray-500 mr-4"></i>
             `;
             return el;
         }
@@ -211,31 +272,24 @@
         function showDetails(index) {
             const log = allLogs[index];
             let dataObject = {};
-            
             try {
-                // The data might be a stringified JSON string, or just a string
                 dataObject = JSON.parse(log.Data);
             } catch (e) {
                 dataObject = { rawData: log.Data };
             }
 
-            // Format JSON for display
             document.getElementById('log-json').textContent = JSON.stringify(log, null, 2);
-            document.getElementById('log-details-modal').style.display = 'flex';
+            modal.showModal();
             
-            // Check for coordinates in the data object
             let lat = null, lon = null;
             if (dataObject.context && dataObject.context.latitude) {
-                // Client log with context
                 lat = dataObject.context.latitude;
                 lon = dataObject.context.longitude;
             } else if (dataObject.latitude) {
-                // Simple object with coords
                 lat = dataObject.latitude;
                 lon = dataObject.longitude;
             }
 
-            // Initialize map if coords exist
             const mapEl = document.getElementById('map-placeholder');
             if (mapInstance) {
                 mapInstance.remove();
@@ -243,41 +297,55 @@
             }
             
             if (lat && lon) {
-                mapEl.innerHTML = ''; // Clear "loading" text
+                mapEl.innerHTML = '';
                 mapEl.style.height = '300px';
-                
                 mapInstance = L.map(mapEl).setView([lat, lon], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap'
-                }).addTo(mapInstance);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
                 L.marker([lat, lon]).addTo(mapInstance);
-                
-                // Leaflet sometimes has trouble resizing in a modal
-                // We force it to re-check its size
                 setTimeout(() => mapInstance.invalidateSize(), 100);
-                
             } else {
                 mapEl.style.height = '100px';
-                mapEl.innerHTML = 'אין נתוני מיקום בלוג זה.';
+                mapEl.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500">אין נתוני מיקום בלוג זה.</div>';
             }
-
-            feather.replace();
         }
 
         function closeModal() {
-            document.getElementById('log-details-modal').style.display = 'none';
+            modal.close();
             if (mapInstance) {
                 mapInstance.remove();
                 mapInstance = null;
             }
+        }
+        
+        // Toast Function
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerText = message;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    container.removeChild(toast);
+                }, 300);
+            }, 3000);
         }
 
         // --- Init ---
         document.addEventListener('DOMContentLoaded', () => {
             feather.replace();
             loadLogs();
+            logToServer('LogViewerApp v31.1', 'INFO', 'Log viewer app loaded');
         });
     </script>
 
 </body>
 </html>
+
