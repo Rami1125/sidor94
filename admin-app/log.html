@@ -3,16 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v33.1 - צג לוגים חכם (מלשינון)</title>
-    <!-- Tailwind Play CDN (for quick demo) -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>DeliveryMaster v33.2 - צג לוגים חכם (מלשינון)</title>
+    
+    <!--
+      Tailwind CSS v33.2 - No CDN
+      הסרנו את ה-CDN והטמענו את הסגנונות הנדרשים ישירות כאן.
+      זה פותר את אזהרת ה-"should not be used in production".
+    -->
     <style>
-        body { 
-            background-color: #111827; /* bg-gray-900 */
-            color: #d1d5db; /* text-gray-300 */
-            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+        /* 1. Tailwind Base (Reset & Defaults) */
+        *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
+        html { line-height: 1.5; -webkit-text-size-adjust: 100%; -moz-tab-size: 4; tab-size: 4; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; direction: rtl; }
+        body { margin: 0; line-height: inherit; background-color: #111827; color: #d1d5db; }
+        
+        /* 2. Tailwind Utilities (Subset used in this file) */
+        .container { width: 100%; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .max-w-7xl { max-width: 80rem; }
+        .p-4 { padding: 1rem; }
+        .p-8 { padding: 2rem; }
+        .p-3 { padding: 0.75rem; }
+        .p-2 { padding: 0.5rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem; }
+        .gap-4 { gap: 1rem; }
+        .gap-3 { gap: 0.75rem; }
+        .grid { display: grid; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        @media (min-width: 768px) {
+            .md\:p-8 { padding: 2rem; }
+            .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         }
-        /* Glass UI Style */
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .w-full { width: 100%; }
+        .w-80 { width: 20rem; }
+        .min-w-full { min-width: 100%; }
+        .h-full { height: 100%; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .rounded-xl { border-radius: 0.75rem; }
+        .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); }
+        .overflow-hidden { overflow: hidden; }
+        .overflow-x-auto { overflow-x: auto; }
+        .text-sm { font-size: 0.875rem; }
+        .text-2xl { font-size: 1.5rem; }
+        .font-bold { font-weight: 700; }
+        .font-semibold { font-weight: 600; }
+        .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .text-white { color: #fff; }
+        .text-gray-200 { color: #e5e7eb; }
+        .text-gray-300 { color: #d1d5db; }
+        .text-gray-400 { color: #9ca3af; }
+        .text-gray-500 { color: #6b7280; }
+        .text-gray-700 { color: #374151; }
+        .text-cyan-300 { color: #67e8f9; }
+        .text-green-400 { color: #4ade80; }
+        .text-yellow-300 { color: #fde047; }
+        .text-yellow-400 { color: #facc15; }
+        .text-red-500 { color: #ef4444; }
+        .text-blue-500 { color: #3b82f6; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .bg-gray-700 { background-color: #374151; }
+        .bg-gray-800 { background-color: #1f2937; }
+        .bg-gray-900 { background-color: #111827; }
+        .bg-blue-600 { background-color: #2563eb; }
+        .hover\:bg-gray-700:hover { background-color: #374151; }
+        .hover\:bg-blue-700:hover { background-color: #1d4ed8; }
+        .border { border-width: 1px; }
+        .border-b { border-bottom-width: 1px; }
+        .border-r-4 { border-right-width: 4px; }
+        .border-gray-500 { border-color: #6b7280; }
+        .border-gray-700 { border-color: #374151; }
+        .border-red-500 { border-color: #ef4444; }
+        .border-yellow-500 { border-color: #f59e0b; }
+        .divide-y > :not([hidden]) ~ :not([hidden]) { border-top-width: 1px; }
+        .divide-gray-700 > :not([hidden]) ~ :not([hidden]) { border-color: #374151; }
+        .focus\:border-blue-500:focus { border-color: #3b82f6; }
+        .focus\:ring-blue-500:focus { --tw-ring-color: #3b82f6; box-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color); }
+        input, select { -webkit-appearance: none; -moz-appearance: none; appearance: none; background-color: transparent; border: none; padding: 0; margin: 0; width: 100%; min-width: 0; display: block; }
+        select { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E"); background-position: left 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-left: 2.5rem; }
+
+        /* 3. Custom Glass UI & App Styles */
         .glass-ui {
             background-color: rgba(31, 41, 55, 0.7); /* bg-gray-800 bg-opacity-70 */
             backdrop-filter: blur(12px);
@@ -21,13 +96,10 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
-        /* Log level colors */
-        .level-INFO { --tw-text-opacity: 1; color: rgb(59 130 246 / var(--tw-text-opacity)); }
-        .level-WARN { --tw-text-opacity: 1; color: rgb(245 158 11 / var(--tw-text-opacity)); }
-        .level-ERROR { --tw-text-opacity: 1; color: rgb(239 68 68 / var(--tw-text-opacity)); font-weight: 600; }
-        .level-CLIENT_ERROR { --tw-text-opacity: 1; color: rgb(234 179 8 / var(--tw-text-opacity)); font-weight: 600; }
-
-        /* Toast Notification */
+        .level-INFO { color: #3b82f6; }
+        .level-WARN { color: #f59e0b; }
+        .level-ERROR { color: #ef4444; font-weight: 600; }
+        .level-CLIENT_ERROR { color: #eab308; font-weight: 600; }
         #toast-container {
             position: fixed;
             top: 1.25rem;
@@ -36,7 +108,7 @@
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
-            direction: rtl; /* Ensure toasts are RTL */
+            direction: rtl;
         }
         .toast {
             animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
@@ -62,7 +134,7 @@
         <header class="glass-ui p-4 flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-white">צג לוגים חכם (מלשינון)</h1>
-                <p class="text-sm text-gray-400">v33.1 - ניטור פעולות מערכת בזמן אמת</p>
+                <p class="text-sm text-gray-400">v33.2 - ניטור פעולות מערכת בזמן אמת</p>
             </div>
             <div class="text-sm text-gray-400" id="connection-status">
                 <span class="text-yellow-400">טוען נתונים...</span>
@@ -107,14 +179,15 @@
 
     <script>
         // --- 1. Configuration ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbyZ84w5JTr-up3kU5mFFqmbhtZMqhHZ5RsG-lnul4Y9_bH5lOAAbdzD291I1SBda91m/exec"; // !!! יש להדביק כאן את ה-URL של ה-WebApp
+        // !!! עדכן את ה-URL הזה ל-URL החדש שתקבל לאחר הפריסה מחדש של Code.gs
+        const API_URL = "https://script.google.com/macros/s/AKfycbyZ84w5JTr-up3kU5mFFqmbhtZMqhHZ5RsG-lnul4Y9_bH5lOAAbdzD291I1SBda91m/exec"; 
         const POLL_INTERVAL = 10000; // 10 שניות
-        const APP_NAME = "AdminLogMonitor_v33.1";
+        const APP_NAME = "AdminLogMonitor_v33.2";
 
         // --- 2. Global State ---
         let globalState = {
             logs: [],
-            lastLogTimestamp: null // Used to detect new logs for notifications
+            lastLogTimestamp: null
         };
 
         // --- 3. API Fetch Utility ---
@@ -126,14 +199,30 @@
                     headers: { 'Content-Type': 'application/json' },
                     mode: 'cors'
                 });
-                if (!response.ok) throw new Error(`Network response was not ok (status: ${response.status})`);
+
+                // בדיקה אם התשובה תקינה (למקרה של שגיאת רשת)
+                if (!response.ok) {
+                    throw new Error(`שגיאת רשת: ${response.status} ${response.statusText}`);
+                }
+                
                 const result = await response.json();
-                if (result.status === 'error') throw new Error(result.message);
+
+                // בדיקה אם ה-API עצמו החזיר שגיאה לוגית
+                if (result.status === 'error') {
+                    throw new Error(result.message);
+                }
+                
                 return result.data;
+
             } catch (error) {
+                // זה המקום שבו הלוג שלך "API Failure: getRecentLogs TypeError: Failed to fetch" נוצר
                 console.error(`API Failure: ${action}`, error);
-                document.getElementById('connection-status').innerHTML = `<span class="text-red-500">שגיאת התחברות</span>`;
-                throw error;
+                document.getElementById('connection-status').innerHTML = `<span class="text-red-500">שגיאת התחברות (CORS?)</span>`;
+                
+                // מציג התראת שגיאה למשתמש
+                createToast('ERROR', `שגיאת תקשורת: ${error.message}. בדוק CORS או פריסה מחדש.`, 'LogMonitor');
+                
+                throw error; // עוצר את המשך הריצה של הפונקציה
             }
         }
 
@@ -141,6 +230,8 @@
         async function fetchLogs() {
             try {
                 const newLogs = await apiFetch('getRecentLogs');
+                
+                // אם הגענו לכאן, התקשורת הצליחה
                 if (!newLogs || newLogs.length === 0) {
                     document.getElementById('connection-status').innerHTML = `<span class="text-green-400">מחובר (אין לוגים)</span>`;
                     return;
@@ -148,7 +239,6 @@
 
                 document.getElementById('connection-status').innerHTML = `<span class="text-green-400">מחובר (עדכון אחרון: ${new Date().toLocaleTimeString()})</span>`;
 
-                // Check for new logs to notify
                 const newestLogTimestamp = newLogs[0].Timestamp;
                 if (globalState.lastLogTimestamp && newestLogTimestamp > globalState.lastLogTimestamp) {
                     const trulyNewLogs = newLogs.filter(log => log.Timestamp > globalState.lastLogTimestamp);
@@ -160,7 +250,8 @@
                 renderLogs();
 
             } catch (error) {
-                // Error is already logged by apiFetch
+                // השגיאה כבר טופלה והוצגה על ידי apiFetch
+                console.warn("fetchLogs נכשל. הלוגים לא יתעדכנו בסבב זה.");
             }
         }
 
@@ -193,7 +284,7 @@
                         <td class="p-3 text-gray-400">${new Date(log.Timestamp).toLocaleString('he-IL')}</td>
                         <td class="p-3 font-bold ${levelClass}">${level}</td>
                         <td class="p-3 text-cyan-300 font-mono">[${log.Origin}]</td>
-                        <td class="p-3 text-white">${log.Message}</td>
+                        <td class="p-3 text-white">${log.Message || '---'}</td>
                         <td class="p-3 text-yellow-300 font-mono">${log.Hint || '---'}</td>
                     </tr>
                 `;
@@ -202,9 +293,7 @@
 
         // --- 6. Notification (Toast) System ---
         function showNewLogNotifications(newLogs) {
-            // Find the most critical new log
             const criticalLog = newLogs.find(l => l.Level === 'ERROR') || newLogs.find(l => l.Level === 'WARN');
-            
             if (criticalLog) {
                 createToast(criticalLog.Level, criticalLog.Message, criticalLog.Origin);
             }
@@ -236,28 +325,20 @@
                 </div>
             `;
             
-            container.prepend(toast); // Add new toast at the top
-            
-            // Remove after 5 seconds
-            setTimeout(() => {
-                toast.remove();
-            }, 5000);
+            container.prepend(toast);
+            setTimeout(() => { toast.remove(); }, 5000);
         }
 
         // --- 7. Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Add event listeners
             document.getElementById('filter-text').addEventListener('input', renderLogs);
             document.getElementById('filter-level').addEventListener('input', renderLogs);
             document.getElementById('force-refresh').addEventListener('click', fetchLogs);
-
-            // Initial load
             fetchLogs();
-
-            // Start polling
             setInterval(fetchLogs, POLL_INTERVAL);
         });
 
     </script>
 </body>
 </html>
+
