@@ -3,397 +3,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v33.0 - חדר מצב</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+    <title>DeliveryMaster v34.0 - דשבורד ניהול</title>
+    <!-- 
+      v34.0 - No CDN
+      כל העיצוב מוטמע ישירות כאן
+    -->
     <style>
-        /* Tailwind Base & Utilities (minified subset for demo) */
-        *,::before,::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb }
-        html { line-height: 1.5; -webkit-text-size-adjust: 100%; -moz-tab-size: 4; tab-size: 4; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"; direction: rtl; }
+        /* 1. Tailwind Base & Utilities (subset) */
+        *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
+        html { line-height: 1.5; -webkit-text-size-adjust: 100%; -moz-tab-size: 4; tab-size: 4; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; direction: rtl; }
         body { margin: 0; line-height: inherit; background-color: #111827; color: #d1d5db; }
         .container { width: 100%; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
-        @media (min-width: 1280px) { .container { max-width: 1280px; } }
-        /* --- v33.0 Glass UI Design System --- */
+        @media (min-width: 1280px) { .container { max-width: 80rem; } }
+        
+        /* 2. Custom Glass UI */
         .glass-ui {
-            background-color: rgba(31, 41, 55, 0.7); /* bg-gray-800 bg-opacity-70 */
+            background-color: rgba(31, 41, 55, 0.7);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border-radius: 0.75rem; /* rounded-xl */
+            border-radius: 0.75rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
-        .glass-button {
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            background-color: rgba(59, 130, 246, 0.8); /* bg-blue-500 bg-opacity-80 */
-            color: white;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .glass-button:hover { background-color: rgba(37, 99, 235, 1); }
-        .glass-input {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            background-color: rgba(17, 24, 39, 0.8); /* bg-gray-900 bg-opacity-80 */
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-        }
-        .glass-input:focus { outline: 2px solid rgba(59, 130, 246, 0.8); }
-        .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
-        .status-new { background-color: #3b82f6; color: white; }
-        .status-assigned { background-color: #eab308; color: #422006; }
-        .status-delivered { background-color: #22c55e; color: #064e3b; }
-        /* Leaflet RTL Fix */
-        .leaflet-container { background: #374151; }
+
+        /* 3. App-specific Styles */
+        .p-4 { padding: 1rem; }
+        .p-3 { padding: 0.75rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem; }
+        .flex { display: flex; }
+        .justify-between { justify-content: space-between; }
+        .items-center { align-items: center; }
+        .text-2xl { font-size: 1.5rem; }
+        .font-bold { font-weight: 700; }
+        .text-sm { font-size: 0.875rem; }
+        .text-white { color: #fff; }
+        .text-gray-400 { color: #9ca3af; }
+        .text-gray-500 { color: #6b7280; }
+        .text-green-400 { color: #4ade80; }
+        .text-yellow-400 { color: #facc15; }
+        .text-red-500 { color: #ef4444; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .w-full { width: 100%; }
+        .min-w-full { min-width: 100%; }
+        .overflow-hidden { overflow: hidden; }
+        .overflow-x-auto { overflow-x: auto; }
+        .border-b { border-bottom-width: 1px; }
+        .border-gray-700 { border-color: #374151; }
+        .divide-y > :not([hidden]) ~ :not([hidden]) { border-top-width: 1px; }
+        .divide-gray-700 > :not([hidden]) ~ :not([hidden]) { border-color: #374151; }
+        .hover\:bg-gray-700:hover { background-color: #374151; }
+        
+        /* Status Badges */
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .status-new { background-color: #3b82f6; color: white; } /* "חדש" */
+        .status-assigned { background-color: #eab308; color: #422006; } /* "שויך" */
+        .status-delivered { background-color: #22c55e; color: #064e3b; } /* "הושלם" */
+        .status-default { background-color: #6b7280; color: #111827; }
     </style>
-</head>
-<body class="p-4 md:p-8">
 
-    <div class="container space-y-6">
-        
-        <header class="glass-ui p-4 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-white">DeliveryMaster v33.0 - חדר מצב</h1>
-            <div class="text-sm text-gray-400">
-                מצב: <span class="text-green-400">מחובר</span> | <span id="clock"></span>
-            </div>
-        </header>
+    <!-- 1. Firebase SDKs (חייב) -->
+    <script type="module">
+        // Import the functions you need from the SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="glass-ui p-5">
-                <h3 class="text-gray-400 text-sm font-medium">סה"כ הזמנות (היום)</h3>
-                <p id="stat-total" class="text-3xl font-bold text-white">טוען...</p>
-            </div>
-            <div class="glass-ui p-5">
-                <h3 class="text-gray-400 text-sm font-medium">ממתין לשיבוץ</h3>
-                <p id="stat-pending" class="text-3xl font-bold text-yellow-400">טוען...</p>
-            </div>
-            <div class="glass-ui p-5">
-                <h3 class="text-gray-400 text-sm font-medium">הזמנות ששויכו</h3>
-                <p id="stat-assigned" class="text-3xl font-bold text-blue-400">טוען...</p>
-            </div>
-            <div class="glass-ui p-5">
-                <h3 class="text-gray-400 text-sm font-medium">נהגים פעילים</h3>
-                <p id="stat-drivers" class="text-3xl font-bold text-green-400">טוען...</p>
-            </div>
-        </section>
-
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            <div class="lg:col-span-2 space-y-4">
-                <div class="glass-ui p-4">
-                    <input type="text" id="smart-search" class="glass-input" placeholder="🔍 חיפוש חכם (שם, טלפון, כתובת, נהג, סטטוס)...">
-                </div>
-                <div class="glass-ui p-4 overflow-auto" style="max-height: 600px;">
-                    <table class="w-full text-right">
-                        <thead class="border-b border-gray-600">
-                            <tr>
-                                <th class="p-2">מזהה</th>
-                                <th class="p-2">לקוח</th>
-                                <th class="p-2">כתובת</th>
-                                <th class="p-2">נהג</th>
-                                <th class="p-2">סטטוס</th>
-                                <th class="p-2">פעולות</th>
-                            </tr>
-                        </thead>
-                        <tbody id="orders-table-body">
-                            <tr><td colspan="6" class="p-8 text-center text-gray-400">טוען הזמנות...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="space-y-6">
-                <div class="glass-ui p-4 space-y-2">
-                    <h2 class="text-lg font-semibold text-white">מפת תצוגה חיה</h2>
-                    <div id="leaflet-map" class="w-full h-64 rounded-lg z-0"></div>
-                </div>
-
-                <div class="glass-ui p-4 space-y-2">
-                    <h2 class="text-lg font-semibold text-white">התפלגות לפי סטטוס</h2>
-                    <canvas id="status-chart" class="w-full"></canvas>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    <script>
-        // --- 1. Configuration ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbzmP5bIgJmMSNmLi2fkyIay4jeX-xxvzWaEgxSaPOghKyIW2BMyG-pbhqVH-NTf2RZy/exec"; // יש להדביק כאן את ה-URL של ה-WebApp שפורסם
-        const APP_NAME = "AdminApp_v33";
-        const REFRESH_INTERVAL = 60000; // 1 minute auto-refresh
-        
-        // --- Global State ---
-        let allOrders = [];
-        let allDrivers = [];
-        let mapInstance = null;
-        let chartInstance = null;
-        let localLogs = [];
-
-        // --- 2. SmartLog v33.0 (Client) ---
-        // "מלשינון" צד לקוח
-        const SmartLog = {
-            info: (message, data = {}) => log('info', message, data),
-            warn: (message, data = {}) => log('warn', message, data),
-            error: (message, error, data = {}) => {
-                const errorData = { 
-                    error: error ? error.message : 'Unknown error', 
-                    stack: error ? error.stack : undefined, ...data 
-                };
-                log('error', message, errorData);
-            },
-            sendBatch: () => {
-                if (localLogs.length === 0) return;
-                
-                const batch = [...localLogs];
-                localLogs = []; // Clear queue
-                
-                fetch(API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'logToServerBatch',
-                        payload: batch,
-                        context: { app: APP_NAME, version: 'v33.0' }
-                    }),
-                    headers: { 'Content-Type': 'application/json' },
-                    mode: 'cors'
-                })
-                .catch(err => console.error("SmartLog FATAL: Failed to send batch.", err));
-            }
+        // --- 2. תצורה (Config) ---
+        // !!! הדבק כאן את האובייקט שקיבלת מ-Firebase (שלב 5 במדריך) !!!
+        const firebaseConfig = {
+          apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
+          authDomain: "saban94-78949.firebaseapp.com",
+          projectId: "saban94-78949",
+          storageBucket: "saban94-78949.firebasestorage.app",
+          messagingSenderId: "41553157903",
+          appId: "1:41553157903:web:cc33d252cff023be97a87a",
+          measurementId: "G-XV6RZDESSB"
         };
 
-        function log(level, message, data) {
-            console[level] || console.log(`[${level}] ${message}`, data);
-            localLogs.push({ level, message, data, timestamp: new Date().toISOString() });
-        }
+        // --- 3. אתחול (Initialization) ---
+        let db;
         
-        // Send logs to server every 30 seconds
-        setInterval(SmartLog.sendBatch, 30000);
-
-        // --- 3. API Fetch Utility (v33.0) ---
-        async function apiFetch(action, payload = {}) {
-            SmartLog.info(`API Request: ${action}`, payload);
+        document.addEventListener('DOMContentLoaded', async () => {
             try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ action, payload, context: { app: APP_NAME } }),
-                    headers: { 'Content-Type': 'application/json' },
-                    mode: 'cors'
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Network response was not ok (status: ${response.status})`);
-                }
-
-                const result = await response.json();
-
-                if (result.status === 'error') {
-                    throw new Error(result.message);
-                }
+                // אתחול Firebase
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                db = getFirestore(app);
                 
-                SmartLog.info(`API Success: ${action}`, result.data);
-                return result.data;
+                setStatus('מתחבר...', 'text-yellow-400');
+                
+                // התחברות אנונימית (שלב 6 במדריך)
+                await signInAnonymously(auth);
+                setStatus('מחובר (מאזין להזמנות...)', 'text-green-400');
+                
+                // התחלת האזנה להזמנות (במקום ללוגים)
+                listenToOrders();
 
             } catch (error) {
-                SmartLog.error(`API Failure: ${action}`, error, payload);
-                // TODO: Add "AutoError Recovery" UI notification
-                alert(`שגיאת תקשורת חמורה: ${error.message}`);
-                throw error;
+                console.error("Firebase Init Error", error);
+                setStatus(`שגיאת התחברות: ${error.message}`, 'text-red-500');
             }
-        }
-
-        // --- 4. Application Logic ---
-        document.addEventListener('DOMContentLoaded', () => {
-            initClock();
-            loadInitialData();
-            initMap();
-            
-            // Auto-refresh data
-            setInterval(loadInitialData, REFRESH_INTERVAL);
-
-            // Smart search listener
-            document.getElementById('smart-search').addEventListener('input', (e) => {
-                renderOrders(e.target.value.toLowerCase());
-            });
         });
 
-        function initClock() {
-            const clockEl = document.getElementById('clock');
-            if (!clockEl) return;
-            const update = () => {
-                clockEl.textContent = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-            };
-            update();
-            setInterval(update, 1000);
-        }
+        // --- 4. האזנה בזמן אמת ---
+        // זוהי הליבה של האפליקציה
+        function listenToOrders() {
+            // "מאזין" לאוסף 'orders' שבנית ב-Firebase
+            const ordersCollection = collection(db, "orders");
+            // ממיין לפי תאריך (צריך להוסיף שדה כזה!)
+            //כרגע נמיין לפי orderId
+            const q = query(ordersCollection, orderBy("orderId", "desc")); 
 
-        async function loadInitialData() {
-            SmartLog.info("Loading initial data...");
-            try {
-                // Run in parallel
-                const [dashboardData, orders, drivers] = await Promise.all([
-                    apiFetch('getDashboardData'),
-                    apiFetch('getOrders', { force: true }), // Force refresh
-                    apiFetch('getDrivers')
-                ]);
-
-                allOrders = orders;
-                allDrivers = drivers;
-                
-                // Update UI
-                renderDashboard(dashboardData);
-                renderOrders();
-                updateMapMarkers(orders);
-                updateDashboardChart(dashboardData.stats.byStatus);
-
-            } catch (error) {
-                SmartLog.error('Failed to load initial data', error);
-            }
-        }
-
-        // --- 5. Render Functions (UX Evolution) ---
-
-        function renderDashboard(data) {
-            const stats = data.stats;
-            document.getElementById('stat-total').textContent = stats.total || 0;
-            document.getElementById('stat-pending').textContent = stats.byStatus['לא משויך'] || 0;
-            document.getElementById('stat-assigned').textContent = stats.today || 0;
-            document.getElementById('stat-drivers').textContent = data.driverCount || 0;
-        }
-
-        function renderOrders(filter = '') {
-            const tableBody = document.getElementById('orders-table-body');
-            let html = '';
-            
-            const filteredOrders = allOrders.filter(order => {
-                if (filter === '') return true;
-                return (
-                    (order.customerName && order.customerName.toLowerCase().includes(filter)) ||
-                    (order.address && order.address.toLowerCase().includes(filter)) ||
-                    (order.driverId && order.driverId.toLowerCase().includes(filter)) ||
-                    (order.status && order.status.toLowerCase().includes(filter)) ||
-                    (order.customerPhone && order.customerPhone.includes(filter)) ||
-                    (order.orderId.toString().includes(filter))
-                );
+            onSnapshot(q, (querySnapshot) => {
+                const orders = [];
+                querySnapshot.forEach((doc) => {
+                    // דוחף את כל המידע מהמסמך למערך
+                    orders.push({ id: doc.id, ...doc.data() });
+                });
+                renderOrders(orders); // מעדכן את הטבלה
+            }, (error) => {
+                console.error("Firestore Listen Error", error);
+                setStatus("שגיאה בהאזנה להזמנות", 'text-red-500');
             });
+        }
 
-            if (filteredOrders.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-400">לא נמצאו הזמנות תואמות.</td></tr>`;
+        // --- 5. עדכון ממשק (Render) ---
+        function renderOrders(orders) {
+            const tableBody = document.getElementById('orders-table-body');
+            if (!orders || orders.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-500">עדיין אין הזמנות בדאטהבייס...</td></tr>`;
                 return;
             }
 
-            filteredOrders.forEach(order => {
-                const statusClass = order.status === 'הושלם' ? 'status-delivered' : (order.status === 'שויך' ? 'status-assigned' : 'status-new');
-                html += `
-                    <tr class="border-b border-gray-700 hover:bg-gray-700">
-                        <td class="p-3">${order.orderId}</td>
-                        <td class="p-3">${order.customerName}</td>
+            tableBody.innerHTML = orders.map(order => {
+                
+                // קורא את הנתונים המשוכפלים (שהכנסת ידנית)
+                const customerName = order.customer ? order.customer.name : 'לא ידוע';
+                const customerPhone = order.customer ? order.customer.phone : '---';
+                const driverName = order.driver ? order.driver.name : 'טרם שויך';
+                
+                // הגדרת צבע לסטטוס
+                let statusClass = 'status-default';
+                if (order.status === 'שויך') statusClass = 'status-assigned';
+                if (order.status === 'חדש') statusClass = 'status-new';
+                if (order.status === 'הושלם') statusClass = 'status-delivered';
+
+                return `
+                    <tr class="hover:bg-gray-700 text-sm">
+                        <td class="p-3">${order.id}</td>
+                        <td class="p-3 text-white">${customerName}</td>
                         <td class="p-3">${order.address}</td>
-                        <td class="p-3">${order.driverId || '---'}</td>
+                        <td class="p-3">${customerPhone}</td>
+                        <td class="p-3 text-white">${driverName}</td>
                         <td class="p-3"><span class="status-badge ${statusClass}">${order.status || 'חדש'}</span></td>
-                        <td class="p-3">
-                            <button class="glass-button text-xs" onclick="openAssignModal('${order.orderId}')">שבץ</button>
-                        </td>
                     </tr>
                 `;
-            });
-            tableBody.innerHTML = html;
-        }
-
-        function updateDashboardChart(statusData) {
-            const ctx = document.getElementById('status-chart').getContext('2d');
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
-            chartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(statusData),
-                    datasets: [{
-                        data: Object.values(statusData),
-                        backgroundColor: ['#eab308', '#3b82f6', '#22c55e', '#ef4444'],
-                        borderColor: '#1f2937',
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { color: '#d1d5db' }
-                        }
-                    }
-                }
-            });
-        }
-
-        // --- 6. Map System (Leaflet) ---
-        
-        function initMap() {
-            try {
-                // Center on Israel
-                mapInstance = L.map('leaflet-map').setView([31.7683, 35.2137], 8);
-                
-                // Use a dark tile layer (MapLibre/OpenStreetMap based)
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-                    subdomains: 'abcd',
-                    maxZoom: 19
-                }).addTo(mapInstance);
-                SmartLog.info("Leaflet map initialized.");
-            } catch (e) {
-                SmartLog.error("Failed to initialize Leaflet map", e);
-                document.getElementById('leaflet-map').innerHTML = "שגיאה בטעינת המפה.";
-            }
-        }
-
-        function updateMapMarkers(orders) {
-            if (!mapInstance) return;
-            
-            // Clear existing markers (TODO: optimize this)
-            mapInstance.eachLayer(layer => {
-                if (layer instanceof L.Marker) {
-                    mapInstance.removeLayer(layer);
-                }
-            });
-
-            orders.forEach(order => {
-                if (order.latitude && order.longitude) {
-                    L.marker([order.latitude, order.longitude])
-                        .addTo(mapInstance)
-                        .bindPopup(`<b>${order.customerName}</b><br>${order.address}<br>סטטוס: ${order.status}`);
-                }
-            });
-        }
-
-        // --- 7. Interactive Modals (UX) ---
-        
-        function openAssignModal(orderId) {
-            // This is a placeholder for the modal logic
-            // In a real app, this would open a 'glass-ui' modal
-            SmartLog.info(`Opening assign modal for ${orderId}`);
-            
-            const driverId = prompt(`בחר נהג לשבץ להזמנה ${orderId}:\n(הכנס ID של נהג)`);
-            if (driverId) {
-                assignDriver(orderId, driverId);
-            }
+            }).join('');
         }
         
-        async function assignDriver(orderId, driverId) {
-            try {
-                const result = await apiFetch('assignDriver', { orderId, driverId });
-                alert(`הזמנה ${orderId} שובצה בהצלחה לנהג ${driverId}!`);
-                loadInitialData(); // Refresh all data
-            } catch (error) {
-                alert(`שגיאה בשיבוץ ההזמנה: ${error.message}`);
-            }
+        function setStatus(message, cssClass) {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.textContent = message;
+            statusEl.className = `text-sm ${cssClass}`;
         }
 
     </script>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="container mx-auto max-w-7xl space-y-6">
+        
+        <!-- 1. Header -->
+        <header class="glass-ui p-4 flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-white">דשבורד ניהול (Firebase v34)</h1>
+                <p class="text-sm text-gray-400">הזמנות מתעדכנות בזמן אמת</p>
+            </div>
+            <div id="connection-status" class="text-sm text-yellow-400">
+                טוען...
+            </div>
+        </header>
+
+        <!-- 2. Orders Table -->
+        <div class="glass-ui overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-full text-right">
+                    <thead class="border-b border-gray-700">
+                        <tr class="text-gray-400 text-sm">
+                            <th class="p-3">מזהה הזמנה</th>
+                            <th class="p-3">לקוח</th>
+                            <th class="p-3">כתובת</th>
+                            <th class="p-3">טלפון</th>
+                            <th class="p-3">נהג משויך</th>
+                            <th class="p-3">סטטוס</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-table-body" class="divide-y divide-gray-700">
+                        <!-- Rows injected by JS -->
+                        <tr><td colspan="6" class="p-8 text-center text-gray-500">טוען חיבור ל-Firebase...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
+
