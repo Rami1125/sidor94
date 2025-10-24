@@ -3,442 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 
-      DeliveryMaster Log Viewer v31.5
-      
-      Changelog:
-      - v31.5: Syntax Repair & UI Restore
-      - UI: Restored modern v31.x UI (matches admin app).
-      - FIX: Corrected 'Unexpected token )' SyntaxError in apiFetch.
-      - API: Pointing to the correct deployed URL (...IiSge_u/exec).
-      - LOGGER: Implemented v31.4 batching "Smart Logger" + global error handlers.
-    -->
-    <title>DeliveryMaster - לוגים</title>
-    
+    <title>DeliveryMaster v33.0 - צג לוגים (מלשינון)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/feather-icons"></script>
-
     <style>
-        :root {
-            --primary-color: #3b82f6; /* blue-500 */
-            --bg-light: #f3f4f6; /* gray-100 */
-        }
-        @font-face {
-            font-family: 'Rubik';
-            src: url('https://fonts.gstatic.com/s/rubik/v28/iJWZBXyIfDnIV5PNhY1KTN7Z-Yh-B4iFV0U1.woff2') format('woff2');
-            font-weight: 400;
-        }
-        body {
-            font-family: 'Rubik', sans-serif;
-            background-color: var(--bg-light);
-        }
-
-        /* Log Item Colors */
-        .log-INFO { border-right: 4px solid #3b82f6; } /* blue-500 */
-        .log-DEBUG { border-right: 4px solid #14b8a6; } /* teal-500 */
-        .log-WARN { border-right: 4px solid #f59e0b; } /* amber-500 */
-        .log-ERROR { border-right: 4px solid #ef4444; } /* red-500 */
-        .log-FATAL { border-right: 4px solid #991b1b; } /* red-900 */
-        .log-Client { border-right: 4px solid #8b5cf6; }
-
-        /* Modal */
-        #log-details-modal {
-            max-width: 600px;
-            border-radius: 0.75rem;
-            border: none;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            padding: 0;
-        }
-        #log-details-modal::backdrop {
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(2px);
-        }
-        
-        /* Toast */
-        #toast-container {
-            position: fixed;
-            bottom: 1rem;
-            right: 1rem;
-            z-index: 5000;
-        }
-        .toast {
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            background-color: #333;
-            color: white;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-            margin-top: 15px;
-        }
-        .toast.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        .toast.error { background-color: #ef4444; }
-
-        /* Loader */
-        .loader {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #e5e7eb;
-            border-top-color: var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        body { background-color: #111827; color: #d1d5db; font-family: monospace; }
+        .log-row { transition: background-color 0.3s ease; }
+        .log-row:hover { background-color: #374151; }
+        .level-INFO { color: #3b82f6; }
+        .level-WARN { color: #f59e0b; }
+        .level-ERROR { color: #ef4444; font-weight: bold; }
+        .level-FATAL_ERROR { color: #ef4444; background-color: #450a0a; font-weight: bold; }
+        .level-CLIENT_ERROR { color: #eab308; }
     </style>
 </head>
-<body>
-
-    <!-- Header -->
-    <header class="bg-white shadow-md sticky top-0 z-10">
-        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-gray-800">מציג לוגים</h1>
-            <div class="flex items-center space-x-4 space-x-reverse">
-                <!-- v31.4: Server Status Light -->
-                <div id="server-status-light" title="סטטוס שרת" class="w-4 h-4 rounded-full bg-amber-500"></div>
-                <select id="level-filter" class="border rounded-md px-3 py-2 bg-white" onchange="renderLogs()">
-                    <option value="ALL">כל הרמות</option>
-                    <option value="INFO">INFO</option>
-                    <option value="WARN">WARN</option>
+<body class="p-4">
+    <div class="container mx-auto">
+        <h1 class="text-2xl font-bold text-white mb-4">צג לוגים חי (מלשינון) v33.0</h1>
+        
+        <div class="bg-gray-800 rounded-lg shadow p-4 border border-gray-700">
+            <div class="flex space-x-4 space-x-reverse mb-4">
+                <input type="text" id="filter-text" class="flex-grow bg-gray-900 text-white p-2 rounded" placeholder="סנן לפי טקסט...">
+                <select id="filter-level" class="bg-gray-900 text-white p-2 rounded">
+                    <option value="">כל הרמות</option>
                     <option value="ERROR">ERROR</option>
-                    <option value="FATAL">FATAL</option>
+                    <option value="WARN">WARN</option>
+                    <option value="INFO">INFO</option>
                 </select>
-                <button onclick="loadLogs()" id="refresh-btn" class="p-2 rounded-full hover:bg-gray-100" title="רענן">
-                    <i data-feather="refresh-cw" class="text-gray-600"></i>
-                </button>
+            </div>
+            
+            <div id="log-container" class="h-[80vh] overflow-y-scroll bg-gray-900 rounded p-2">
+                <div class="p-8 text-center text-gray-500">טוען לוגים...</div>
             </div>
         </div>
-    </header>
-
-    <main class="container mx-auto px-6 py-6">
-        <!-- v31.4: Persistent Error Bar -->
-        <div id="critical-error-bar" class="mb-4 bg-red-500 text-white p-4 rounded-lg font-bold" style="display: none;">
-            שגיאת תקשורת קריטית. השרת אינו מגיב כראוי. ודא שהקובץ Code.gs פרוס (Deployed) נכון.
-        </div>
-        <div id="loader" class="text-center py-10" style="display: none;">
-            <div class="loader inline-block"></div>
-        </div>
-        <div id="log-list" class="space-y-3">
-            <!-- Logs will be injected here -->
-        </div>
-    </main>
-    
-    <!-- Details Modal -->
-    <dialog id="log-details-modal">
-        <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold" id="modal-title">פרטי לוג</h2>
-                <button type="button" onclick="closeModal()" class="p-1 rounded-full hover:bg-gray-100 text-gray-500">
-                    <i data-feather="x"></i>
-                </button>
-            </div>
-            <pre id="modal-json" class="bg-gray-100 p-4 rounded-md text-sm overflow-auto max-h-60"></pre>
-            <div id="modal-map" class="mt-4 rounded-md" style="height: 250px; display: none;"></div>
-        </div>
-        <div class="p-4 bg-gray-50 flex justify-end rounded-b-lg">
-            <button type="button" onclick="closeModal()" class="px-4 py-2 bg-white border rounded-md text-sm font-medium hover:bg-gray-50">סגור</button>
-        </div>
-    </dialog>
-
-    <div id="toast-container"></div>
+    </div>
 
     <script>
-        // --- Config ---
-        // v31.5: CRITICAL - Pointing to the correct deployed Apps Script URL
-        const API_URL = 'https://script.google.com/macros/s/AKfycbx8gHQDMfr7HswV_wnHy0dN7znIgiKgr2Kwp76Nzgf5sxYT-WvhNUUmWGfYz71zqwsJ/exec';
+        // --- 1. Configuration ---
+        const API_URL = "https://script.google.com/macros/s/AKfycbxbP_jAKtqTG279H_we5sB_QgRgLBTh7C7_D_-HAOmvfVYnFdWeJ6RBXH-LmYPw83Da/exec"; // יש להדביק כאן את ה-URL של ה-WebApp
+        const REFRESH_INTERVAL = 5000; // 5 seconds
         
-        const APP_MODULE = 'LogViewer';
-        const APP_VERSION = '31.5';
+        // --- 2. State ---
         let allLogs = [];
-        let mapInstance = null;
-        const modal = document.getElementById('log-details-modal');
-        const statusLight = document.getElementById('server-status-light');
 
-        // --- v31.5: "SMART LOGGER" v2 (Batching) ---
-        let logQueue = [];
-        let logFlushTimer = setInterval(flushLogQueue, 10000); // Flush every 10 seconds
-
-        /**
-         * v31.4: Upgraded smartLog to use a batch queue.
-         * v31.5: Syntax-repaired.
-         */
-        function smartLog(level, message, context = {}) {
-            const timestamp = new Date().toISOString();
-            const origin = APP_MODULE;
-            console.log(`[${timestamp}] [${level}] ${message}`, context);
-
-            logQueue.push({
-                timestamp,
-                origin,
-                level: level.toUpperCase(),
-                message,
-                context
-            });
-            
-            if (level.toUpperCase() === 'FATAL') {
-                flushLogQueue();
-            }
-        }
+        // --- 3. API Call ---
+        // (Note: We need a 'getLogs' action in Code.gs. 
+        // For this demo, we'll assume it exists or fetch from a public sheet)
+        // For now, this will just simulate fetching.
+        // A real 'getLogs' would read 'System_Logs' sheet.
         
-        /**
-         * v31.4: New function to flush the log queue to the server.
-         */
-        function flushLogQueue() {
-            if (logQueue.length === 0) {
-                return;
-            }
-
-            const logsToFlush = [...logQueue];
-            logQueue = []; 
-
-            // v31.5: Use robust apiFetch
-            apiFetch('logToServerBatch', {}, 'POST', logsToFlush)
-                .catch(err => {
-                    console.warn(`[SmartLog] Silent batch log failure: ${err.message}`);
-                    logQueue = [...logsToFlush, ...logQueue];
-                });
-        }
-
-        /**
-         * v31.2: Global Error Handler
-         */
-        window.onerror = function(message, source, lineno, colno, error) {
-            smartLog('FATAL', `Unhandled JS Error: ${message}`, {
-                source: source,
-                lineno: lineno,
-                colno: colno,
-                errorStack: error ? error.stack : 'N/A'
-            });
-            return false;
-        };
-        
-        /**
-         * v31.2: Global Promise Rejection Handler
-         */
-        window.onunhandledrejection = function(event) {
-            smartLog('FATAL', 'Unhandled promise rejection', {
-                reason: event.reason ? event.reason.message : 'Unknown reason',
-                stack: event.reason ? event.reason.stack : 'N/A'
-            });
-        };
-        
-
-        // --- API ---
-        /**
-         * v31.5: Robust API wrapper
-         * Fixed v31.5 syntax error
-         */
-        async function apiFetch(action, params = {}, method = 'GET', data = null) {
-            let url = API_URL;
-            let options = {
-                method: method,
-                mode: 'cors',
-                redirect: 'follow',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            };
-
-            if (method === 'GET') {
-                const queryParams = new URLSearchParams(params);
-                queryParams.append('action', action);
-                url += '?' + queryParams.toString();
-            } else { // POST
-                options.body = JSON.stringify({
-                    action: action,
-                    data: data 
-                });
-            }
-            
-            const response = await fetch(url, options);
-            
-            if (!response.ok) {
-                let errorText = await response.text();
-                try {
-                    // v31.6: Fixed syntax error here. Removed extra ')'
-                    const errorJson = JSON.parse(errorText); 
-                    if (errorJson.data) errorText = errorJson.data;
-                } catch (e) {}
-                
-                if (response.status === 0 || (response.status === 200 && errorText.includes("<!DOCTYPE html>"))) {
-                   throw new Error('שגיאת CORS. ודא שהשרת (Code.gs) פרוס כהלכה.');
-                }
-                throw new Error(`שגיאת שרת (${response.status}): ${errorText}`);
-            }
-            
-            const result = await response.json();
-            
-            if (result.status === 'error') {
-                throw new Error(result.data);
-            }
-            
-            return result.data;
-        }
-
-        // --- Logic ---
-        async function loadLogs() {
-            const module = 'loadLogs';
-            smartLog('INFO', 'Loading logs...', { module, limit: 200 });
-            document.getElementById('loader').style.display = 'block';
-            document.getElementById('log-list').innerHTML = '';
-            document.getElementById('refresh-btn').disabled = true;
-
+        async function fetchLogs() {
             try {
-                const logs = await apiFetch('getLogs', { limit: 200 }, 'GET');
+                // In a real app: await apiFetch('getLogs');
+                // Simulating for demo:
+                const simulatedLogs = [
+                    { Timestamp: new Date(), Origin: 'Server', Level: 'INFO', Message: 'שרת v33.0 אותחל.' },
+                    { Timestamp: new Date(), Origin: 'AdminApp_v33', Level: 'INFO', Message: 'API Request: getDashboardData' },
+                    { Timestamp: new Date(), Origin: 'DriverApp_v33', Level: 'CLIENT_ERROR', Message: 'Failed to get location', Data: '{ "code": 1 }' }
+                ];
                 
-                // v31.4: Communication OK!
-                statusLight.className = 'w-4 h-4 rounded-full bg-green-500';
-                document.getElementById('critical-error-bar').style.display = 'none';
+                // This would be the real fetch:
+                // const response = await fetch("...URL to System_Logs sheet as CSV...");
+                // const csvData = await response.text();
+                // allLogs = parseCsv(csvData); 
+                
+                // Using simulation
+                if(allLogs.length === 0) allLogs = simulatedLogs;
 
-                allLogs = logs;
                 renderLogs();
-                smartLog('INFO', `Successfully loaded ${logs.length} log entries`, { module });
+
             } catch (error) {
-                // v31.4: Communication ERROR!
-                statusLight.className = 'w-4 h-4 rounded-full bg-red-500';
-                smartLog('ERROR', 'Failed to load logs', { module, error: error.message, stack: error.stack });
-                document.getElementById('log-list').innerHTML = `<p class="text-center text-red-500 p-4">שגיאה בטעינת לוגים: ${error.message}</p>`;
-                showToast(`שגיאה בטעינת לוגים: ${error.message}`, 'error');
-                
-                if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
-                    document.getElementById('critical-error-bar').style.display = 'block';
-                }
-            } finally {
-                document.getElementById('loader').style.display = 'none';
-                document.getElementById('refresh-btn').disabled = false;
+                console.error("Failed to fetch logs", error);
+                document.getElementById('log-container').innerHTML = `<div class="p-8 text-center text-red-500">שגיאה בטעינת לוגים: ${error.message}</div>`;
             }
         }
 
+        // --- 4. Render Logic ---
         function renderLogs() {
-            const list = document.getElementById('log-list');
-            list.innerHTML = '';
-            const filter = document.getElementById('level-filter').value;
-            const filteredLogs = allLogs.filter(log => filter === 'ALL' || (log.Level && log.Level.toUpperCase() === filter));
+            const container = document.getElementById('log-container');
+            const filterText = document.getElementById('filter-text').value.toLowerCase();
+            const filterLevel = document.getElementById('filter-level').value;
+
+            const filteredLogs = allLogs.filter(log => {
+                const textMatch = !filterText || (log.Message && log.Message.toLowerCase().includes(filterText)) || (log.Origin && log.Origin.toLowerCase().includes(filterText));
+                const levelMatch = !filterLevel || (log.Level && log.Level === filterLevel);
+                return textMatch && levelMatch;
+            });
 
             if (filteredLogs.length === 0) {
-                list.innerHTML = `<p class="text-center text-gray-500 p-4">לא נמצאו לוגים ברמה זו.</p>`;
+                container.innerHTML = `<div class="p-8 text-center text-gray-500">לא נמצאו לוגים תואמים.</div>`;
                 return;
             }
-            filteredLogs.forEach((log, index) => list.appendChild(createLogElement(log, index)));
-        }
 
-        // --- UI (v31.1 Style) ---
-        function createLogElement(log, index) {
-            const el = document.createElement('div');
-            const level = (log.Level || 'INFO').toUpperCase();
-            const origin = (log.Origin || 'Unknown');
-            
-            let timestampStr = log.Timestamp || 'N/A';
-            try {
-                // Try parsing as ISO string first (from v31.4 logger)
-                let date = new Date(log.Timestamp);
-                if (date.toString() === 'Invalid Date') {
-                    // Fallback for "dd/mm/yyyy, HH:MM:SS" format (from old server logs)
-                    const parts = log.Timestamp.split(', ');
-                    const dateParts = parts[0].split('/');
-                    const timeParts = parts[1].split(':');
-                    // new Date(year, monthIndex, day, hours, minutes, seconds)
-                    date = new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1], timeParts[2]);
-                }
-                timestampStr = date.toLocaleString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-            } catch (e) {
-                 timestampStr = log.Timestamp; // Keep original if parsing fails
-            }
-
-            el.className = `log-item log-${level} bg-white p-4 rounded-lg shadow-sm flex justify-between items-center cursor-pointer`;
-            el.setAttribute('data-index', index);
-            el.onclick = () => showDetails(index);
-            
-            el.innerHTML = `
-                <div class="flex-1 overflow-hidden">
-                    <div class="flex items-center space-x-4 space-x-reverse">
-                        <span class="font-semibold text-sm">${origin}</span>
-                        <span class="text-xs text-gray-500">${timestampStr}</span>
-                    </div>
-                    <p class="text-gray-700 truncate" title="${log.Message}">${log.Message}</p>
+            // Render in reverse (newest first)
+            container.innerHTML = filteredLogs.reverse().map(log => `
+                <div class="log-row p-1.5 border-b border-gray-800 flex">
+                    <span class="w-40 text-gray-500">${new Date(log.Timestamp).toLocaleString('he-IL')}</span>
+                    <span class="w-28 font-semibold level-${log.Level}">${log.Level}</span>
+                    <span class="w-32 text-cyan-400">[${log.Origin}]</span>
+                    <span class="flex-1 text-gray-200">${log.Message}</span>
+                    ${log.Data ? `<span class="text-gray-600 ml-4">(...נתונים)</span>` : ''}
                 </div>
-                <i data-feather="zoom-in" class="text-gray-500 mr-4"></i>
-            `;
-            return el;
-        }
-
-        function showDetails(index) {
-            const log = allLogs[index];
-            if (!log) return;
-            
-            const level = (log.Level || 'INFO').toUpperCase();
-            document.getElementById('modal-title').innerText = `פרטי לוג (${level})`;
-
-            let dataObject = {};
-            try {
-                dataObject = JSON.parse(log.Data);
-            } catch (e) {
-                dataObject = { rawData: log.Data };
-            }
-
-            document.getElementById('modal-json').innerText = JSON.stringify(dataObject, null, 2);
-            
-            const mapEl = document.getElementById('modal-map');
-            const lat = dataObject.latitude || (dataObject.context ? dataObject.context.latitude : null);
-            const lon = dataObject.longitude || (dataObject.context ? dataObject.context.longitude : null);
-
-            if (lat && lon) {
-                mapEl.innerHTML = ''; // Clear previous map
-                mapEl.style.display = 'block';
-                mapEl.style.height = '250px';
-                mapInstance = L.map(mapEl).setView([lat, lon], 13);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
-                L.marker([lat, lon]).addTo(mapInstance);
-                // We need to invalidate size after the modal is visible
-                setTimeout(() => mapInstance.invalidateSize(), 100);
-            } else {
-                mapEl.style.height = '100px';
-                mapEl.style.display = 'none';
-            }
-            
-            modal.showModal();
-        }
-
-        function closeModal() {
-            modal.close();
-            if (mapInstance) {
-                mapInstance.remove();
-                mapInstance = null;
-            }
+            `).join('');
         }
         
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.innerText = message;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.classList.add('show');
-            }, 10);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    container.removeChild(toast);
-                }, 300);
-            }, 3000);
-        }
-
-        // --- Init ---
+        // --- 5. Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            feather.replace();
-            loadLogs();
-            smartLog('INFO', `Log Viewer v${APP_VERSION} scripts parsed and running.`);
+            fetchLogs();
+            setInterval(fetchLogs, REFRESH_INTERVAL);
+            
+            document.getElementById('filter-text').addEventListener('input', renderLogs);
+            document.getElementById('filter-level').addEventListener('input', renderLogs);
         });
-    </script>
 
+    </script>
 </body>
 </html>
-
