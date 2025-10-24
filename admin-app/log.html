@@ -3,116 +3,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v33.0 - צג לוגים (מלשינון)</title>
+    <title>DeliveryMaster v33.1 - צג לוגים חכם (מלשינון)</title>
+    <!-- Tailwind Play CDN (for quick demo) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #111827; color: #d1d5db; font-family: monospace; }
-        .log-row { transition: background-color 0.3s ease; }
-        .log-row:hover { background-color: #374151; }
-        .level-INFO { color: #3b82f6; }
-        .level-WARN { color: #f59e0b; }
-        .level-ERROR { color: #ef4444; font-weight: bold; }
-        .level-FATAL_ERROR { color: #ef4444; background-color: #450a0a; font-weight: bold; }
-        .level-CLIENT_ERROR { color: #eab308; }
+        body { 
+            background-color: #111827; /* bg-gray-900 */
+            color: #d1d5db; /* text-gray-300 */
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+        }
+        /* Glass UI Style */
+        .glass-ui {
+            background-color: rgba(31, 41, 55, 0.7); /* bg-gray-800 bg-opacity-70 */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 0.75rem; /* rounded-xl */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        /* Log level colors */
+        .level-INFO { --tw-text-opacity: 1; color: rgb(59 130 246 / var(--tw-text-opacity)); }
+        .level-WARN { --tw-text-opacity: 1; color: rgb(245 158 11 / var(--tw-text-opacity)); }
+        .level-ERROR { --tw-text-opacity: 1; color: rgb(239 68 68 / var(--tw-text-opacity)); font-weight: 600; }
+        .level-CLIENT_ERROR { --tw-text-opacity: 1; color: rgb(234 179 8 / var(--tw-text-opacity)); font-weight: 600; }
+
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            top: 1.25rem;
+            left: 1.25rem;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            direction: rtl; /* Ensure toasts are RTL */
+        }
+        .toast {
+            animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; transform: translateX(-100%); }
+        }
     </style>
 </head>
-<body class="p-4">
-    <div class="container mx-auto">
-        <h1 class="text-2xl font-bold text-white mb-4">צג לוגים חי (מלשינון) v33.0</h1>
+<body class="p-4 md:p-8">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <div class="container mx-auto max-w-7xl space-y-6">
         
-        <div class="bg-gray-800 rounded-lg shadow p-4 border border-gray-700">
-            <div class="flex space-x-4 space-x-reverse mb-4">
-                <input type="text" id="filter-text" class="flex-grow bg-gray-900 text-white p-2 rounded" placeholder="סנן לפי טקסט...">
-                <select id="filter-level" class="bg-gray-900 text-white p-2 rounded">
-                    <option value="">כל הרמות</option>
-                    <option value="ERROR">ERROR</option>
-                    <option value="WARN">WARN</option>
-                    <option value="INFO">INFO</option>
-                </select>
+        <!-- 1. Header -->
+        <header class="glass-ui p-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-white">צג לוגים חכם (מלשינון)</h1>
+                <p class="text-sm text-gray-400">v33.1 - ניטור פעולות מערכת בזמן אמת</p>
             </div>
-            
-            <div id="log-container" class="h-[80vh] overflow-y-scroll bg-gray-900 rounded p-2">
-                <div class="p-8 text-center text-gray-500">טוען לוגים...</div>
+            <div class="text-sm text-gray-400" id="connection-status">
+                <span class="text-yellow-400">טוען נתונים...</span>
+            </div>
+        </header>
+
+        <!-- 2. Filters -->
+        <div class="glass-ui p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <input type="text" id="filter-text" class="w-full bg-gray-900 text-white p-2 rounded-lg border border-gray-700 focus:border-blue-500 focus:ring-blue-500" placeholder="סנן לפי הודעה, מקור...">
+            <select id="filter-level" class="w-full bg-gray-900 text-white p-2 rounded-lg border border-gray-700 focus:border-blue-500 focus:ring-blue-500">
+                <option value="">כל הרמות</option>
+                <option value="ERROR">שגיאה (ERROR)</option>
+                <option value="WARN">אזהרה (WARN)</option>
+                <option value="INFO">מידע (INFO)</option>
+            </select>
+            <button id="force-refresh" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                רענן כעת
+            </button>
+        </div>
+
+        <!-- 3. Log Table -->
+        <div class="glass-ui overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-full text-right">
+                    <thead class="border-b border-gray-700">
+                        <tr class="text-gray-400 text-sm">
+                            <th class="p-3">🕓 זמן</th>
+                            <th class="p-3">🏷️ רמה</th>
+                            <th class="p-3">🧩 מקור</th>
+                            <th class="p-3">💬 הודעה</th>
+                            <th class="p-3">💡 המלצה לפתרון</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table-body" class="divide-y divide-gray-700">
+                        <!-- Rows injected by JS -->
+                        <tr><td colspan="5" class="p-8 text-center text-gray-500">טוען לוגים...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <script>
         // --- 1. Configuration ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbxbP_jAKtqTG279H_we5sB_QgRgLBTh7C7_D_-HAOmvfVYnFdWeJ6RBXH-LmYPw83Da/exec"; // יש להדביק כאן את ה-URL של ה-WebApp
-        const REFRESH_INTERVAL = 5000; // 5 seconds
-        
-        // --- 2. State ---
-        let allLogs = [];
+        const API_URL = "https://script.google.com/macros/s/AKfycbyZ84w5JTr-up3kU5mFFqmbhtZMqhHZ5RsG-lnul4Y9_bH5lOAAbdzD291I1SBda91m/exec"; // !!! יש להדביק כאן את ה-URL של ה-WebApp
+        const POLL_INTERVAL = 10000; // 10 שניות
+        const APP_NAME = "AdminLogMonitor_v33.1";
 
-        // --- 3. API Call ---
-        // (Note: We need a 'getLogs' action in Code.gs. 
-        // For this demo, we'll assume it exists or fetch from a public sheet)
-        // For now, this will just simulate fetching.
-        // A real 'getLogs' would read 'System_Logs' sheet.
-        
-        async function fetchLogs() {
+        // --- 2. Global State ---
+        let globalState = {
+            logs: [],
+            lastLogTimestamp: null // Used to detect new logs for notifications
+        };
+
+        // --- 3. API Fetch Utility ---
+        async function apiFetch(action, payload = {}) {
             try {
-                // In a real app: await apiFetch('getLogs');
-                // Simulating for demo:
-                const simulatedLogs = [
-                    { Timestamp: new Date(), Origin: 'Server', Level: 'INFO', Message: 'שרת v33.0 אותחל.' },
-                    { Timestamp: new Date(), Origin: 'AdminApp_v33', Level: 'INFO', Message: 'API Request: getDashboardData' },
-                    { Timestamp: new Date(), Origin: 'DriverApp_v33', Level: 'CLIENT_ERROR', Message: 'Failed to get location', Data: '{ "code": 1 }' }
-                ];
-                
-                // This would be the real fetch:
-                // const response = await fetch("...URL to System_Logs sheet as CSV...");
-                // const csvData = await response.text();
-                // allLogs = parseCsv(csvData); 
-                
-                // Using simulation
-                if(allLogs.length === 0) allLogs = simulatedLogs;
-
-                renderLogs();
-
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action, payload, context: { app: APP_NAME } }),
+                    headers: { 'Content-Type': 'application/json' },
+                    mode: 'cors'
+                });
+                if (!response.ok) throw new Error(`Network response was not ok (status: ${response.status})`);
+                const result = await response.json();
+                if (result.status === 'error') throw new Error(result.message);
+                return result.data;
             } catch (error) {
-                console.error("Failed to fetch logs", error);
-                document.getElementById('log-container').innerHTML = `<div class="p-8 text-center text-red-500">שגיאה בטעינת לוגים: ${error.message}</div>`;
+                console.error(`API Failure: ${action}`, error);
+                document.getElementById('connection-status').innerHTML = `<span class="text-red-500">שגיאת התחברות</span>`;
+                throw error;
             }
         }
 
-        // --- 4. Render Logic ---
+        // --- 4. Core Logic ---
+        async function fetchLogs() {
+            try {
+                const newLogs = await apiFetch('getRecentLogs');
+                if (!newLogs || newLogs.length === 0) {
+                    document.getElementById('connection-status').innerHTML = `<span class="text-green-400">מחובר (אין לוגים)</span>`;
+                    return;
+                }
+
+                document.getElementById('connection-status').innerHTML = `<span class="text-green-400">מחובר (עדכון אחרון: ${new Date().toLocaleTimeString()})</span>`;
+
+                // Check for new logs to notify
+                const newestLogTimestamp = newLogs[0].Timestamp;
+                if (globalState.lastLogTimestamp && newestLogTimestamp > globalState.lastLogTimestamp) {
+                    const trulyNewLogs = newLogs.filter(log => log.Timestamp > globalState.lastLogTimestamp);
+                    showNewLogNotifications(trulyNewLogs);
+                }
+                
+                globalState.lastLogTimestamp = newestLogTimestamp;
+                globalState.logs = newLogs;
+                renderLogs();
+
+            } catch (error) {
+                // Error is already logged by apiFetch
+            }
+        }
+
+        // --- 5. Render Functions ---
         function renderLogs() {
-            const container = document.getElementById('log-container');
+            const tableBody = document.getElementById('logs-table-body');
             const filterText = document.getElementById('filter-text').value.toLowerCase();
             const filterLevel = document.getElementById('filter-level').value;
 
-            const filteredLogs = allLogs.filter(log => {
-                const textMatch = !filterText || (log.Message && log.Message.toLowerCase().includes(filterText)) || (log.Origin && log.Origin.toLowerCase().includes(filterText));
+            const filteredLogs = globalState.logs.filter(log => {
+                const textMatch = !filterText ||
+                    (log.Message && log.Message.toLowerCase().includes(filterText)) ||
+                    (log.Origin && log.Origin.toLowerCase().includes(filterText)) ||
+                    (log.Hint && log.Hint.toLowerCase().includes(filterText));
                 const levelMatch = !filterLevel || (log.Level && log.Level === filterLevel);
                 return textMatch && levelMatch;
             });
 
             if (filteredLogs.length === 0) {
-                container.innerHTML = `<div class="p-8 text-center text-gray-500">לא נמצאו לוגים תואמים.</div>`;
+                tableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">לא נמצאו לוגים תואמים.</td></tr>`;
                 return;
             }
 
-            // Render in reverse (newest first)
-            container.innerHTML = filteredLogs.reverse().map(log => `
-                <div class="log-row p-1.5 border-b border-gray-800 flex">
-                    <span class="w-40 text-gray-500">${new Date(log.Timestamp).toLocaleString('he-IL')}</span>
-                    <span class="w-28 font-semibold level-${log.Level}">${log.Level}</span>
-                    <span class="w-32 text-cyan-400">[${log.Origin}]</span>
-                    <span class="flex-1 text-gray-200">${log.Message}</span>
-                    ${log.Data ? `<span class="text-gray-600 ml-4">(...נתונים)</span>` : ''}
-                </div>
-            `).join('');
+            tableBody.innerHTML = filteredLogs.map(log => {
+                const level = log.Level || 'INFO';
+                const levelClass = `level-${level.replace(' ', '_')}`;
+                
+                return `
+                    <tr class="hover:bg-gray-700 text-sm">
+                        <td class="p-3 text-gray-400">${new Date(log.Timestamp).toLocaleString('he-IL')}</td>
+                        <td class="p-3 font-bold ${levelClass}">${level}</td>
+                        <td class="p-3 text-cyan-300 font-mono">[${log.Origin}]</td>
+                        <td class="p-3 text-white">${log.Message}</td>
+                        <td class="p-3 text-yellow-300 font-mono">${log.Hint || '---'}</td>
+                    </tr>
+                `;
+            }).join('');
         }
-        
-        // --- 5. Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchLogs();
-            setInterval(fetchLogs, REFRESH_INTERVAL);
+
+        // --- 6. Notification (Toast) System ---
+        function showNewLogNotifications(newLogs) {
+            // Find the most critical new log
+            const criticalLog = newLogs.find(l => l.Level === 'ERROR') || newLogs.find(l => l.Level === 'WARN');
             
+            if (criticalLog) {
+                createToast(criticalLog.Level, criticalLog.Message, criticalLog.Origin);
+            }
+        }
+
+        function createToast(level, message, origin) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let borderColor = 'border-gray-500';
+            let icon = '🔔';
+            if (level === 'ERROR') { 
+                borderColor = 'border-red-500'; 
+                icon = '❌';
+            }
+            if (level === 'WARN') { 
+                borderColor = 'border-yellow-500';
+                icon = '⚠️';
+            }
+
+            toast.className = `toast glass-ui p-4 w-80 shadow-lg border-r-4 ${borderColor}`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="text-2xl">${icon}</div>
+                    <div>
+                        <h4 class="font-bold text-white">התראה חדשה [${origin}]</h4>
+                        <p class="text-sm text-gray-200">${message}</p>
+                    </div>
+                </div>
+            `;
+            
+            container.prepend(toast); // Add new toast at the top
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 5000);
+        }
+
+        // --- 7. Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add event listeners
             document.getElementById('filter-text').addEventListener('input', renderLogs);
             document.getElementById('filter-level').addEventListener('input', renderLogs);
+            document.getElementById('force-refresh').addEventListener('click', fetchLogs);
+
+            // Initial load
+            fetchLogs();
+
+            // Start polling
+            setInterval(fetchLogs, POLL_INTERVAL);
         });
 
     </script>
