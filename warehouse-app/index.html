@@ -4,53 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DeliveryMaster - כניסת מחסן</title>
-    <!-- DeliveryMaster Warehouse Login v27.0 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Arial', sans-serif; }
+        body { font-family: 'Rubik', sans-serif; }
     </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center h-screen">
 
-    <div class="w-full max-w-xs bg-white p-8 rounded-lg shadow-md">
-        <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">ניהול מחסן</h1>
+    <div class="w-full max-w-sm bg-white p-8 rounded-xl shadow-lg">
+        <div class="w-16 h-16 bg-blue-500 rounded-lg flex items-center justify-center mb-6 mx-auto">
+            <span class="text-white text-3xl font-bold">DM</span>
+        </div>
+        <h1 class="text-2xl font-bold text-center mb-2 text-gray-800">ניהול מחסן</h1>
         <p class="text-center text-gray-600 mb-6">בחר את המחסן שלך:</p>
         
-        <!-- This should be populated dynamically -->
-        <select id="warehouse-select" class="w-full px-4 py-2 border rounded-lg text-center mb-4">
+        <select id="warehouse-select" class="w-full px-4 py-3 border rounded-lg text-gray-700 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-4">
             <option value="">טוען רשימת מחסנים...</option>
-            <!-- 
-                Example:
-                <option value="Haharash">החרש</option>
-                <option value="Hatalmid">התלמיד</option>
-            -->
         </select>
         
-        <button id="login-btn" class="w-full bg-blue-500 text-white py-2 rounded-lg font-semibold hover:bg-blue-600">
+        <button id="login-btn" class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition duration-200">
             כניסה
         </button>
         
-        <p id="error-message" class="text-red-500 text-center mt-3 text-sm"></p>
+        <p id="error-message" class="text-red-500 text-center mt-4 text-sm"></p>
     </div>
 
     <script>
-        // TODO: In a real app, this should fetch a list of warehouses/managers
-        // For now, we'll use the hardcoded list from settings
-        
         const warehouseSelect = document.getElementById('warehouse-select');
         const loginButton = document.getElementById('login-btn');
         const errorMessage = document.getElementById('error-message');
 
-        // Populate warehouses (placeholder)
-        // A real app would fetch this
         function populateWarehouses() {
             const warehouses = [
                 { id: 'החרש', name: 'מחסן החרש' },
                 { id: 'התלמיד', name: 'מחסן התלמיד' }
             ];
-            
-            warehouseSelect.innerHTML = '<option value="">בחר מחסן</option>'; // Clear
-            
+            warehouseSelect.innerHTML = '<option value="">בחר מחסן</option>';
             warehouses.forEach(wh => {
                 const option = document.createElement('option');
                 option.value = wh.id;
@@ -65,20 +54,12 @@
                 errorMessage.innerText = 'אנא בחר מחסן.';
                 return;
             }
-            
-            // Store selected warehouse and redirect
             localStorage.setItem('warehouseId', warehouseId);
             window.location.href = 'warehouse.html';
         }
 
         loginButton.addEventListener('click', login);
-
-        // Init
-        document.addEventListener('DOMContentLoaded', () => {
-             populateWarehouses();
-        });
-
+        document.addEventListener('DOMContentLoaded', populateWarehouses);
     </script>
-
 </body>
 </html>
