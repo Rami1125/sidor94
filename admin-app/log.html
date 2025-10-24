@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v33.3 - צג לוגים חכם (מלשינון)</title>
+    <title>DeliveryMaster v34.1 - צג לוגים (Firebase)</title>
     
-    <!--
-      Tailwind CSS v33.3 - No CDN
-      הסרנו את ה-CDN והטמענו את הסגנונות הנדרשים ישירות כאן.
+    <!-- 
+      v34.0 - Firebase SDK
+      אנחנו טוענים את הספריות החדשות של Firebase
     -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
     <style>
-        /* 1. Tailwind Base (Reset & Defaults) */
+        /* 1. Tailwind Base (Reset & Defaults) - מוטמע */
         *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
         html { line-height: 1.5; -webkit-text-size-adjust: 100%; -moz-tab-size: 4; tab-size: 4; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; direction: rtl; }
         body { margin: 0; line-height: inherit; background-color: #111827; color: #d1d5db; }
@@ -132,11 +136,11 @@
         <!-- 1. Header -->
         <header class="glass-ui p-4 flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold text-white">צג לוגים חכם (מלשינון)</h1>
-                <p class="text-sm text-gray-400">v33.3 - ניטור פעולות מערכת בזמן אמת</p>
+                <h1 class="text-2xl font-bold text-white">צג לוגים (Firebase v34.1)</h1>
+                <p class="text-sm text-gray-400">ניטור פעולות מערכת בזמן אמת</p>
             </div>
             <div class="text-sm text-gray-400" id="connection-status">
-                <span class="text-yellow-400">טוען נתונים...</span>
+                <span class="text-yellow-400">מתחבר ל-Firebase...</span>
             </div>
         </header>
 
@@ -149,8 +153,9 @@
                 <option value="WARN">אזהרה (WARN)</option>
                 <option value="INFO">מידע (INFO)</option>
             </select>
-            <button id="force-refresh" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                רענן כעת
+            <!-- הכפתור הזה כבר לא נחוץ כי זה זמן אמת! -->
+            <button id="force-refresh" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg" disabled>
+                עדכון אוטומטי (זמן אמת)
             </button>
         </div>
 
@@ -168,8 +173,7 @@
                         </tr>
                     </thead>
                     <tbody id="logs-table-body" class="divide-y divide-gray-700">
-                        <!-- Rows injected by JS -->
-                        <tr><td colspan="5" class="p-8 text-center text-gray-500">טוען לוגים...</td></tr>
+                        <tr><td colspan="5" class="p-8 text-center text-gray-500">ממתין לנתונים...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -177,83 +181,113 @@
     </div>
 
     <script>
-        // --- 1. Configuration ---
-        // !!! עדכון v33.3: ה-URL עודכן לגרסת הפריסה החדשה שסיפקת.
-        const API_URL = "https://script.google.com/macros/s/AKfycbydELHOkt0ayi8dKgXxGm-KNEHYjr3RF6zBJpwsdxFPntUDEGSmm7JhTeR3ES_uzLGx/exec"; 
-        const POLL_INTERVAL = 10000; // 10 שניות
-        const APP_NAME = "AdminLogMonitor_v33.3";
+        // --- 1. Configuration v34.1 ---
+        
+        // אובייקט הקונפיגורציה של Firebase עודכן
+        const firebaseConfig = {
+          apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
+          authDomain: "saban94-78949.firebaseapp.com",
+          projectId: "saban94-78949",
+          storageBucket: "saban94-78949.firebasestorage.app",
+          messagingSenderId: "41553157903",
+          appId: "1:41553157903:web:cc33d252cff023be97a87a",
+          measurementId: "G-XV6RZDESSB"
+        };
 
         // --- 2. Global State ---
         let globalState = {
             logs: [],
-            lastLogTimestamp: null
+            db: null,
+            unsubscribeLogs: null // פונקציה לניתוק המאזין
         };
 
-        // --- 3. API Fetch Utility ---
-        async function apiFetch(action, payload = {}) {
+        // --- 3. Firebase Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
             try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ action, payload, context: { app: APP_NAME } }),
-                    headers: { 'Content-Type': 'application/json' },
-                    mode: 'cors'
-                });
+                // אתחול Firebase
+                firebase.initializeApp(firebaseConfig);
+                globalState.db = firebase.firestore();
+                const auth = firebase.auth();
 
-                // בדיקה אם התשובה תקינה (למקרה של שגיאת רשת)
-                if (!response.ok) {
-                    throw new Error(`שגיאת רשת: ${response.status} ${response.statusText}`);
-                }
-                
-                const result = await response.json();
+                // התחברות אנונימית (כדי לעבור את חוקי האבטחה)
+                auth.signInAnonymously()
+                    .then(() => {
+                        console.log("Firebase Auth success (Anonymous)");
+                        document.getElementById('connection-status').innerHTML = `<span class="text-green-400">מחובר (מאזין לשינויים...)</span>`;
+                        // התחל להאזין ללוגים
+                        listenToLogs();
+                    })
+                    .catch((error) => {
+                        console.error("Firebase Auth Error", error);
+                        document.getElementById('connection-status').innerHTML = `<span class="text-red-500">שגיאת אימות Firebase</span>`;
+                        createToast('ERROR', `שגיאת אימות: ${error.message}`, 'Firebase');
+                    });
 
-                // בדיקה אם ה-API עצמו החזיר שגיאה לוגית
-                if (result.status === 'error') {
-                    throw new Error(result.message);
-                }
-                
-                return result.data;
+                // הוספת מאזינים לפילטרים
+                document.getElementById('filter-text').addEventListener('input', renderLogs);
+                document.getElementById('filter-level').addEventListener('input', renderLogs);
 
             } catch (error) {
-                // זה המקום שבו הלוג שלך "API Failure: getRecentLogs TypeError: Failed to fetch" נוצר
-                console.error(`API Failure: ${action}`, error);
-                document.getElementById('connection-status').innerHTML = `<span class="text-red-500">שגיאת התחברות</span>`;
-                
-                // מציג התראת שגיאה למשתמש
-                createToast('ERROR', `שגיאת תקשורת: ${error.message}.`, 'LogMonitor');
-                
-                throw error; // עוצר את המשך הריצה של הפונקציה
+                console.error("Firebase Init Error", error);
+                document.getElementById('connection-status').innerHTML = `<span class="text-red-500">שגיאה קריטית ב-Firebase</span>`;
+                alert(`שגיאה קריטית באתחול Firebase: ${error.message}. \n\nהאם הדבקת את אובייקט ה-firebaseConfig הנכון?`);
             }
-        }
+        });
 
-        // --- 4. Core Logic ---
-        async function fetchLogs() {
-            try {
-                const newLogs = await apiFetch('getRecentLogs');
-                
-                // אם הגענו לכאן, התקשורת הצליחה
-                if (!newLogs || newLogs.length === 0) {
-                    document.getElementById('connection-status').innerHTML = `<span class="text-green-400">מחובר (אין לוגים)</span>`;
-                    globalState.logs = []; // נקה לוגים קודמים אם הגיליון התרוקן
-                    renderLogs(); // רנדר מחדש כדי להציג "אין לוגים"
-                    return;
-                }
-
-                document.getElementById('connection-status').innerHTML = `<span class="text-green-400">מחובר (עדכון אחרון: ${new Date().toLocaleTimeString()})</span>`;
-
-                const newestLogTimestamp = newLogs[0].Timestamp;
-                if (globalState.lastLogTimestamp && newestLogTimestamp > globalState.lastLogTimestamp) {
-                    const trulyNewLogs = newLogs.filter(log => log.Timestamp > globalState.lastLogTimestamp);
-                    showNewLogNotifications(trulyNewLogs);
-                }
-                
-                globalState.lastLogTimestamp = newestLogTimestamp;
-                globalState.logs = newLogs;
-                renderLogs();
-
-            } catch (error) {
-                // השגיאה כבר טופלה והוצגה על ידי apiFetch
-                console.warn("fetchLogs נכשל. הלוגים לא יתעדכנו בסבב זה.");
+        // --- 4. Core Logic (Real-time!) ---
+        
+        /**
+         * v34.0 - הפונקציה החדשה
+         * נרשמת לשינויים ב-Firestore בזמן אמת.
+         * אין יותר Polling!
+         */
+        function listenToLogs() {
+            if (globalState.unsubscribeLogs) {
+                globalState.unsubscribeLogs(); // נתק מאזין קודם אם קיים
             }
+
+            const logsCollection = globalState.db.collection('System_Logs')
+                                    .orderBy('Timestamp', 'desc')
+                                    .limit(100);
+
+            // onSnapshot: זה הקסם. הפונקציה הזו תרוץ
+            // אוטומטית בכל פעם שהמידע בשרת משתנה.
+            globalState.unsubscribeLogs = logsCollection.onSnapshot(
+                (snapshot) => {
+                    const newLogs = [];
+                    let newestTimestamp = globalState.lastLogTimestamp;
+
+                    snapshot.forEach(doc => {
+                        const log = doc.data();
+                        
+                        // המרה מ-Timestamp של Firebase ל-Date
+                        const timestamp = log.Timestamp.toDate();
+                        
+                        if (!newestTimestamp || timestamp > newestTimestamp) {
+                            newestTimestamp = timestamp;
+                        }
+                        
+                        // בדוק אם זה לוג חדש שצריך התראה
+                        if (globalState.lastLogTimestamp && timestamp > globalState.lastLogTimestamp) {
+                            if (log.Level === 'ERROR' || log.Level === 'WARN') {
+                                createToast(log.Level, log.Message, log.Origin);
+                            }
+                        }
+                        
+                        newLogs.push({ ...log, Timestamp: timestamp });
+                    });
+
+                    globalState.lastLogTimestamp = newestTimestamp;
+                    globalState.logs = newLogs;
+                    renderLogs();
+                },
+                (error) => {
+                    // שגיאה בהאזנה (למשל, אין הרשאות)
+                    console.error("Firebase Snapshot Error", error);
+                    document.getElementById('connection-status').innerHTML = `<span class="text-red-500">שגיאת האזנה (בדוק חוקים)</span>`;
+                    createToast('ERROR', `שגיאת האזנה: ${error.message}`, 'Firestore');
+                }
+            );
         }
 
         // --- 5. Render Functions ---
@@ -262,15 +296,11 @@
             const filterText = document.getElementById('filter-text').value.toLowerCase();
             const filterLevel = document.getElementById('filter-level').value;
 
-            // ודא ש-globalState.logs הוא מערך
-            const logsToFilter = Array.isArray(globalState.logs) ? globalState.logs : [];
-
-            const filteredLogs = logsToFilter.filter(log => {
-                // בדיקות בטוחות למקרה שאובייקט הלוג לא תקין
+            const filteredLogs = globalState.logs.filter(log => {
                 const textMatch = !filterText ||
-                    (log.Message && typeof log.Message === 'string' && log.Message.toLowerCase().includes(filterText)) ||
-                    (log.Origin && typeof log.Origin === 'string' && log.Origin.toLowerCase().includes(filterText)) ||
-                    (log.Hint && typeof log.Hint === 'string' && log.Hint.toLowerCase().includes(filterText));
+                    (log.Message && log.Message.toLowerCase().includes(filterText)) ||
+                    (log.Origin && log.Origin.toLowerCase().includes(filterText)) ||
+                    (log.Hint && log.Hint.toLowerCase().includes(filterText));
                 const levelMatch = !filterLevel || (log.Level && log.Level === filterLevel);
                 return textMatch && levelMatch;
             });
@@ -286,9 +316,9 @@
                 
                 return `
                     <tr class="hover:bg-gray-700 text-sm">
-                        <td class="p-3 text-gray-400">${new Date(log.Timestamp).toLocaleString('he-IL')}</td>
+                        <td class="p-3 text-gray-400">${log.Timestamp.toLocaleString('he-IL')}</td>
                         <td class="p-3 font-bold ${levelClass}">${level}</td>
-                        <td class="p-3 text-cyan-300 font-mono">[${log.Origin || 'N/A'}]</td>
+                        <td class="p-3 text-cyan-300 font-mono">[${log.Origin}]</td>
                         <td class="p-3 text-white">${log.Message || '---'}</td>
                         <td class="p-3 text-yellow-300 font-mono">${log.Hint || '---'}</td>
                     </tr>
@@ -297,13 +327,6 @@
         }
 
         // --- 6. Notification (Toast) System ---
-        function showNewLogNotifications(newLogs) {
-            const criticalLog = newLogs.find(l => l.Level === 'ERROR') || newLogs.find(l => l.Level === 'WARN');
-            if (criticalLog) {
-                createToast(criticalLog.Level, criticalLog.Message, criticalLog.Origin);
-            }
-        }
-
         function createToast(level, message, origin) {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -333,15 +356,6 @@
             container.prepend(toast);
             setTimeout(() => { toast.remove(); }, 5000);
         }
-
-        // --- 7. Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('filter-text').addEventListener('input', renderLogs);
-            document.getElementById('filter-level').addEventListener('input', renderLogs);
-            document.getElementById('force-refresh').addEventListener('click', fetchLogs);
-            fetchLogs();
-            setInterval(fetchLogs, POLL_INTERVAL);
-        });
 
     </script>
 </body>
