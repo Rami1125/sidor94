@@ -3,81 +3,310 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster - כניסת נהג</title>
-    <!-- 
-      DeliveryMaster Driver Login v28.0
-      This file is a simple redirector/login page.
-      The main application is in driver.html
-    -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Driver App v35.0</title>
     <style>
-        body {
-            font-family: 'Arial', sans-serif;
+        /* 1. Tailwind Base & Utilities (subset) */
+        *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
+        html { line-height: 1.5; -webkit-text-size-adjust: 100%; -moz-tab-size: 4; tab-size: 4; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; direction: rtl; }
+        body { margin: 0; line-height: inherit; background-color: #1f2937; color: #d1d5db; } /* bg-gray-800 */
+        
+        /* 2. Custom Glass UI */
+        .glass-ui {
+            background-color: rgba(55, 65, 81, 0.7); /* bg-gray-600 bg-opacity-70 */
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-radius: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
+
+        /* 3. App-specific Styles */
+        .p-4 { padding: 1rem; }
+        .p-6 { padding: 1.5rem; }
+        .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
+        .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .justify-between { justify-content: space-between; }
+        .items-center { align-items: center; }
+        .text-xl { font-size: 1.25rem; }
+        .text-2xl { font-size: 1.5rem; }
+        .font-bold { font-weight: 700; }
+        .text-lg { font-size: 1.125rem; }
+        .text-sm { font-size: 0.875rem; }
+        .text-white { color: #fff; }
+        .text-gray-300 { color: #d1d5db; }
+        .text-gray-400 { color: #9ca3af; }
+        .text-green-400 { color: #4ade80; }
+        .text-yellow-400 { color: #facc15; }
+        .text-red-500 { color: #ef4444; }
+        .text-blue-400 { color: #60a5fa; }
+        .w-full { width: 100%; }
+        .min-h-screen { min-height: 100vh; }
+        .rounded-lg { border-radius: 0.5rem; }
+        
+        /* Buttons */
+        .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; text-align: center; }
+        .btn-primary { background-color: #2563eb; color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-success { background-color: #16a34a; color: white; }
+        .btn-success:hover { background-color: #15803d; }
+        
+        /* Form Inputs */
+        .form-input {
+            width: 100%; background-color: #1f2937; border: 1px solid #374151;
+            color: white; padding: 0.75rem 1rem; border-radius: 0.5rem;
+            font-size: 1.125rem; text-align: center;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; text-align: center; }
+        
+        /* Order Card */
+        .order-card {
+            border-right: 5px solid #3b82f6; /* status-חדש */
         }
+        .order-card.status-שויך {
+            border-right-color: #eab308; /* status-שויך */
+        }
+        
     </style>
-</head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
 
-    <div class="w-full max-w-sm bg-white p-8 rounded-lg shadow-md text-center">
-        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">DeliveryMaster</h1>
-        
-        <div id="login-form">
-            <p class="text-center text-gray-600 mb-6">כניסה לאפליקציית נהגים</p>
-            <p class="text-sm text-gray-500 mb-4">
-                הכניסה מתבצעת כעת דרך האפליקציה הראשית.
-            </p>
-            <button id="login-btn" class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600">
-                פתח אפליקציית נהגים
-            </button>
-        </div>
-        
-        <div id="loading" class="hidden">
-             <div class="loader mx-auto"></div>
-             <p class="mt-4 text-gray-600">טוען...</p>
-        </div>
+    <!-- 1. Firebase SDKs (חייב) -->
+    <script type="module">
+        // Import the functions you need from the SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, query, where, onSnapshot, 
+            doc, setDoc, serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-    </div>
+        // --- 2. תצורה (Config) ---
+        // !!! הדבק כאן את ה-firebaseConfig שלך (מאותו פרויקט) !!!
+        const firebaseConfig = {
+          apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
+          authDomain: "saban94-78949.firebaseapp.com",
+          projectId: "saban94-78949",
+          storageBucket: "saban94-78949.firebasestorage.app",
+          messagingSenderId: "41553157903",
+          appId: "1:41553157903:web:cc33d252cff023be97a87a",
+          measurementId: "G-XV6RZDESSB"
+        };
 
-    <script>
-        // This file now simply redirects to driver.html
-        // The full app logic is contained there.
+        // --- 3. אתחול (Initialization) ---
+        let db;
+        let currentDriverId = null; // "עלי", "חכמת" וכו'.
+        let gpsWatcherId = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                db = getFirestore(app);
+                
+                await signInAnonymously(auth);
+                // האפליקציה מתחילה במסך "התחברות"
+                
+            } catch (error) {
+                console.error("Firebase Init Error", error);
+                document.getElementById('status-bar').innerHTML = `<span class="text-red-500">שגיאת התחברות Firebase</span>`;
+            }
+            
+            // Event Listeners
+            document.getElementById('login-button').addEventListener('click', handleDriverLogin);
+        });
         
-        function redirectToApp() {
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('loading').style.display = 'block';
+        // --- 4. לוגיקת אפליקציה ---
+        
+        function handleDriverLogin() {
+            const driverIdInput = document.getElementById('driver-id-input');
+            const driverId = driverIdInput.value.trim();
             
-            // We check if a driver ID is already stored.
-            // driver.html will handle the full login logic.
-            const storedDriverId = localStorage.getItem('driverId');
+            if (!driverId) {
+                alert("חובה להזין שם נהג (לדוגמה: עלי, חכמת)");
+                return;
+            }
             
-            let redirectUrl = 'driver.html';
+            currentDriverId = driverId;
             
-            // We don't pass query params anymore as driver.html handles
-            // storage-based login.
+            // החלפת מסכים
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'flex';
+            document.getElementById('driver-name-display').textContent = `נהג: ${currentDriverId}`;
             
-            console.log('Redirecting to main driver app...');
-            window.location.href = redirectUrl;
+            // הפעלת GPS וסנכרון משימות
+            startGpsTracking();
+            listenToTasks();
         }
 
-        document.getElementById('login-btn').addEventListener('click', redirectToApp);
+        // --- 5. GPS ושידור מיקום (החלק הקריטי) ---
+        function startGpsTracking() {
+            if (!('geolocation' in navigator)) {
+                setStatus('GPS לא נתמך בדפדפן זה', 'text-red-500');
+                return;
+            }
+            
+            setStatus('מפעיל GPS...', 'text-yellow-400');
+            
+            // watchPosition עוקב אחרי המיקום ברציפות
+            gpsWatcherId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    setStatus('GPS פעיל. משדר מיקום.', 'text-green-400');
+                    
+                    // שליחת המיקום ל-Firebase
+                    updateDriverLocation(latitude, longitude);
+                },
+                (error) => {
+                    let errorMsg = 'שגיאת GPS: ';
+                    if (error.code === 1) errorMsg += 'אין הרשאת מיקום.';
+                    else if (error.code === 2) errorMsg += 'לא ניתן לקבוע מיקום.';
+                    else errorMsg += 'זמן קצוב פג.';
+                    setStatus(errorMsg, 'text-red-500');
+                    console.error("GPS Error", error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000, // 10 שניות
+                    maximumAge: 0
+                }
+            );
+        }
+        
+        async function updateDriverLocation(lat, lng) {
+            if (!db || !currentDriverId) return;
+            
+            // זה ה-Document ID שהגדרת ב-'driverLocations'
+            const locationRef = doc(db, "driverLocations", currentDriverId);
+            
+            try {
+                // setDoc (עם merge) ייצור את המסמך אם לא קיים, או יעדכן אם קיים
+                await setDoc(locationRef, {
+                    latitude: lat,
+                    longitude: lng,
+                    lastUpdate: serverTimestamp() // חותמת זמן של השרת
+                }, { merge: true });
+                
+                console.log(`Location updated for ${currentDriverId}: ${lat}, ${lng}`);
+                
+            } catch (e) {
+                console.error("Error updating location: ", e);
+                setStatus('שגיאת סנכרון מיקום', 'text-red-500');
+            }
+        }
 
-        // Optional: Auto-redirect if we know they're logged in
-        // if (localStorage.getItem('driverId')) {
-        //     redirectToApp();
-        // }
+        // --- 6. האזנה למשימות (Orders) ---
+        function listenToTasks() {
+            if (!db || !currentDriverId) return;
+
+            setStatus('מסנכרן משימות...', 'text-yellow-400');
+            
+            // שאילתה שמחפשת הזמנות ששויכו לנהג הנוכחי ועדיין לא הושלמו
+            const ordersCollection = collection(db, "orders");
+            const q = query(
+                ordersCollection,
+                where("driver.id", "==", currentDriverId),
+                where("status", "!=", "הושלם") // הצג רק "חדש" (אם שויך בטעות) ו"שויך"
+            );
+
+            onSnapshot(q, (querySnapshot) => {
+                const tasks = [];
+                querySnapshot.forEach((doc) => {
+                    tasks.push({ id: doc.id, ...doc.data() });
+                });
+                renderTasks(tasks); // עדכון רשימת המשימות
+                setStatus(`GPS פעיל | ${tasks.length} משימות פתוחות`, 'text-green-400');
+            }, (error) => {
+                console.error("Firestore Listen Error (Tasks)", error);
+                setStatus("שגיאה בסנכרון משימות", 'text-red-500');
+            });
+        }
+        
+        function renderTasks(tasks) {
+            const taskList = document.getElementById('task-list');
+            if (!tasks || tasks.length === 0) {
+                taskList.innerHTML = `<div class="p-8 text-center text-gray-400">אין משימות פתוחות.</div>`;
+                return;
+            }
+
+            taskList.innerHTML = tasks.map(task => {
+                const statusClass = `status-${task.status.replace(' ', '_')}` || '';
+                return `
+                    <div class="glass-ui p-4 space-y-2 order-card ${statusClass}">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xl font-bold text-white">${task.customer.name}</h3>
+                            <span class="text-sm font-bold text-blue-400">${task.status}</span>
+                        </div>
+                        <p class="text-lg text-gray-300">${task.address}</p>
+                        <p class="text-sm text-gray-400">טלפון: ${task.customer.phone} | סוג: ${task.deliveryType || 'לא צוין'}</p>
+                        <button class="btn btn-success w-full" onclick="window.markTaskAsCompleted('${task.id}')">
+                            סיימתי (הושלם)
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // --- 7. עדכון סטטוס משימה ---
+        window.markTaskAsCompleted = async (orderId) => {
+             if (!db || !orderId) return;
+             if (!confirm("האם אתה בטוח שסיימת את המשימה?")) return;
+             
+             const orderRef = doc(db, "orders", orderId);
+             try {
+                 await updateDoc(orderRef, {
+                    status: "הושלם"
+                 });
+                 // onSnapshot יטפל בעדכון הרשימה אוטומטית
+                 alert("המשימה עודכנה בהצלחה!");
+             } catch (e) {
+                 console.error("Error completing order: ", e);
+                 alert("שגיאה בסיום הזמנה: " + e.message);
+             }
+        }
+        
+        function setStatus(message, cssClass) {
+            const statusEl = document.getElementById('status-bar-text');
+            statusEl.textContent = message;
+            statusEl.className = `text-sm ${cssClass}`;
+        }
+        
+        // --- Attach to window for onclick ---
+        window.handleDriverLogin = handleDriverLogin;
 
     </script>
+</head>
+<body class="p-4 min-h-screen">
+
+    <!-- 1. מסך התחברות (ברירת מחדל) -->
+    <div id="login-screen" class="min-h-screen flex flex-col items-center justify-center space-y-6" style="display: flex;">
+        <h1 class="text-2xl font-bold text-white">אפליקציית נהג (v35)</h1>
+        <div class="glass-ui p-6 space-y-4 w-full max-w-sm">
+            <label for="driver-id-input" class="form-label">אנא הזן את שם הנהג שלך</label>
+            <input type="text" id="driver-id-input" class="form-input" placeholder="לדוגמה: עלי, חכמת..." value="עלי">
+            <button id="login-button" class="btn btn-primary w-full">התחבר והפעל GPS</button>
+        </div>
+        <p id="status-bar-login" class="text-sm text-gray-400">יש לאשר הרשאות מיקום לאחר ההתחברות.</p>
+    </div>
+
+    <!-- 2. מסך אפליקציה ראשי (מוסתר) -->
+    <div id="app-screen" class="h-full flex-col space-y-4" style="display: none; height: calc(100vh - 2rem);">
+        
+        <!-- Header -->
+        <header class="glass-ui p-4 flex justify-between items-center flex-shrink-0">
+            <div>
+                <h1 id="driver-name-display" class="text-lg font-bold text-white">נהג: ...</h1>
+            </div>
+            <div id="status-bar" class="text-sm text-yellow-400">
+                <span id="status-bar-text">מאתחל...</span>
+            </div>
+        </header>
+
+        <!-- Task List -->
+        <main id="task-list" class="flex-grow space-y-4 overflow-y-auto p-2">
+            <!-- משימות יטענו כאן... -->
+            <div class="p-8 text-center text-gray-400">טוען משימות...</div>
+        </main>
+        
+    </div>
+
 </body>
 </html>
