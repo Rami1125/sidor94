@@ -3,55 +3,588 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster - כניסה לצפייה</title>
-    <!-- DeliveryMaster Viewer Login v27.0 -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>DeliveryMaster v35.0 - חדר מצב (מפה)</title>
+    
+    <!-- 1. Leaflet (Map System) CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <style>
-        body { font-family: 'Arial', sans-serif; }
+        /* 1. Tailwind Base & Utilities (subset) */
+        *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
+        html { line-height: 1.5; -webkit-text-size-adjust: 100%; -moz-tab-size: 4; tab-size: 4; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; direction: rtl; }
+        body { margin: 0; line-height: inherit; background-color: #111827; color: #d1d5db; overflow-y: hidden; /* מונע גלילה כפולה */ }
+        .container { width: 100%; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+        @media (min-width: 1536px) { .container { max-width: 1536px; } } /* 2xl */
+        
+        /* 2. Custom Glass UI */
+        .glass-ui {
+            background-color: rgba(31, 41, 55, 0.7);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-radius: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 3. App-specific Styles (v35 Layout) */
+        .p-4 { padding: 1rem; }
+        .p-3 { padding: 0.75rem; }
+        .p-6 { padding: 1.5rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem; }
+        .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
+        .flex { display: flex; }
+        .grid { display: grid; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
+        .gap-6 { gap: 1.5rem; }
+        .justify-between { justify-content: space-between; }
+        .items-center { align-items: center; }
+        .text-2xl { font-size: 1.5rem; }
+        .font-bold { font-weight: 700; }
+        .text-sm { font-size: 0.875rem; }
+        .text-white { color: #fff; }
+        .text-gray-400 { color: #9ca3af; }
+        .text-gray-500 { color: #6b7280; }
+        .text-green-400 { color: #4ade80; }
+        .text-yellow-400 { color: #facc15; }
+        .text-red-500 { color: #ef4444; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .w-full { width: 100%; }
+        .min-w-full { min-width: 100%; }
+        .h-screen { height: 100vh; }
+        .overflow-hidden { overflow: hidden; }
+        .overflow-y-auto { overflow-y: auto; }
+        .overflow-x-auto { overflow-x: auto; }
+        .border-b { border-bottom-width: 1px; }
+        .border-gray-700 { border-color: #374151; }
+        .divide-y > :not([hidden]) ~ :not([hidden]) { border-top-width: 1px; }
+        .divide-gray-700 > :not([hidden]) ~ :not([hidden]) { border-color: #374151; }
+        .hover\:bg-gray-700:hover { background-color: #374151; }
+        
+        /* Layout */
+        @media (min-width: 1024px) {
+            .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .lg\:col-span-2 { grid-column: span 2 / span 2; }
+            .lg\:h-full { height: 100%; }
+        }
+        
+        /* Map */
+        #leaflet-map {
+            height: 400px; /* גובה למובייל */
+            width: 100%;
+            border-radius: 0.75rem;
+            z-index: 10;
+        }
+        @media (min-width: 1024px) {
+            #leaflet-map { height: 100%; } /* גובה מלא לדסקטופ */
+        }
+        .leaflet-container { background: #374151; }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: #1f2937; /* bg-gray-800 */
+            color: #d1d5db; /* text-gray-300 */
+            border-radius: 0.5rem;
+        }
+        .leaflet-popup-close-button { color: #d1d5db !important; }
+
+        /* Buttons & Status */
+        .btn { padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .btn-primary { background-color: #2563eb; color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-secondary { background-color: #4b5563; color: white; }
+        .btn-secondary:hover { background-color: #374151; }
+        .btn-success { background-color: #16a34a; color: white; }
+        .btn-success:hover { background-color: #15803d; }
+        .btn-warning { background-color: #d97706; color: white; }
+        .btn-warning:hover { background-color: #b45309; }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .status-חדש { background-color: #3b82f6; color: white; }
+        .status-שויך { background-color: #eab308; color: #422006; }
+        .status-הושלם { background-color: #22c55e; color: #064e3b; }
+        .status-default { background-color: #6b7280; color: #111827; }
+        
+        /* Modal Styles */
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+            display: none; align-items: center; justify-content: center;
+            z-index: 50;
+        }
+        .modal-content { width: 90%; max-width: 500px; }
+        
+        /* Form Inputs */
+        .form-input {
+            width: 100%; background-color: #1f2937; border: 1px solid #374151;
+            color: white; padding: 0.75rem 1rem; border-radius: 0.5rem;
+        }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
     </style>
-</head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
 
-    <div class="w-full max-w-xs bg-white p-8 rounded-lg shadow-md">
-        <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">צפייה במפה</h1>
-        <p class="text-center text-gray-600 mb-6">הכנס סיסמת צפייה:</p>
+    <!-- 1. Firebase SDKs (חייב) -->
+    <script type="module">
+        // Import the functions you need from the SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, query, orderBy, onSnapshot, 
+            doc, setDoc, updateDoc, serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // --- 2. תצורה (Config) ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
+          authDomain: "saban94-78949.firebaseapp.com",
+          projectId: "saban94-78949",
+          storageBucket: "saban94-78949.firebasestorage.app",
+          messagingSenderId: "41553157903",
+          appId: "1:41553157903:web:cc33d252cff023be97a87a",
+          measurementId: "G-XV6RZDESSB"
+        };
+
+        // --- 3. אתחול (Initialization) ---
+        let db;
+        let currentOrderId = null; // Used by modals
         
-        <input type="password" id="password-input" class="w-full px-4 py-2 border rounded-lg text-center" placeholder="סיסמה">
+        // --- v35: Map Globals ---
+        let mapInstance = null;
+        let allDrivers = {}; // ישמש לאחסון שמות הנהגים
+        let driverMarkers = {}; // ישמש לעדכון סמני נהגים
+        let orderMarkers = {}; // ישמש לעדכון סמני הזמנות
+
+        // --- v35: Custom Map Icons ---
+        // אייקון משאית (נהג)
+        const driverIcon = L.divIcon({
+            html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8 text-yellow-400">
+                      <path d="M3.375 4.5C2.339 4.5 1.5 5.34 1.5 6.375V13.5h1.063c.24 0 .47.09.643.255l3.48 3.099A2.25 2.25 0 008.25 18H18a2.25 2.25 0 002.25-2.25V6.375c0-1.036-.84-1.875-1.875-1.875H3.375zM13.5 15a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25z" />
+                      <path d="M13.5 7.5a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25zM17.25 15a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25zM17.25 7.5a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25zM5.25 15a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25zM5.25 7.5a1.125 1.125 0 100-2.25 1.125 1.125 0 000 2.25zM22.5 9.375c0-1.036-.84-1.875-1.875-1.875h-.375v10.125c0 1.035-.84 1.875-1.875 1.875h-.375v.75c0 1.036-.84 1.875-1.875 1.875H8.625c-1.035 0-1.875-.84-1.875-1.875v-.75H6v-3.83l-3.47-3.088A2.25 2.25 0 00.9 9.375H.375A.375.375 0 010 9V7.125A.375.375 0 01.375 6.75H6.75v5.64l3.47 3.088c.174.155.402.242.643.242H21.375a.375.375 0 01.375.375v1.875a.375.375 0 01-.375.375h-.375a.375.375 0 01-.375-.375v-.75H18a.375.375 0 01-.375-.375V6.75h4.5a.375.375 0 01.375.375v2.25a.375.375 0 01-.375.375h-.375z" />
+                    </svg>`,
+            className: '', // No default div styles
+            iconSize: [32, 32],
+            iconAnchor: [16, 32] // Point of the icon
+        });
         
-        <button id="login-btn" class_="w-full bg-blue-500 text-white py-2 rounded-lg mt-4 font-semibold hover:bg-blue-600">
-            כניסה
-        </button>
+        // אייקון בית (הזמנה)
+        const orderIcon = L.divIcon({
+            html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-blue-400">
+                      <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0L2.41 11.47a.75.75 0 101.06 1.06l8.69-8.69z" />
+                      <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75v4.5A.75.75 0 019 21.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" />
+                    </svg>`,
+            className: '',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24]
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                db = getFirestore(app);
+                
+                setStatus('מתחבר...', 'text-yellow-400');
+                await signInAnonymously(auth);
+                setStatus('מחובר (מאזין לנתונים...)', 'text-green-400');
+                
+                initMap();
+                listenToDrivers();
+                listenToDriverLocations();
+                listenToOrders();
+
+            } catch (error) {
+                console.error("Firebase Init Error", error);
+                setStatus(`שגיאת התחברות: ${error.message}`, 'text-red-500');
+            }
+        });
+
+        // --- 4. האזנה בזמן אמת (READ) ---
         
-        <p id="error-message" class="text-red-500 text-center mt-3 text-sm"></p>
-    </div>
+        // v35: מאזין לנהגים כדי לשמור שמות בזיכרון
+        function listenToDrivers() {
+            const driversCollection = collection(db, "drivers");
+            onSnapshot(driversCollection, (querySnapshot) => {
+                querySnapshot.forEach((doc) => {
+                    allDrivers[doc.id] = doc.data(); // שומר את כל נתוני הנהג
+                });
+                console.log("Driver cache updated:", allDrivers);
+            }, (error) => console.error("Error listening to drivers:", error));
+        }
 
-    <script>
-        // This is a simple placeholder password.
-        // In a real app, this should be validated securely.
-        const VIEWER_PASSWORD = "1234"; // TODO: Move to settings
+        // v35: מאזין למיקומי נהגים
+        function listenToDriverLocations() {
+            const locationsCollection = collection(db, "driverLocations");
+            onSnapshot(locationsCollection, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const driverId = change.doc.id;
+                    const locationData = change.doc.data();
+                    
+                    if (change.type === "added" || change.type === "modified") {
+                        updateDriverMarker(driverId, locationData);
+                    } else if (change.type === "removed") {
+                        if (driverMarkers[driverId]) {
+                            mapInstance.removeLayer(driverMarkers[driverId]);
+                            delete driverMarkers[driverId];
+                        }
+                    }
+                });
+            }, (error) => console.error("Error listening to driver locations:", error));
+        }
 
-        const passwordInput = document.getElementById('password-input');
-        const loginButton = document.getElementById('login-btn');
-        const errorMessage = document.getElementById('error-message');
+        // v35: מאזין להזמנות (משודרג)
+        function listenToOrders() {
+            const ordersCollection = collection(db, "orders");
+            const q = query(ordersCollection, orderBy("orderId", "desc")); 
 
-        function login() {
-            const pass = passwordInput.value;
-            if (pass === VIEWER_PASSWORD) {
-                // Store a session token to allow access to viewer.html
-                sessionStorage.setItem('viewerToken', 'VALID_TOKEN'); // Simple token
-                window.location.href = 'viewer.html';
-            } else {
-                errorMessage.innerText = 'סיסמה שגויה.';
+            onSnapshot(q, (querySnapshot) => {
+                const orders = [];
+                querySnapshot.forEach((doc) => {
+                    orders.push({ id: doc.id, ...doc.data() });
+                });
+                renderOrders(orders); // מעדכן טבלה
+                updateOrderMarkers(orders); // v35: מעדכן מפה
+            }, (error) => {
+                console.error("Firestore Listen Error", error);
+                setStatus("שגיאה בהאזנה להזמנות", 'text-red-500');
+            });
+        }
+
+        // --- 5. עדכון ממשק (Render) ---
+        function renderOrders(orders) {
+            const tableBody = document.getElementById('orders-table-body');
+            if (!orders || orders.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-500">עדיין אין הזמנות בדאטהבייס...</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = orders.map(order => {
+                // (אותה לוגיקה כמו ב-v34.1)
+                const customerName = order.customer ? order.customer.name : 'לא ידוע';
+                const customerPhone = order.customer ? order.customer.phone : '---';
+                const driverName = order.driver ? order.driver.name : 'טרם שויך';
+                const status = order.status || 'חדש';
+                
+                let statusClass = `status-${status.replace(' ', '_')}` || 'status-default';
+
+                let actionsHtml = '';
+                if (status === 'חדש') {
+                    actionsHtml = `<button class="btn btn-warning text-sm" onclick="openAssignDriverModal('${order.id}')">שבץ נהג</button>`;
+                } else if (status === 'שויך') {
+                    actionsHtml = `<button class="btn btn-success text-sm" onclick="handleMarkAsCompleted('${order.id}')">הושלם</button>`;
+                } else {
+                    actionsHtml = `<span class="text-gray-500 text-sm">אין פעולות</span>`;
+                }
+                
+                return `
+                    <tr class="hover:bg-gray-700 text-sm">
+                        <td class="p-3">${order.id}</td>
+                        <td class="p-3 text-white">${customerName}</td>
+                        <td class="p-3">${order.address}</td>
+                        <td class="p-3">${customerPhone}</td>
+                        <td class="p-3 text-white">${driverName}</td>
+                        <td class="p-3"><span class="status-badge ${statusClass}">${status}</span></td>
+                        <td class="p-3 gap-2">${actionsHtml}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function setStatus(message, cssClass) {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.textContent = message;
+            statusEl.className = `text-sm ${cssClass}`;
+        }
+
+        // --- 6. פונקציות מפה (v35) ---
+        window.initMap = () => {
+            try {
+                mapInstance = L.map('leaflet-map').setView([31.7683, 35.2137], 8); // מרכז ישראל
+                
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                    subdomains: 'abcd',
+                    maxZoom: 19
+                }).addTo(mapInstance);
+            } catch (e) {
+                console.error("Failed to initialize Leaflet map", e);
+                document.getElementById('leaflet-map').innerHTML = "שגיאה בטעינת המפה.";
             }
         }
 
-        loginButton.addEventListener('click', login);
-        passwordInput.addEventListener('keyup', (event) => {
-            if (event.key === 'Enter') {
-                login();
+        function updateDriverMarker(driverId, locationData) {
+            if (!mapInstance || !locationData.latitude || !locationData.longitude) return;
+
+            const latLng = [locationData.latitude, locationData.longitude];
+            const driverName = allDrivers[driverId] ? allDrivers[driverId].name : driverId;
+            const popupContent = `<b>${driverName}</b><br>עודכן: ${new Date(locationData.lastUpdate.toDate()).toLocaleTimeString('he-IL')}`;
+
+            if (driverMarkers[driverId]) {
+                // עדכון סמן קיים
+                driverMarkers[driverId].setLatLng(latLng);
+                driverMarkers[driverId].setPopupContent(popupContent);
+            } else {
+                // יצירת סמן חדש
+                driverMarkers[driverId] = L.marker(latLng, { icon: driverIcon })
+                    .addTo(mapInstance)
+                    .bindPopup(popupContent);
             }
-        });
+        }
+
+        function updateOrderMarkers(orders) {
+            if (!mapInstance) return;
+            
+            // TODO: לנקות סמנים ישנים אם צריך
+            
+            orders.forEach(order => {
+                // הצג הזמנות שעדיין לא הושלמו ויש להן מיקום
+                if (order.status !== 'הושלם' && order.latitude && order.longitude) {
+                    const latLng = [order.latitude, order.longitude];
+                    const popupContent = `<b>לקוח: ${order.customer.name}</b><br>${order.address}<br>סטטוס: ${order.status}`;
+                    const orderId = order.id;
+
+                    if (orderMarkers[orderId]) {
+                        orderMarkers[orderId].setLatLng(latLng);
+                        orderMarkers[orderId].setPopupContent(popupContent);
+                    } else {
+                        orderMarkers[orderId] = L.marker(latLng, { icon: orderIcon })
+                            .addTo(mapInstance)
+                            .bindPopup(popupContent);
+                    }
+                } else if (orderMarkers[order.id]) {
+                    // הסר סמן אם ההזמנה הושלמה
+                    mapInstance.removeLayer(orderMarkers[order.id]);
+                    delete orderMarkers[order.id];
+                }
+            });
+        }
+        
+        // --- 7. פונקציות כתיבה (WRITE) - (v34.1) ---
+        
+        // --- Modal Controls ---
+        window.openAddOrderModal = () => {
+            document.getElementById('addOrderModal').style.display = 'flex';
+        }
+        window.openAssignDriverModal = (orderId) => {
+            currentOrderId = orderId; 
+            document.getElementById('assignDriverModal').style.display = 'flex';
+        }
+        window.closeModal = (modalId) => {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        
+        // --- Create (New Order) ---
+        window.handleSaveOrder = async () => {
+            const form = document.getElementById('addOrderForm');
+            const newOrderId = Date.now().toString();
+            const orderRef = doc(db, "orders", newOrderId);
+
+            try {
+                // v35: הוספת שדות מיקום
+                const newOrder = {
+                    orderId: newOrderId,
+                    address: form.address.value,
+                    latitude: parseFloat(form.latitude.value) || null,
+                    longitude: parseFloat(form.longitude.value) || null,
+                    status: "חדש",
+                    orderDate: new Date().toLocaleDateString('he-IL'),
+                    createdAt: serverTimestamp(),
+                    deliveryType: form.deliveryType.value,
+                    customer: {
+                        name: form.customerName.value,
+                        phone: form.customerPhone.value,
+                        id: form.customerId.value || null
+                    },
+                    driver: null
+                };
+                
+                await setDoc(orderRef, newOrder);
+                closeModal('addOrderModal');
+                form.reset();
+                
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                alert("שגיאה ביצירת הזמנה: " + e.message);
+            }
+        }
+        
+        // --- Update (Assign Driver) ---
+        window.handleAssignDriver = async () => {
+            const driverName = document.getElementById('driverNameInput').value;
+            if (!driverName || !currentOrderId) {
+                alert("שם נהג חסר או שגיאת מזהה הזמנה.");
+                return;
+            }
+            
+            const orderRef = doc(db, "orders", currentOrderId);
+            
+            try {
+                // v35: קורא את הנהג מהזיכרון כדי לקבל ID
+                const driverId = Object.keys(allDrivers).find(id => allDrivers[id].name === driverName) || driverName;
+
+                const driverData = {
+                    id: driverId,
+                    name: driverName
+                };
+                
+                await updateDoc(orderRef, {
+                    driver: driverData,
+                    status: "שויך"
+                });
+                
+                closeModal('assignDriverModal');
+                document.getElementById('driverNameInput').value = '';
+                currentOrderId = null;
+                
+            } catch (e) {
+                console.error("Error updating document: ", e);
+                alert("שגיאה בשיבוץ נהג: " + e.message);
+            }
+        }
+        
+        // --- Update (Mark as Completed) ---
+        window.handleMarkAsCompleted = async (orderId) => {
+            if (!confirm(`האם אתה בטוח שברצונך לסמן הזמנה ${orderId} כ"הושלם"?`)) {
+                return;
+            }
+            
+            const orderRef = doc(db, "orders", orderId);
+            try {
+                await updateDoc(orderRef, {
+                    status: "הושלם"
+                });
+            } catch (e) {
+                console.error("Error completing order: ", e);
+                alert("שגיאה בסיום הזמנה: " + e.message);
+            }
+        }
+        
+        // --- Attach to window for onclick ---
+        window.listenToOrders = listenToOrders;
+        window.renderOrders = renderOrders;
+        window.setStatus = setStatus;
+        window.handleMarkAsCompleted = handleMarkAsCompleted;
+        window.listenToDrivers = listenToDrivers;
+        window.listenToDriverLocations = listenToDriverLocations;
+
     </script>
+    
+    <!-- 2. Leaflet (Map System) JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="p-4 md:p-8 h-screen overflow-hidden">
+
+    <div class="container mx-auto max-w-7xl h-full space-y-6 flex flex-col">
+        
+        <!-- 1. Header -->
+        <header class="glass-ui p-4 flex-shrink-0 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-white">חדר מצב (Firebase v35.0) - ח. סבן</h1>
+                <p class="text-sm text-gray-400">הזמנות ונהגים בזמן אמת</p>
+            </div>
+            <div class="flex gap-4 items-center">
+                <div id="connection-status" class="text-sm text-yellow-400">
+                    טוען...
+                </div>
+                <button class="btn btn-primary" onclick="openAddOrderModal()">
+                    + הוסף הזמנה חדשה
+                </button>
+            </div>
+        </header>
+
+        <!-- 2. Main Content (Map + Table) -->
+        <main class="flex-grow grid lg:grid-cols-3 gap-6 lg:h-full min-h-0">
+            
+            <!-- Map Column -->
+            <div class="glass-ui lg:h-full">
+                <div id="leaflet-map"></div>
+            </div>
+
+            <!-- Table Column -->
+            <div class="glass-ui lg:col-span-2 overflow-hidden flex flex-col lg:h-full">
+                <div class="overflow-x-auto overflow-y-auto flex-grow">
+                    <table class="w-full min-w-full text-right">
+                        <thead class="border-b border-gray-700 sticky top-0 bg-gray-800/70 z-10">
+                            <tr class="text-gray-400 text-sm">
+                                <th class="p-3">מזהה הזמנה</th>
+                                <th class="p-3">לקוח</th>
+                                <th class="p-3">כתובת</th>
+                                <th class="p-3">טלפון</th>
+                                <th class="p-3">נהג משויך</th>
+                                <th class="p-3">סטטוס</th>
+                                <th class="p-3">פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body" class="divide-y divide-gray-700">
+                            <tr><td colspan="7" class="p-8 text-center text-gray-500">טוען חיבור ל-Firebase...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- MODALS (NEW v34.1) -->
+    
+    <!-- Add Order Modal (v35 - with Lat/Lng) -->
+    <div id="addOrderModal" class="modal-backdrop" style="display: none;">
+        <div class="glass-ui modal-content p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold text-white">יצירת הזמנה חדשה</h2>
+            <form id="addOrderForm" class="space-y-4" onsubmit="event.preventDefault(); handleSaveOrder();">
+                <div>
+                    <label class="form-label">שם לקוח</label>
+                    <input type="text" name="customerName" class="form-input" required>
+                </div>
+                <div>
+                    <label class="form-label">טלפון לקוח</label>
+                    <input type="text" name="customerPhone" class="form-input" required>
+                </div>
+                <div>
+                    <label class="form-label">כתובת</label>
+                    <input type="text" name="address" class="form-input" required>
+                </div>
+                <!-- v35: שדות מיקום -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">Latitude (ק. רוחב)</label>
+                        <input type="number" step="any" name="latitude" class="form-input" placeholder="לדוגמה: 32.0684">
+                    </div>
+                     <div>
+                        <label class="form-label">Longitude (ק. אורך)</label>
+                        <input type="number" step="any" name="longitude" class="form-input" placeholder="לדוגמה: 34.8247">
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">סוג הובלה</label>
+                    <input type="text" name="deliveryType" class="form-input" value="פריקה ידנית">
+                </div>
+                 <div>
+                    <label class="form-label">(אופציונלי) מזהה לקוח קיים</label>
+                    <input type="text" name="customerId" class="form-input">
+                </div>
+                <div class="flex gap-4">
+                    <button type="button" class="btn btn-secondary w-full" onclick="closeModal('addOrderModal')">ביטול</button>
+                    <button type="submit" class="btn btn-primary w-full">שמור הזמנה</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Assign Driver Modal -->
+    <div id="assignDriverModal" class="modal-backdrop" style="display: none;">
+        <div class="glass-ui modal-content p-6 space-y-4">
+            <h2 class="text-xl font-bold text-white">שיבוץ נהג</h2>
+            <form onsubmit="event.preventDefault(); handleAssignDriver();">
+                <div>
+                    <label class="form-label">שם הנהג</label>
+                    <!-- TODO: להפוך ל-dropdown שקורא מ-collection 'drivers' -->
+                    <input type="text" id="driverNameInput" class="form-input" placeholder="לדוגמה: עלי, חכמת..." required>
+                </div>
+                <div class="flex gap-4">
+                    <button type="button" class="btn btn-secondary w-full" onclick="closeModal('assignDriverModal')">ביטול</button>
+                    <button type="submit" class="btn btn-warning w-full">שבץ נהג</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
 </body>
 </html>
+
