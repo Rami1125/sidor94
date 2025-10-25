@@ -3,24 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v34.1 - דשבורד ניהול (כתיבה)</title>
-    <!-- 
-      v34.1 - No CDN
-      כל העיצוב מוטמע ישירות כאן
-    -->
+    <title>Driver App v35.0</title>
     <style>
         /* 1. Tailwind Base & Utilities (subset) */
         *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
         html { line-height: 1.5; -webkit-text-size-adjust: 100%; -moz-tab-size: 4; tab-size: 4; font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif; direction: rtl; }
-        body { margin: 0; line-height: inherit; background-color: #111827; color: #d1d5db; }
-        .container { width: 100%; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
-        @media (min-width: 1280px) { .container { max-width: 80rem; } }
+        body { margin: 0; line-height: inherit; background-color: #1f2937; color: #d1d5db; } /* bg-gray-800 */
         
         /* 2. Custom Glass UI */
         .glass-ui {
-            background-color: rgba(31, 41, 55, 0.7);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            background-color: rgba(55, 65, 81, 0.7); /* bg-gray-600 bg-opacity-70 */
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border-radius: 0.75rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
@@ -28,83 +21,52 @@
 
         /* 3. App-specific Styles */
         .p-4 { padding: 1rem; }
-        .p-3 { padding: 0.75rem; }
         .p-6 { padding: 1.5rem; }
-        .mb-6 { margin-bottom: 1.5rem; }
-        .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem; }
         .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
+        .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem; }
         .flex { display: flex; }
-        .gap-2 { gap: 0.5rem; }
-        .gap-4 { gap: 1rem; }
+        .flex-col { flex-direction: column; }
         .justify-between { justify-content: space-between; }
         .items-center { align-items: center; }
+        .text-xl { font-size: 1.25rem; }
         .text-2xl { font-size: 1.5rem; }
         .font-bold { font-weight: 700; }
+        .text-lg { font-size: 1.125rem; }
         .text-sm { font-size: 0.875rem; }
         .text-white { color: #fff; }
+        .text-gray-300 { color: #d1d5db; }
         .text-gray-400 { color: #9ca3af; }
-        .text-gray-500 { color: #6b7280; }
         .text-green-400 { color: #4ade80; }
         .text-yellow-400 { color: #facc15; }
         .text-red-500 { color: #ef4444; }
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
+        .text-blue-400 { color: #60a5fa; }
         .w-full { width: 100%; }
-        .min-w-full { min-width: 100%; }
-        .overflow-hidden { overflow: hidden; }
-        .overflow-x-auto { overflow-x: auto; }
-        .border-b { border-bottom-width: 1px; }
-        .border-gray-700 { border-color: #374151; }
-        .divide-y > :not([hidden]) ~ :not([hidden]) { border-top-width: 1px; }
-        .divide-gray-700 > :not([hidden]) ~ :not([hidden]) { border-color: #374151; }
-        .hover\:bg-gray-700:hover { background-color: #374151; }
+        .min-h-screen { min-height: 100vh; }
+        .rounded-lg { border-radius: 0.5rem; }
         
         /* Buttons */
-        .btn { padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; text-align: center; }
         .btn-primary { background-color: #2563eb; color: white; }
         .btn-primary:hover { background-color: #1d4ed8; }
-        .btn-secondary { background-color: #4b5563; color: white; }
-        .btn-secondary:hover { background-color: #374151; }
         .btn-success { background-color: #16a34a; color: white; }
         .btn-success:hover { background-color: #15803d; }
-        .btn-warning { background-color: #d97706; color: white; }
-        .btn-warning:hover { background-color: #b45309; }
-
-        /* Status Badges */
-        .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-        .status-חדש { background-color: #3b82f6; color: white; }
-        .status-שויך { background-color: #eab308; color: #422006; }
-        .status-הושלם { background-color: #22c55e; color: #064e3b; }
-        .status-default { background-color: #6b7280; color: #111827; }
-        
-        /* Modal Styles */
-        .modal-backdrop {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
-            display: none; /* Changed to 'flex' by JS */
-            align-items: center; justify-content: center;
-            z-index: 50;
-        }
-        .modal-content {
-            width: 90%;
-            max-width: 500px;
-        }
         
         /* Form Inputs */
         .form-input {
-            width: 100%;
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            color: white;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
+            width: 100%; background-color: #1f2937; border: 1px solid #374151;
+            color: white; padding: 0.75rem 1rem; border-radius: 0.5rem;
+            font-size: 1.125rem; text-align: center;
         }
-        .form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; text-align: center; }
+        
+        /* Order Card */
+        .order-card {
+            border-right: 5px solid #3b82f6; /* status-חדש */
         }
+        .order-card.status-שויך {
+            border-right-color: #eab308; /* status-שויך */
+        }
+        
     </style>
 
     <!-- 1. Firebase SDKs (חייב) -->
@@ -113,12 +75,12 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
         import { 
-            getFirestore, collection, query, orderBy, onSnapshot, 
-            doc, setDoc, updateDoc, serverTimestamp
+            getFirestore, collection, query, where, onSnapshot, 
+            doc, setDoc, serverTimestamp
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
         // --- 2. תצורה (Config) ---
-        // !!! הדבק כאן את האובייקט שקיבלת מ-Firebase (שלב 5 במדריך) !!!
+        // !!! הדבק כאן את ה-firebaseConfig שלך (מאותו פרויקט) !!!
         const firebaseConfig = {
           apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
           authDomain: "saban94-78949.firebaseapp.com",
@@ -131,296 +93,220 @@
 
         // --- 3. אתחול (Initialization) ---
         let db;
-        let currentOrderId = null; // Used by modals
-        
+        let currentDriverId = null; // "עלי", "חכמת" וכו'.
+        let gpsWatcherId = null;
+
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const app = initializeApp(firebaseConfig);
                 const auth = getAuth(app);
                 db = getFirestore(app);
                 
-                setStatus('מתחבר...', 'text-yellow-400');
-                
                 await signInAnonymously(auth);
-                setStatus('מחובר (מאזין להזמנות...)', 'text-green-400');
+                // האפליקציה מתחילה במסך "התחברות"
                 
-                listenToOrders();
             } catch (error) {
                 console.error("Firebase Init Error", error);
-                setStatus(`שגיאת התחברות: ${error.message}`, 'text-red-500');
+                document.getElementById('status-bar').innerHTML = `<span class="text-red-500">שגיאת התחברות Firebase</span>`;
             }
+            
+            // Event Listeners
+            document.getElementById('login-button').addEventListener('click', handleDriverLogin);
         });
-
-        // --- 4. האזנה בזמן אמת (READ) ---
-        function listenToOrders() {
-            const ordersCollection = collection(db, "orders");
-            const q = query(ordersCollection, orderBy("orderId", "desc")); 
-
-            onSnapshot(q, (querySnapshot) => {
-                const orders = [];
-                querySnapshot.forEach((doc) => {
-                    orders.push({ id: doc.id, ...doc.data() });
-                });
-                renderOrders(orders); 
-            }, (error) => {
-                console.error("Firestore Listen Error", error);
-                setStatus("שגיאה בהאזנה להזמנות", 'text-red-500');
-            });
+        
+        // --- 4. לוגיקת אפליקציה ---
+        
+        function handleDriverLogin() {
+            const driverIdInput = document.getElementById('driver-id-input');
+            const driverId = driverIdInput.value.trim();
+            
+            if (!driverId) {
+                alert("חובה להזין שם נהג (לדוגמה: עלי, חכמת)");
+                return;
+            }
+            
+            currentDriverId = driverId;
+            
+            // החלפת מסכים
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'flex';
+            document.getElementById('driver-name-display').textContent = `נהג: ${currentDriverId}`;
+            
+            // הפעלת GPS וסנכרון משימות
+            startGpsTracking();
+            listenToTasks();
         }
 
-        // --- 5. עדכון ממשק (Render) ---
-        function renderOrders(orders) {
-            const tableBody = document.getElementById('orders-table-body');
-            if (!orders || orders.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-500">עדיין אין הזמנות בדאטהבייס...</td></tr>`;
+        // --- 5. GPS ושידור מיקום (החלק הקריטי) ---
+        function startGpsTracking() {
+            if (!('geolocation' in navigator)) {
+                setStatus('GPS לא נתמך בדפדפן זה', 'text-red-500');
+                return;
+            }
+            
+            setStatus('מפעיל GPS...', 'text-yellow-400');
+            
+            // watchPosition עוקב אחרי המיקום ברציפות
+            gpsWatcherId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    setStatus('GPS פעיל. משדר מיקום.', 'text-green-400');
+                    
+                    // שליחת המיקום ל-Firebase
+                    updateDriverLocation(latitude, longitude);
+                },
+                (error) => {
+                    let errorMsg = 'שגיאת GPS: ';
+                    if (error.code === 1) errorMsg += 'אין הרשאת מיקום.';
+                    else if (error.code === 2) errorMsg += 'לא ניתן לקבוע מיקום.';
+                    else errorMsg += 'זמן קצוב פג.';
+                    setStatus(errorMsg, 'text-red-500');
+                    console.error("GPS Error", error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000, // 10 שניות
+                    maximumAge: 0
+                }
+            );
+        }
+        
+        async function updateDriverLocation(lat, lng) {
+            if (!db || !currentDriverId) return;
+            
+            // זה ה-Document ID שהגדרת ב-'driverLocations'
+            const locationRef = doc(db, "driverLocations", currentDriverId);
+            
+            try {
+                // setDoc (עם merge) ייצור את המסמך אם לא קיים, או יעדכן אם קיים
+                await setDoc(locationRef, {
+                    latitude: lat,
+                    longitude: lng,
+                    lastUpdate: serverTimestamp() // חותמת זמן של השרת
+                }, { merge: true });
+                
+                console.log(`Location updated for ${currentDriverId}: ${lat}, ${lng}`);
+                
+            } catch (e) {
+                console.error("Error updating location: ", e);
+                setStatus('שגיאת סנכרון מיקום', 'text-red-500');
+            }
+        }
+
+        // --- 6. האזנה למשימות (Orders) ---
+        function listenToTasks() {
+            if (!db || !currentDriverId) return;
+
+            setStatus('מסנכרן משימות...', 'text-yellow-400');
+            
+            // שאילתה שמחפשת הזמנות ששויכו לנהג הנוכחי ועדיין לא הושלמו
+            const ordersCollection = collection(db, "orders");
+            const q = query(
+                ordersCollection,
+                where("driver.id", "==", currentDriverId),
+                where("status", "!=", "הושלם") // הצג רק "חדש" (אם שויך בטעות) ו"שויך"
+            );
+
+            onSnapshot(q, (querySnapshot) => {
+                const tasks = [];
+                querySnapshot.forEach((doc) => {
+                    tasks.push({ id: doc.id, ...doc.data() });
+                });
+                renderTasks(tasks); // עדכון רשימת המשימות
+                setStatus(`GPS פעיל | ${tasks.length} משימות פתוחות`, 'text-green-400');
+            }, (error) => {
+                console.error("Firestore Listen Error (Tasks)", error);
+                setStatus("שגיאה בסנכרון משימות", 'text-red-500');
+            });
+        }
+        
+        function renderTasks(tasks) {
+            const taskList = document.getElementById('task-list');
+            if (!tasks || tasks.length === 0) {
+                taskList.innerHTML = `<div class="p-8 text-center text-gray-400">אין משימות פתוחות.</div>`;
                 return;
             }
 
-            tableBody.innerHTML = orders.map(order => {
-                
-                const customerName = order.customer ? order.customer.name : 'לא ידוע';
-                const customerPhone = order.customer ? order.customer.phone : '---';
-                const driverName = order.driver ? order.driver.name : 'טרם שויך';
-                const status = order.status || 'חדש';
-                
-                let statusClass = `status-${status.replace(' ', '_')}` || 'status-default';
-                if (!document.styleSheets[0].cssRules[0].style[statusClass]) {
-                    statusClass = 'status-default';
-                }
-
-                // --- NEW v34.1: Actions Buttons ---
-                let actionsHtml = '';
-                if (status === 'חדש') {
-                    actionsHtml = `<button class="btn btn-warning text-sm" onclick="openAssignDriverModal('${order.id}')">שבץ נהג</button>`;
-                } else if (status === 'שויך') {
-                    actionsHtml = `<button class="btn btn-success text-sm" onclick="handleMarkAsCompleted('${order.id}')">הושלם</button>`;
-                } else {
-                    actionsHtml = `<span class="text-gray-500 text-sm">אין פעולות</span>`;
-                }
-                
+            taskList.innerHTML = tasks.map(task => {
+                const statusClass = `status-${task.status.replace(' ', '_')}` || '';
                 return `
-                    <tr class="hover:bg-gray-700 text-sm">
-                        <td class="p-3">${order.id}</td>
-                        <td class="p-3 text-white">${customerName}</td>
-                        <td class="p-3">${order.address}</td>
-                        <td class="p-3">${customerPhone}</td>
-                        <td class="p-3 text-white">${driverName}</td>
-                        <td class="p-3"><span class="status-badge ${statusClass}">${status}</span></td>
-                        <td class="p-3 gap-2">${actionsHtml}</td>
-                    </tr>
+                    <div class="glass-ui p-4 space-y-2 order-card ${statusClass}">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xl font-bold text-white">${task.customer.name}</h3>
+                            <span class="text-sm font-bold text-blue-400">${task.status}</span>
+                        </div>
+                        <p class="text-lg text-gray-300">${task.address}</p>
+                        <p class="text-sm text-gray-400">טלפון: ${task.customer.phone} | סוג: ${task.deliveryType || 'לא צוין'}</p>
+                        <button class="btn btn-success w-full" onclick="window.markTaskAsCompleted('${task.id}')">
+                            סיימתי (הושלם)
+                        </button>
+                    </div>
                 `;
             }).join('');
         }
         
+        // --- 7. עדכון סטטוס משימה ---
+        window.markTaskAsCompleted = async (orderId) => {
+             if (!db || !orderId) return;
+             if (!confirm("האם אתה בטוח שסיימת את המשימה?")) return;
+             
+             const orderRef = doc(db, "orders", orderId);
+             try {
+                 await updateDoc(orderRef, {
+                    status: "הושלם"
+                 });
+                 // onSnapshot יטפל בעדכון הרשימה אוטומטית
+                 alert("המשימה עודכנה בהצלחה!");
+             } catch (e) {
+                 console.error("Error completing order: ", e);
+                 alert("שגיאה בסיום הזמנה: " + e.message);
+             }
+        }
+        
         function setStatus(message, cssClass) {
-            const statusEl = document.getElementById('connection-status');
+            const statusEl = document.getElementById('status-bar-text');
             statusEl.textContent = message;
             statusEl.className = `text-sm ${cssClass}`;
         }
         
-        // --- 6. פונקציות כתיבה (WRITE) - NEW v34.1 ---
-        
-        // --- Modal Controls ---
-        window.openAddOrderModal = () => {
-            document.getElementById('addOrderModal').style.display = 'flex';
-        }
-        window.openAssignDriverModal = (orderId) => {
-            currentOrderId = orderId; // Store the ID for the save function
-            document.getElementById('assignDriverModal').style.display = 'flex';
-        }
-        window.closeModal = (modalId) => {
-            document.getElementById(modalId).style.display = 'none';
-        }
-        
-        // --- Create (New Order) ---
-        window.handleSaveOrder = async () => {
-            const form = document.getElementById('addOrderForm');
-            const newOrderId = Date.now().toString(); // יצירת מזהה ייחודי
-            const orderRef = doc(db, "orders", newOrderId);
-
-            try {
-                const newOrder = {
-                    orderId: newOrderId,
-                    address: form.address.value,
-                    status: "חדש",
-                    orderDate: new Date().toLocaleDateString('he-IL'), // תאריך של היום
-                    createdAt: serverTimestamp(), // חותמת זמן של השרת
-                    deliveryType: form.deliveryType.value,
-                    
-                    customer: {
-                        name: form.customerName.value,
-                        phone: form.customerPhone.value,
-                        id: form.customerId.value || null
-                    },
-                    driver: null // מתחיל ללא נהג
-                };
-                
-                await setDoc(orderRef, newOrder);
-                closeModal('addOrderModal');
-                form.reset();
-                // אין צורך לרענן! onSnapshot יעשה את זה אוטומטית.
-                
-            } catch (e) {
-                console.error("Error adding document: ", e);
-                alert("שגיאה ביצירת הזמנה: " + e.message);
-            }
-        }
-        
-        // --- Update (Assign Driver) ---
-        window.handleAssignDriver = async () => {
-            const driverName = document.getElementById('driverNameInput').value;
-            if (!driverName || !currentOrderId) {
-                alert("שם נהג חסר או שגיאת מזהה הזמנה.");
-                return;
-            }
-            
-            const orderRef = doc(db, "orders", currentOrderId);
-            
-            try {
-                const driverData = {
-                    id: driverName, // TODO: לשלוף מ-collection 'drivers'
-                    name: driverName
-                };
-                
-                await updateDoc(orderRef, {
-                    driver: driverData,
-                    status: "שויך"
-                });
-                
-                closeModal('assignDriverModal');
-                document.getElementById('driverNameInput').value = ''; // Reset form
-                currentOrderId = null;
-                
-            } catch (e) {
-                console.error("Error updating document: ", e);
-                alert("שגיאה בשיבוץ נהג: " + e.message);
-            }
-        }
-        
-        // --- Update (Mark as Completed) ---
-        window.handleMarkAsCompleted = async (orderId) => {
-            if (!confirm(`האם אתה בטוח שברצונך לסמן הזמנה ${orderId} כ"הושלם"?`)) {
-                return;
-            }
-            
-            const orderRef = doc(db, "orders", orderId);
-            try {
-                await updateDoc(orderRef, {
-                    status: "הושלם"
-                });
-                // onSnapshot יטפל בעדכון
-            } catch (e) {
-                console.error("Error completing order: ", e);
-                alert("שגיאה בסיום הזמנה: " + e.message);
-            }
-        }
-        
         // --- Attach to window for onclick ---
-        // (Must be done in modules)
-        window.listenToOrders = listenToOrders;
-        window.renderOrders = renderOrders;
-        window.setStatus = setStatus;
-        window.handleMarkAsCompleted = handleMarkAsCompleted;
+        window.handleDriverLogin = handleDriverLogin;
 
     </script>
 </head>
-<body class="p-4 md:p-8">
+<body class="p-4 min-h-screen">
 
-    <div class="container mx-auto max-w-7xl space-y-6">
+    <!-- 1. מסך התחברות (ברירת מחדל) -->
+    <div id="login-screen" class="min-h-screen flex flex-col items-center justify-center space-y-6" style="display: flex;">
+        <h1 class="text-2xl font-bold text-white">אפליקציית נהג (v35)</h1>
+        <div class="glass-ui p-6 space-y-4 w-full max-w-sm">
+            <label for="driver-id-input" class="form-label">אנא הזן את שם הנהג שלך</label>
+            <input type="text" id="driver-id-input" class="form-input" placeholder="לדוגמה: עלי, חכמת..." value="עלי">
+            <button id="login-button" class="btn btn-primary w-full">התחבר והפעל GPS</button>
+        </div>
+        <p id="status-bar-login" class="text-sm text-gray-400">יש לאשר הרשאות מיקום לאחר ההתחברות.</p>
+    </div>
+
+    <!-- 2. מסך אפליקציה ראשי (מוסתר) -->
+    <div id="app-screen" class="h-full flex-col space-y-4" style="display: none; height: calc(100vh - 2rem);">
         
-        <!-- 1. Header -->
-        <header class="glass-ui p-4 flex justify-between items-center mb-6">
+        <!-- Header -->
+        <header class="glass-ui p-4 flex justify-between items-center flex-shrink-0">
             <div>
-                <h1 class="text-2xl font-bold text-white">דשבורד ניהול (Firebase v34.1)</h1>
-                <p class="text-sm text-gray-400">הזמנות מתעדכנות בזמן אמת</p>
+                <h1 id="driver-name-display" class="text-lg font-bold text-white">נהג: ...</h1>
             </div>
-            <div class="flex gap-4 items-center">
-                <div id="connection-status" class="text-sm text-yellow-400">
-                    טוען...
-                </div>
-                <!-- NEW v34.1: Add Order Button -->
-                <button class="btn btn-primary" onclick="openAddOrderModal()">
-                    + הוסף הזמנה חדשה
-                </button>
+            <div id="status-bar" class="text-sm text-yellow-400">
+                <span id="status-bar-text">מאתחל...</span>
             </div>
         </header>
 
-        <!-- 2. Orders Table -->
-        <div class="glass-ui overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-full text-right">
-                    <thead class="border-b border-gray-700">
-                        <tr class="text-gray-400 text-sm">
-                            <th class="p-3">מזהה הזמנה</th>
-                            <th class="p-3">לקוח</th>
-                            <th class="p-3">כתובת</th>
-                            <th class="p-3">טלפון</th>
-                            <th class="p-3">נהג משויך</th>
-                            <th class="p-3">סטטוס</th>
-                            <th class="p-3">פעולות</th> <!-- NEW -->
-                        </tr>
-                    </thead>
-                    <tbody id="orders-table-body" class="divide-y divide-gray-700">
-                        <tr><td colspan="7" class="p-8 text-center text-gray-500">טוען חיבור ל-Firebase...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    
-    <!-- MODALS (NEW v34.1) -->
-    
-    <!-- Add Order Modal -->
-    <div id="addOrderModal" class="modal-backdrop" style="display: none;">
-        <div class="glass-ui modal-content p-6 space-y-4">
-            <h2 class="text-xl font-bold text-white">יצירת הזמנה חדשה</h2>
-            <form id="addOrderForm" class="space-y-4" onsubmit="event.preventDefault(); handleSaveOrder();">
-                <div>
-                    <label class="form-label">שם לקוח</label>
-                    <input type="text" name="customerName" class="form-input" required>
-                </div>
-                <div>
-                    <label class="form-label">טלפון לקוח</label>
-                    <input type="text" name="customerPhone" class="form-input" required>
-                </div>
-                <div>
-                    <label class="form-label">כתובת</label>
-                    <input type="text" name="address" class="form-input" required>
-                </div>
-                <div>
-                    <label class="form-label">סוג הובלה</label>
-                    <input type="text" name="deliveryType" class="form-input" value="פריקה ידנית">
-                </div>
-                 <div>
-                    <label class="form-label">(אופציונלי) מזהה לקוח קיים</label>
-                    <input type="text" name="customerId" class="form-input">
-                </div>
-                <div class="flex gap-4">
-                    <button type="button" class="btn btn-secondary w-full" onclick="closeModal('addOrderModal')">ביטול</button>
-                    <button type="submit" class="btn btn-primary w-full">שמור הזמנה</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Assign Driver Modal -->
-    <div id="assignDriverModal" class="modal-backdrop" style="display: none;">
-        <div class="glass-ui modal-content p-6 space-y-4">
-            <h2 class="text-xl font-bold text-white">שיבוץ נהג</h2>
-            <form onsubmit="event.preventDefault(); handleAssignDriver();">
-                <div>
-                    <label class="form-label">שם הנהג</label>
-                    <!-- TODO: להפוך ל-dropdown שקורא מ-collection 'drivers' -->
-                    <input type="text" id="driverNameInput" class="form-input" placeholder="לדוגמה: עלי, חכמת..." required>
-                </div>
-                <div class="flex gap-4">
-                    <button type="button" class="btn btn-secondary w-full" onclick="closeModal('assignDriverModal')">ביטול</button>
-                    <button type="submit" class="btn btn-warning w-full">שבץ נהג</button>
-                </div>
-            </form>
-        </div>
+        <!-- Task List -->
+        <main id="task-list" class="flex-grow space-y-4 overflow-y-auto p-2">
+            <!-- משימות יטענו כאן... -->
+            <div class="p-8 text-center text-gray-400">טוען משימות...</div>
+        </main>
+        
     </div>
 
 </body>
 </html>
-
