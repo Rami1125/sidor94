@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v34.0 - דשבורד ניהול</title>
+    <title>DeliveryMaster v34.1 - דשבורד ניהול (כתיבה)</title>
     <!-- 
-      v34.0 - No CDN
+      v34.1 - No CDN
       כל העיצוב מוטמע ישירות כאן
     -->
     <style>
@@ -29,9 +29,13 @@
         /* 3. App-specific Styles */
         .p-4 { padding: 1rem; }
         .p-3 { padding: 0.75rem; }
+        .p-6 { padding: 1.5rem; }
         .mb-6 { margin-bottom: 1.5rem; }
         .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem; }
+        .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
         .flex { display: flex; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-4 { gap: 1rem; }
         .justify-between { justify-content: space-between; }
         .items-center { align-items: center; }
         .text-2xl { font-size: 1.5rem; }
@@ -55,12 +59,52 @@
         .divide-gray-700 > :not([hidden]) ~ :not([hidden]) { border-color: #374151; }
         .hover\:bg-gray-700:hover { background-color: #374151; }
         
+        /* Buttons */
+        .btn { padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .btn-primary { background-color: #2563eb; color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-secondary { background-color: #4b5563; color: white; }
+        .btn-secondary:hover { background-color: #374151; }
+        .btn-success { background-color: #16a34a; color: white; }
+        .btn-success:hover { background-color: #15803d; }
+        .btn-warning { background-color: #d97706; color: white; }
+        .btn-warning:hover { background-color: #b45309; }
+
         /* Status Badges */
         .status-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
-        .status-new { background-color: #3b82f6; color: white; } /* "חדש" */
-        .status-assigned { background-color: #eab308; color: #422006; } /* "שויך" */
-        .status-delivered { background-color: #22c55e; color: #064e3b; } /* "הושלם" */
+        .status-חדש { background-color: #3b82f6; color: white; }
+        .status-שויך { background-color: #eab308; color: #422006; }
+        .status-הושלם { background-color: #22c55e; color: #064e3b; }
         .status-default { background-color: #6b7280; color: #111827; }
+        
+        /* Modal Styles */
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+            display: none; /* Changed to 'flex' by JS */
+            align-items: center; justify-content: center;
+            z-index: 50;
+        }
+        .modal-content {
+            width: 90%;
+            max-width: 500px;
+        }
+        
+        /* Form Inputs */
+        .form-input {
+            width: 100%;
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
     </style>
 
     <!-- 1. Firebase SDKs (חייב) -->
@@ -68,7 +112,10 @@
         // Import the functions you need from the SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+        import { 
+            getFirestore, collection, query, orderBy, onSnapshot, 
+            doc, setDoc, updateDoc, serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
         // --- 2. תצורה (Config) ---
         // !!! הדבק כאן את האובייקט שקיבלת מ-Firebase (שלב 5 במדריך) !!!
@@ -84,45 +131,37 @@
 
         // --- 3. אתחול (Initialization) ---
         let db;
+        let currentOrderId = null; // Used by modals
         
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // אתחול Firebase
                 const app = initializeApp(firebaseConfig);
                 const auth = getAuth(app);
                 db = getFirestore(app);
                 
                 setStatus('מתחבר...', 'text-yellow-400');
                 
-                // התחברות אנונימית (שלב 6 במדריך)
                 await signInAnonymously(auth);
                 setStatus('מחובר (מאזין להזמנות...)', 'text-green-400');
                 
-                // התחלת האזנה להזמנות (במקום ללוגים)
                 listenToOrders();
-
             } catch (error) {
                 console.error("Firebase Init Error", error);
                 setStatus(`שגיאת התחברות: ${error.message}`, 'text-red-500');
             }
         });
 
-        // --- 4. האזנה בזמן אמת ---
-        // זוהי הליבה של האפליקציה
+        // --- 4. האזנה בזמן אמת (READ) ---
         function listenToOrders() {
-            // "מאזין" לאוסף 'orders' שבנית ב-Firebase
             const ordersCollection = collection(db, "orders");
-            // ממיין לפי תאריך (צריך להוסיף שדה כזה!)
-            //כרגע נמיין לפי orderId
             const q = query(ordersCollection, orderBy("orderId", "desc")); 
 
             onSnapshot(q, (querySnapshot) => {
                 const orders = [];
                 querySnapshot.forEach((doc) => {
-                    // דוחף את כל המידע מהמסמך למערך
                     orders.push({ id: doc.id, ...doc.data() });
                 });
-                renderOrders(orders); // מעדכן את הטבלה
+                renderOrders(orders); 
             }, (error) => {
                 console.error("Firestore Listen Error", error);
                 setStatus("שגיאה בהאזנה להזמנות", 'text-red-500');
@@ -133,23 +172,32 @@
         function renderOrders(orders) {
             const tableBody = document.getElementById('orders-table-body');
             if (!orders || orders.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-500">עדיין אין הזמנות בדאטהבייס...</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-500">עדיין אין הזמנות בדאטהבייס...</td></tr>`;
                 return;
             }
 
             tableBody.innerHTML = orders.map(order => {
                 
-                // קורא את הנתונים המשוכפלים (שהכנסת ידנית)
                 const customerName = order.customer ? order.customer.name : 'לא ידוע';
                 const customerPhone = order.customer ? order.customer.phone : '---';
                 const driverName = order.driver ? order.driver.name : 'טרם שויך';
+                const status = order.status || 'חדש';
                 
-                // הגדרת צבע לסטטוס
-                let statusClass = 'status-default';
-                if (order.status === 'שויך') statusClass = 'status-assigned';
-                if (order.status === 'חדש') statusClass = 'status-new';
-                if (order.status === 'הושלם') statusClass = 'status-delivered';
+                let statusClass = `status-${status.replace(' ', '_')}` || 'status-default';
+                if (!document.styleSheets[0].cssRules[0].style[statusClass]) {
+                    statusClass = 'status-default';
+                }
 
+                // --- NEW v34.1: Actions Buttons ---
+                let actionsHtml = '';
+                if (status === 'חדש') {
+                    actionsHtml = `<button class="btn btn-warning text-sm" onclick="openAssignDriverModal('${order.id}')">שבץ נהג</button>`;
+                } else if (status === 'שויך') {
+                    actionsHtml = `<button class="btn btn-success text-sm" onclick="handleMarkAsCompleted('${order.id}')">הושלם</button>`;
+                } else {
+                    actionsHtml = `<span class="text-gray-500 text-sm">אין פעולות</span>`;
+                }
+                
                 return `
                     <tr class="hover:bg-gray-700 text-sm">
                         <td class="p-3">${order.id}</td>
@@ -157,7 +205,8 @@
                         <td class="p-3">${order.address}</td>
                         <td class="p-3">${customerPhone}</td>
                         <td class="p-3 text-white">${driverName}</td>
-                        <td class="p-3"><span class="status-badge ${statusClass}">${order.status || 'חדש'}</span></td>
+                        <td class="p-3"><span class="status-badge ${statusClass}">${status}</span></td>
+                        <td class="p-3 gap-2">${actionsHtml}</td>
                     </tr>
                 `;
             }).join('');
@@ -168,6 +217,110 @@
             statusEl.textContent = message;
             statusEl.className = `text-sm ${cssClass}`;
         }
+        
+        // --- 6. פונקציות כתיבה (WRITE) - NEW v34.1 ---
+        
+        // --- Modal Controls ---
+        window.openAddOrderModal = () => {
+            document.getElementById('addOrderModal').style.display = 'flex';
+        }
+        window.openAssignDriverModal = (orderId) => {
+            currentOrderId = orderId; // Store the ID for the save function
+            document.getElementById('assignDriverModal').style.display = 'flex';
+        }
+        window.closeModal = (modalId) => {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        
+        // --- Create (New Order) ---
+        window.handleSaveOrder = async () => {
+            const form = document.getElementById('addOrderForm');
+            const newOrderId = Date.now().toString(); // יצירת מזהה ייחודי
+            const orderRef = doc(db, "orders", newOrderId);
+
+            try {
+                const newOrder = {
+                    orderId: newOrderId,
+                    address: form.address.value,
+                    status: "חדש",
+                    orderDate: new Date().toLocaleDateString('he-IL'), // תאריך של היום
+                    createdAt: serverTimestamp(), // חותמת זמן של השרת
+                    deliveryType: form.deliveryType.value,
+                    
+                    customer: {
+                        name: form.customerName.value,
+                        phone: form.customerPhone.value,
+                        id: form.customerId.value || null
+                    },
+                    driver: null // מתחיל ללא נהג
+                };
+                
+                await setDoc(orderRef, newOrder);
+                closeModal('addOrderModal');
+                form.reset();
+                // אין צורך לרענן! onSnapshot יעשה את זה אוטומטית.
+                
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                alert("שגיאה ביצירת הזמנה: " + e.message);
+            }
+        }
+        
+        // --- Update (Assign Driver) ---
+        window.handleAssignDriver = async () => {
+            const driverName = document.getElementById('driverNameInput').value;
+            if (!driverName || !currentOrderId) {
+                alert("שם נהג חסר או שגיאת מזהה הזמנה.");
+                return;
+            }
+            
+            const orderRef = doc(db, "orders", currentOrderId);
+            
+            try {
+                const driverData = {
+                    id: driverName, // TODO: לשלוף מ-collection 'drivers'
+                    name: driverName
+                };
+                
+                await updateDoc(orderRef, {
+                    driver: driverData,
+                    status: "שויך"
+                });
+                
+                closeModal('assignDriverModal');
+                document.getElementById('driverNameInput').value = ''; // Reset form
+                currentOrderId = null;
+                
+            } catch (e) {
+                console.error("Error updating document: ", e);
+                alert("שגיאה בשיבוץ נהג: " + e.message);
+            }
+        }
+        
+        // --- Update (Mark as Completed) ---
+        window.handleMarkAsCompleted = async (orderId) => {
+            if (!confirm(`האם אתה בטוח שברצונך לסמן הזמנה ${orderId} כ"הושלם"?`)) {
+                return;
+            }
+            
+            const orderRef = doc(db, "orders", orderId);
+            try {
+                await updateDoc(orderRef, {
+                    status: "הושלם"
+                });
+                // onSnapshot יטפל בעדכון
+            } catch (e) {
+                console.error("Error completing order: ", e);
+                alert("שגיאה בסיום הזמנה: " + e.message);
+            }
+        }
+        
+        // --- Attach to window for onclick ---
+        // (Must be done in modules)
+        window.listenToOrders = listenToOrders;
+        window.renderOrders = renderOrders;
+        window.setStatus = setStatus;
+        window.handleMarkAsCompleted = handleMarkAsCompleted;
 
     </script>
 </head>
@@ -178,11 +331,17 @@
         <!-- 1. Header -->
         <header class="glass-ui p-4 flex justify-between items-center mb-6">
             <div>
-                <h1 class="text-2xl font-bold text-white">דשבורד ניהול (Firebase v34)</h1>
+                <h1 class="text-2xl font-bold text-white">דשבורד ניהול (Firebase v34.1)</h1>
                 <p class="text-sm text-gray-400">הזמנות מתעדכנות בזמן אמת</p>
             </div>
-            <div id="connection-status" class="text-sm text-yellow-400">
-                טוען...
+            <div class="flex gap-4 items-center">
+                <div id="connection-status" class="text-sm text-yellow-400">
+                    טוען...
+                </div>
+                <!-- NEW v34.1: Add Order Button -->
+                <button class="btn btn-primary" onclick="openAddOrderModal()">
+                    + הוסף הזמנה חדשה
+                </button>
             </div>
         </header>
 
@@ -198,14 +357,67 @@
                             <th class="p-3">טלפון</th>
                             <th class="p-3">נהג משויך</th>
                             <th class="p-3">סטטוס</th>
+                            <th class="p-3">פעולות</th> <!-- NEW -->
                         </tr>
                     </thead>
                     <tbody id="orders-table-body" class="divide-y divide-gray-700">
-                        <!-- Rows injected by JS -->
-                        <tr><td colspan="6" class="p-8 text-center text-gray-500">טוען חיבור ל-Firebase...</td></tr>
+                        <tr><td colspan="7" class="p-8 text-center text-gray-500">טוען חיבור ל-Firebase...</td></tr>
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+    
+    <!-- MODALS (NEW v34.1) -->
+    
+    <!-- Add Order Modal -->
+    <div id="addOrderModal" class="modal-backdrop" style="display: none;">
+        <div class="glass-ui modal-content p-6 space-y-4">
+            <h2 class="text-xl font-bold text-white">יצירת הזמנה חדשה</h2>
+            <form id="addOrderForm" class="space-y-4" onsubmit="event.preventDefault(); handleSaveOrder();">
+                <div>
+                    <label class="form-label">שם לקוח</label>
+                    <input type="text" name="customerName" class="form-input" required>
+                </div>
+                <div>
+                    <label class="form-label">טלפון לקוח</label>
+                    <input type="text" name="customerPhone" class="form-input" required>
+                </div>
+                <div>
+                    <label class="form-label">כתובת</label>
+                    <input type="text" name="address" class="form-input" required>
+                </div>
+                <div>
+                    <label class="form-label">סוג הובלה</label>
+                    <input type="text" name="deliveryType" class="form-input" value="פריקה ידנית">
+                </div>
+                 <div>
+                    <label class="form-label">(אופציונלי) מזהה לקוח קיים</label>
+                    <input type="text" name="customerId" class="form-input">
+                </div>
+                <div class="flex gap-4">
+                    <button type="button" class="btn btn-secondary w-full" onclick="closeModal('addOrderModal')">ביטול</button>
+                    <button type="submit" class="btn btn-primary w-full">שמור הזמנה</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Assign Driver Modal -->
+    <div id="assignDriverModal" class="modal-backdrop" style="display: none;">
+        <div class="glass-ui modal-content p-6 space-y-4">
+            <h2 class="text-xl font-bold text-white">שיבוץ נהג</h2>
+            <form onsubmit="event.preventDefault(); handleAssignDriver();">
+                <div>
+                    <label class="form-label">שם הנהג</label>
+                    <!-- TODO: להפוך ל-dropdown שקורא מ-collection 'drivers' -->
+                    <input type="text" id="driverNameInput" class="form-input" placeholder="לדוגמה: עלי, חכמת..." required>
+                </div>
+                <div class="flex gap-4">
+                    <button type="button" class="btn btn-secondary w-full" onclick="closeModal('assignDriverModal')">ביטול</button>
+                    <button type="submit" class="btn btn-warning w-full">שבץ נהג</button>
+                </div>
+            </form>
         </div>
     </div>
 
