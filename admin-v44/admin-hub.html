@@ -491,12 +491,38 @@
             serverTimestamp // v46.0: חותמת זמן
         } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
-        // --- v46.0: הגדרות מ-v43 ---
-        const WAREHOUSE_LOCATIONS = {
-            "החרש": L.latLng(32.0573, 34.7963),
-            "התלמיד": L.latLng(32.0853, 34.7818) // (דוגמה, מרכז ת"א)
-        };
+        // --- v46.1: Helper Functions (Moved outside authReady) ---
+        function getCssVariable(varName) {
+            // Added try-catch for safety during early load
+            try {
+                return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+            } catch (e) {
+                console.warn(`Could not get CSS variable ${varName} early. Falling back.`);
+                // Fallback values if needed
+                if (varName === '--primary-color') return '#0ea5e9';
+                if (varName === '--warning') return '#f9a825';
+                return '#ffffff'; // Default fallback
+            }
+        }
         
+        function hexToRgba(hex, opacity) {
+            let c;
+            if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
+                c= hex.substring(1).split('');
+                if(c.length== 3){ c= [c[0], c[0], c[1], c[1], c[2], c[2]]; }
+                c= '0x'+c.join('');
+                return `rgba(${[(c>>16)&255, (c>>8)&255, c&255].join(',')},${opacity})`;
+            }
+            // If the input is already rgba or similar, return it, otherwise default
+            if (hex && hex.startsWith('rgb')) return hex;
+             console.warn(`Invalid hex color received: ${hex}. Falling back to default.`);
+            return `rgba(255, 255, 255, ${opacity})`; // Default fallback (white)
+        }
+        
+        // --- v46.1: Define Variables & Icons (Moved outside authReady) ---
+        const varPrimary = getCssVariable('--primary-color');
+        const varWarning = getCssVariable('--warning');
+
         // אייקון משאית (נהג)
         const driverIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="${hexToRgba(varWarning, 0.9)}" stroke="black" stroke-width="1"><path d="M37.5 22.5h-5.833c-1.021 0-1.906.396-2.635 1.177-.729.781-1.146 1.74-1.146 2.865v2.917H5.833V7.5h20.834v10h10.833ZM5.833 33.333h1.25v-2.083h1.667v2.083h10.833v-2.083h1.667v2.083h1.25a2.083 2.083 0 0 0 2.083-2.083v-5.417h4.167a2.083 2.083 0 0 0 2.083-2.083V20c0-1.146-.938-2.083-2.083-2.083H32.5V7.5a2.083 2.083 0 0 0-2.083-2.083H5.833A2.083 2.083 0 0 0 3.75 7.5v23.75a2.083 2.083 0 0 0 2.083 2.083Zm5-8.333a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Zm10.833 0a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>`;
 
@@ -516,6 +542,12 @@
             iconSize: [30, 30],
             iconAnchor: [15, 30]
         });
+
+        // --- v46.0: הגדרות מ-v43 ---
+        const WAREHOUSE_LOCATIONS = {
+            "החרש": L.latLng(32.0573, 34.7963),
+            "התלמיד": L.latLng(32.0853, 34.7818) // (דוגמה, מרכז ת"א)
+        };
 
         // --- Globals ---
         let map;
@@ -950,24 +982,10 @@
         }
         
         // --- v46.0: Helper Functions ---
-        function getCssVariable(varName) {
-            return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-        }
-        
-        function hexToRgba(hex, opacity) {
-            let c;
-            if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
-                c= hex.substring(1).split('');
-                if(c.length== 3){ c= [c[0], c[0], c[1], c[1], c[2], c[2]]; }
-                c= '0x'+c.join('');
-                return `rgba(${[(c>>16)&255, (c>>8)&255, c&255].join(',')},${opacity})`;
-            }
-            return hex; // Fallback
-        }
-        
+        // Moved up for v46.1 fix
+
         // --- Start App ---
-        const varPrimary = getCssVariable('--primary-color');
-        const varWarning = getCssVariable('--warning');
+        // Removed variable definitions from here for v46.1
 
         authReady.then(() => {
             init();
@@ -979,4 +997,5 @@
     </script>
 </body>
 </html>
+
 
