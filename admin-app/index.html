@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v41.1 - קוקפיט אולטימטיבי</title>
+    <title>DeliveryMaster v42.0 - קוקפיט משופץ</title>
     
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -13,7 +13,7 @@
     <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
 
     <style>
-        /* Base & Theme (Light v40) - Further Refinements */
+        /* Base & Theme (Light v41) - Final Polish */
         *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
         html { line-height: 1.5; font-family: 'Inter', system-ui, sans-serif; direction: rtl; }
         body { margin: 0; line-height: inherit; background-color: #f3f4f6; color: #1f2937; overflow: hidden; }
@@ -28,6 +28,7 @@
         .gap-2 { gap: 0.5rem; } .gap-4 { gap: 1rem; }
         .justify-between { justify-content: space-between; } .items-center { align-items: center; }
         .text-2xl { font-size: 1.5rem; } .font-bold { font-weight: 700; } .font-semibold { font-weight: 600; }
+        .text-xl { font-size: 1.25rem; } /* Added for headers */
         .text-sm { font-size: 0.875rem; } .text-xs { font-size: 0.75rem; }
         .text-gray-600 { color: #4b5563; } .text-gray-800 { color: #1f2937; } .text-gray-500 { color: #6b7280; }
         .text-green-500 { color: #22c55e; } .text-yellow-500 { color: #eab308; } .text-red-500 { color: #ef4444; }
@@ -43,6 +44,7 @@
         .rounded-lg { border-radius: 0.5rem; } .rounded-xl { border-radius: 0.75rem; }
         .sticky { position: sticky; } .top-0 { top: 0; } .z-10 { z-index: 10; } .z-50 { z-index: 50; }
         .bg-gray-50 { background-color: #f9fafb; }
+        .flex-shrink-0 { flex-shrink: 0; } .flex-grow { flex-grow: 1; }
 
         /* Layout */
         .main-layout { display: grid; grid-template-columns: 240px 1fr; height: 100vh; padding: 1rem; gap: 1rem; background-color: #f3f4f6; }
@@ -68,17 +70,17 @@
         .leaflet-popup-close-button { color: #374151 !important; }
         .map-popup-button { margin-top: 6px; padding: 3px 6px; font-size: 11px; background-color: #0ea5e9; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .leaflet-marker-draggable.leaflet-drag-target { cursor: grabbing !important; }
-        .leaflet-div-icon { background: none !important; border: none !important; font-size: 2rem; /* v41: Larger icons */ }
+        .leaflet-div-icon { background: none !important; border: none !important; font-size: 2.2rem; /* v42: Slightly larger icons */ text-shadow: 0 1px 2px rgba(0,0,0,0.2); /* Add subtle shadow */ }
 
-        /* Buttons v41 - Final Polish */
-        .btn { padding: 0.6rem 1.2rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease-out; border: 1px solid transparent; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; white-space: nowrap; }
-        .btn:hover { filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.06); }
-        .btn:active { transform: scale(0.98); box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); filter: brightness(1); }
-        .btn-primary { background-color: #0ea5e9; color: white; border-color: #0ea5e9; } .btn-primary:hover { background-color: #0284c7; border-color: #0284c7; }
+        /* Buttons v42 - More 3D Feel */
+        .btn { padding: 0.6rem 1.2rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.1s ease-out; /* Faster transition */ border: 1px solid transparent; box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); /* Slightly more shadow */ display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; white-space: nowrap; }
+        .btn:hover { filter: brightness(1.05); transform: translateY(-1px); /* Lift on hover */ box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.1), 0 2px 4px 0 rgba(0, 0, 0, 0.08); }
+        .btn:active { transform: translateY(1px); /* Press down */ box-shadow: inset 0 2px 3px 0 rgba(0, 0, 0, 0.1); filter: brightness(0.95); }
+        .btn-primary { background-color: #0ea5e9; color: white; border-color: #0c91cc; } .btn-primary:hover { background-color: #0284c7; border-color: #037ab1; }
         .btn-secondary { background-color: #fff; color: #374151; border-color: #d1d5db; } .btn-secondary:hover { background-color: #f9fafb; border-color: #adb5bd;}
-        .btn-success { background-color: #22c55e; color: white; border-color: #22c55e; } .btn-success:hover { background-color: #16a34a; border-color: #16a34a; }
-        .btn-warning { background-color: #f59e0b; color: white; border-color: #f59e0b; } .btn-warning:hover { background-color: #d97706; border-color: #d97706; }
-        .btn-danger { background-color: #ef4444; color: white; border-color: #ef4444; } .btn-danger:hover { background-color: #dc2626; border-color: #dc2626; }
+        .btn-success { background-color: #22c55e; color: white; border-color: #1a9c4d; } .btn-success:hover { background-color: #16a34a; border-color: #13873e; }
+        .btn-warning { background-color: #f59e0b; color: white; border-color: #d1820a; } .btn-warning:hover { background-color: #d97706; border-color: #b45309; }
+        .btn-danger { background-color: #ef4444; color: white; border-color: #d62f2f; } .btn-danger:hover { background-color: #dc2626; border-color: #b91c1c; }
         .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 0.5rem; }
 
         /* Status & Logs */
@@ -92,22 +94,27 @@
         .modal-header { border-bottom: 1px solid #e5e7eb; padding-bottom: 0.75rem; margin-bottom: 1rem; }
         .modal-footer { margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end; border-top: 1px solid #e5e7eb; padding-top: 1rem; }
         
-        /* Form & Filter Inputs v41 */
+        /* Form & Filter Inputs v42 - Integrated Icon */
         .form-input { width: 100%; background-color: #f9fafb; border: 1px solid #d1d5db; color: #1f2937; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: border-color 0.2s, box-shadow 0.2s; }
         .form-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2); outline: none; }
         .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #374151; }
         .filter-input-wrapper { position: relative; margin-bottom: 1rem; flex-shrink: 0; }
-        .filter-input { padding-left: 2.5rem; }
-        .filter-input-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; pointer-events: none; width: 1.25rem; height: 1.25rem; } /* Adjusted size */
+        .filter-input { padding-left: 2.5rem; /* Space for icon */ }
+        .filter-input-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; pointer-events: none; width: 1.25rem; height: 1.25rem; }
 
         /* Table */
-        table { border-collapse: collapse; } thead { background-color: #f9fafb; } th { color: #4b5563; padding: 0.75rem; font-weight: 600; text-align: right; } tbody { background-color: #fff; } td { padding: 0.75rem; text-align: right; }
+        table { border-collapse: collapse; width: 100%; /* Ensure table takes full width */ } 
+        thead { background-color: #f9fafb; } 
+        th { color: #4b5563; padding: 0.75rem; font-weight: 600; text-align: right; white-space: nowrap; } 
+        tbody { background-color: #fff; } 
+        td { padding: 0.75rem; text-align: right; }
+        td:last-child { white-space: nowrap; width: 1%; /* Prevent action buttons wrapping */ }
         
         /* Select Driver Modal List */
         #driver-select-list button { display: block; width: 100%; text-align: right; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; border-radius: 0.5rem; }
         #driver-select-list button:hover { background-color: #f3f4f6; }
         
-        /* v41: Notification Ticker */
+        /* v42: Notification Ticker */
         #notification-ticker { height: 40px; overflow: hidden; background-color: #fff; border-bottom: 1px solid #e5e7eb; position: relative; flex-shrink: 0; cursor: default; }
         #notification-ticker ul { list-style: none; padding: 0; margin: 0; position: absolute; width: 100%; animation: ticker-scroll-v41 40s linear infinite; }
         #notification-ticker li { height: 40px; padding: 0 1rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #4b5563; border-bottom: 1px dashed #e5e7eb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -117,32 +124,23 @@
         @keyframes ticker-scroll-v41 { 0% { transform: translateY(0); } 100% { transform: translateY(-100%); } }
         #notification-ticker:hover ul { animation-play-state: paused; }
 
-        /* v41: View Transitions */
+        /* v42: View Transitions - Smoother */
         .app-view { 
-            position: absolute; /* Take views out of flow initially */
-            top: 0; left: 0; width: 100%; height: 100%;
-            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            transition: opacity 0.25s ease-out, transform 0.25s ease-out; 
             will-change: transform, opacity;
             opacity: 0;
-            transform: translateY(10px);
-            pointer-events: none; /* Prevent interaction when hidden */
+            transform: translateY(8px); /* Start slightly lower */
+            pointer-events: none; 
         }
-        .app-view:not(.hidden) { /* Styles for the active view */
+        .app-view:not(.hidden) { 
             opacity: 1;
             transform: translateY(0);
             pointer-events: auto;
-            position: relative; /* Put back into flow */
+            position: relative; 
         }
-        /* Special handling for map view to ensure it fills space */
-        #view-map {
-             position: relative; /* Ensure map stays in flow when active */
-        }
-         /* Ensure hidden map doesn't interfere */
-        #view-map.hidden {
-            position: absolute; 
-            opacity: 0; 
-            pointer-events: none;
-        }
+        #view-map { position: relative; }
+        #view-map.hidden { position: absolute; opacity: 0; pointer-events: none;}
 
     </style>
 
@@ -173,33 +171,34 @@
         // --- Warehouse Coordinates ---
         const WAREHOUSES = { /* ... same ... */ hatalmid: { name: "התלמיד 6", lat: 32.1860, lng: 34.9080 }, haharash: { name: "החרש 10", lat: 32.1840, lng: 34.9095 } };
         
-        // --- Icons v41 ---
+        // --- Icons v42 ---
+        // הדבק כאן לינקים לאייקונים שלך אם תרצה (השאר null כדי להשתמש ב-SVG)
         const driverIconUrl = null; 
         const orderIconUrl = null; 
-        const driverSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f59e0b" width="32px" height="32px"><path d="M0 0h24v24H0z" fill="none"/><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`;
-        const orderSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%230ea5e9" width="32px" height="32px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
+        // SVG icons remain the same but ensure fill colors match theme needs
+        const driverSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f59e0b" width="32px" height="32px"><path d="M0 0h24v24H0z" fill="none"/><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`; // Amber color
+        const orderSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%230ea5e9" width="32px" height="32px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`; // Sky color
         const driverIcon = driverIconUrl ? L.icon({ iconUrl: driverIconUrl, iconSize: [38, 38], iconAnchor: [19, 38] }) : L.divIcon({ html: driverSvg, className: 'leaflet-div-icon', iconSize: [32, 32], iconAnchor: [16, 16] }); 
         const orderIcon = orderIconUrl ? L.icon({ iconUrl: orderIconUrl, iconSize: [32, 42], iconAnchor: [16, 42] }) : L.divIcon({ html: orderSvg, className: 'leaflet-div-icon', iconSize: [32, 32], iconAnchor: [16, 32] }); 
 
         // --- Init App ---
         document.addEventListener('DOMContentLoaded', async () => { 
-            try { 
+             try { 
                 const app = initializeApp(firebaseConfig);
                 const auth = getAuth(app);
                 db = getFirestore(app);
                 setStatus('מתחבר...', 'text-yellow-500'); 
                 await signInAnonymously(auth);
                 setStatus('מחובר (מאזין...)', 'text-green-500'); 
-                initNavigation(); // Init nav first
-                initMap(); // Then map
-                // Then listeners
+                initNavigation(); 
+                initMap(); 
                 listenToDrivers();
                 listenToDriverLocations();
                 listenToOrders();
                 listenToCustomers();
                 listenToSystemLogs();
                 initFilters();
-                renderNotifications(); // Initial render for ticker
+                renderNotifications(); 
             } catch (error) { 
                 console.error("Init Error", error); 
                 setStatus(`שגיאת התחברות: ${error.message}`, 'text-red-500'); 
@@ -209,75 +208,46 @@
         // --- Navigation & View Transitions ---
         function initNavigation() { 
             const navLinks = document.querySelectorAll('.sidebar-nav a');
-            navLinks.forEach(link => { 
-                link.addEventListener('click', (e) => { 
-                    e.preventDefault(); 
-                    const viewId = e.currentTarget.getAttribute('href').substring(1); 
-                    showView(viewId); 
-                    navLinks.forEach(l => l.classList.remove('active')); 
-                    e.currentTarget.classList.add('active'); 
-                }); 
-            });
-            // v41.1: Add null check for the initial active link
+            navLinks.forEach(link => { link.addEventListener('click', (e) => { e.preventDefault(); const viewId = e.currentTarget.getAttribute('href').substring(1); showView(viewId); navLinks.forEach(l => l.classList.remove('active')); e.currentTarget.classList.add('active'); }); });
             const initialLink = document.querySelector('.sidebar-nav a[href="#view-map"]');
-            if (initialLink) {
-                 initialLink.classList.add('active');
-                 showView('view-map'); // Show map initially AFTER setting active class
-            } else {
-                 console.error("Initial navigation link for map not found!");
-                 showView('view-orders'); // Fallback to orders view
-                 const ordersLink = document.querySelector('.sidebar-nav a[href="#view-orders"]');
-                 if (ordersLink) ordersLink.classList.add('active');
-            }
+            if (initialLink) { initialLink.classList.add('active'); showView('view-map'); } 
+            else { console.error("Initial map link not found!"); showView('view-orders'); const ol = document.querySelector('.sidebar-nav a[href="#view-orders"]'); if (ol) ol.classList.add('active');}
         }
         
-        window.currentViewId = null; // Initialize null
+        window.currentViewId = null; 
         window.showView = (viewId) => { 
             if (viewId === window.currentViewId) return; 
-
             const currentView = window.currentViewId ? document.getElementById(window.currentViewId) : null;
             const targetView = document.getElementById(viewId); 
-
             console.log(`Switching view from ${window.currentViewId} to ${viewId}`);
-
-            if (currentView) {
-                currentView.classList.add('hidden'); 
-                currentView.style.position = 'absolute'; // Ensure it's out of flow
-            }
-            
+            if (currentView) { currentView.classList.add('hidden'); currentView.style.position = 'absolute';}
             if (targetView) {
-                targetView.classList.remove('hidden'); // Make it potentially visible
-                targetView.style.position = 'relative'; // Put back in flow for layout calculation
-                targetView.offsetHeight; // Force reflow
-                targetView.style.opacity = '1';
-                targetView.style.transform = 'translateY(0)';
-                 
-                window.currentViewId = viewId; // Update tracked view AFTER transition starts
+                // Prepare target view (make it visible but positioned for transition)
+                targetView.style.position = 'relative'; // Put back into flow FIRST
+                targetView.offsetHeight; // Force reflow to ensure it takes space
+                targetView.classList.remove('hidden'); // Remove hidden class AFTER position relative
+                targetView.offsetHeight; // Another reflow might be needed
+                
+                // Start transition (opacity and transform are handled by CSS)
+                window.currentViewId = viewId; 
 
-                // Handle map invalidate after transition
                 if (viewId === 'view-map' && mapInstance) { 
-                    setTimeout(() => {
-                        console.log("Invalidating map size");
-                        mapInstance.invalidateSize({ animate: false }); // Try without animation first
-                    }, 300); // Increased delay
+                    setTimeout(() => { mapInstance.invalidateSize({ animate: false }); }, 300); // Delay map resize
                 }
-            } else {
-                 console.error(`Target view ${viewId} not found!`);
-                 window.currentViewId = null; // Reset current view if target not found
-            }
+            } else { console.error(`Target view ${viewId} not found!`); window.currentViewId = null; }
         }
 
         // --- Real-time Listeners (READ) ---
         // (Listeners remain the same, triggering renders/notifications)
         function listenToDrivers(){/*...*/} function listenToDriverLocations(){/*...*/} function listenToOrders(){/*...*/} function listenToCustomers(){/*...*/} function listenToSystemLogs(){/*...*/}
 
-        // --- Render Functions (v41 Filters) ---
+        // --- Render Functions (v42 Filters) ---
         function initFilters() { /* ... same ... */ document.getElementById('filter-orders')?.addEventListener('input',renderOrdersTable);document.getElementById('filter-drivers')?.addEventListener('input',renderDriversTable);document.getElementById('filter-customers')?.addEventListener('input',renderCustomersTable); }
-        function renderOrdersTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('orders-table-body'); const filterInput = document.getElementById('filter-orders'); const f= filterInput ? filterInput.value.toLowerCase() : ''; const o=(window.allOrdersData||[]).filter(d=>{if(!f)return!0;const c=d.customer?.name||'';const v=d.driver?.name||'';const s=d.status||'';const a=d.address||'';return d.id.toLowerCase().includes(f)||c.toLowerCase().includes(f)||v.toLowerCase().includes(f)||s.toLowerCase().includes(f)||a.toLowerCase().includes(f)});if(!t)return;if(!o||o.length===0){t.innerHTML=`<tr><td colspan="6" class="p-8 text-center text-gray-500">לא נמצאו הזמנות תואמות.</td></tr>`;return;}t.innerHTML=o.map(d=>{const c=d.customer?.name||'לא ידוע';const v=d.driver?.name||'טרם שויך';const s=d.status||'חדש';const k=`status-${s.replace(' ','_')}`||'status-default';let h='';if(s==='חדש')h=`<button class="btn btn-warning btn-sm" onclick="openSelectDriverModal('${d.id}')">שבץ מרשימה</button>`;else if(s==='שויך')h=`<button class="btn btn-success btn-sm" onclick="handleMarkAsCompleted('${d.id}')">הושלם</button>`;return`<tr class="hover:bg-gray-100 text-sm"><td class="p-3">${d.id}</td><td class="p-3 text-gray-800 font-semibold">${c}</td><td class="p-3">${d.address}</td><td class="p-3 text-gray-800 font-semibold">${v}</td><td class="p-3"><span class="status-badge ${k}">${s}</span></td><td class="p-3 flex gap-2">${h}<button class="btn btn-secondary btn-sm" onclick="openEditOrderModal(JSON.stringify(window.allOrders['${d.id}']))">ערוך</button><button class="btn btn-danger btn-sm" onclick="handleDelete('orders','${d.id}')">מחק</button></td></tr>`}).join('');window.allOrders=o.reduce((a,c)=>{a[c.id]=c;return a},{})}
+        function renderOrdersTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('orders-table-body'); const filterInput = document.getElementById('filter-orders'); const f= filterInput ? filterInput.value.toLowerCase() : ''; const o=(window.allOrdersData||[]).filter(d=>{if(!f)return!0;const c=d.customer?.name||'';const v=d.driver?.name||'';const s=d.status||'';const a=d.address||'';return d.id.toLowerCase().includes(f)||c.toLowerCase().includes(f)||v.toLowerCase().includes(f)||s.toLowerCase().includes(f)||a.toLowerCase().includes(f)});if(!t)return;if(!o||o.length===0){t.innerHTML=`<tr><td colspan="6" class="p-8 text-center text-gray-500">לא נמצאו הזמנות תואמות.</td></tr>`;return;}t.innerHTML=o.map(d=>{const c=d.customer?.name||'לא ידוע';const v=d.driver?.name||'טרם שויך';const s=d.status||'חדש';const k=`status-${s.replace(' ','_')}`||'status-default';let h='';if(s==='חדש')h=`<button class="btn btn-warning btn-sm" onclick="openSelectDriverModal('${d.id}')">שבץ מרשימה</button>`;else if(s==='שויך')h=`<button class="btn btn-success btn-sm" onclick="handleMarkAsCompleted('${d.id}')">הושלם</button>`;return`<tr class="hover:bg-gray-100 text-sm"><td class="p-3">${d.id.slice(-6)}</td><td class="p-3 text-gray-800 font-semibold">${c}</td><td class="p-3">${d.address}</td><td class="p-3 text-gray-800 font-semibold">${v}</td><td class="p-3"><span class="status-badge ${k}">${s}</span></td><td class="p-3 flex gap-2">${h}<button class="btn btn-secondary btn-sm" onclick="openEditOrderModal(JSON.stringify(window.allOrders['${d.id}']))">ערוך</button><button class="btn btn-danger btn-sm" onclick="handleDelete('orders','${d.id}')">מחק</button></td></tr>`}).join('');window.allOrders=o.reduce((a,c)=>{a[c.id]=c;return a},{})} // Show last 6 digits of ID
         function renderDriversTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('drivers-table-body'); const filterInput = document.getElementById('filter-drivers'); const f = filterInput ? filterInput.value.toLowerCase() : ''; const d=Object.values(allDrivers||{}).filter(v=>{if(!f)return!0;const n=v.name||'';const p=v.phone||'';const s=v.status||'';const i=Object.keys(allDrivers).find(k=>allDrivers[k]===v)||'';return n.toLowerCase().includes(f)||p.toLowerCase().includes(f)||s.toLowerCase().includes(f)||i.toLowerCase().includes(f)});if(!t)return;t.innerHTML=d.map(v=>{const i=Object.keys(allDrivers).find(k=>allDrivers[k]===v)||'N/A';return`<tr class="hover:bg-gray-100 text-sm"><td class="p-3 text-gray-800 font-semibold">${v.name||i}</td><td class="p-3">${v.phone||'---'}</td><td class="p-3">${v.vehicleType||'לא ידוע'}</td><td class="p-3">${v.status||'לא פעיל'}</td><td class="p-3 flex gap-2"><button class="btn btn-danger btn-sm" onclick="handleDelete('drivers','${i}')">מחק</button></td></tr>`}).join('')}
         function renderCustomersTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('customers-table-body'); const filterInput = document.getElementById('filter-customers'); const f = filterInput ? filterInput.value.toLowerCase() : ''; const c=(window.allCustomersData||[]).filter(u=>{if(!f)return!0;const n=u.name||'';const p=u.phone||'';const a=u.defaultAddress||'';return n.toLowerCase().includes(f)||p.toLowerCase().includes(f)||a.toLowerCase().includes(f)});if(!t)return;t.innerHTML=c.map(u=>`<tr class="hover:bg-gray-100 text-sm"><td class="p-3 text-gray-800 font-semibold">${u.name||u.id}</td><td class="p-3">${u.phone||'---'}</td><td class="p-3">${u.defaultAddress||'---'}</td><td class="p-3">${u.contactPerson||'---'}</td><td class="p-3 flex gap-2"><button class="btn btn-danger btn-sm" onclick="handleDelete('customers','${u.id}')">מחק</button></td></tr>`).join('')}
         function renderLogsTable() { /* ... same rendering ... */ const t=document.getElementById('logs-table-body');if(!t)return;const l=window.allLogsData||[];t.innerHTML=l.map(g=>{const v=g.level||'INFO';const i=g.timestamp?.toDate().toLocaleString('he-IL')||'---';return`<tr class="hover:bg-gray-100 text-sm font-mono"><td class="p-3 text-gray-500">${i}</td><td class="p-3 font-bold level-${v}">${v}</td><td class="p-3 text-cyan-500">[${g.origin||'N/A'}]</td><td class="p-3 text-gray-800">${g.message||'---'}</td><td class="p-3 text-xs text-gray-500">${g.data||''}</td></tr>`}).join('')}
-        function setStatus(message, cssClass) { /* ... same ... */ const el=document.getElementById('connection-status'); if(el) { el.textContent=message; el.className=`text-sm ${cssClass} p-2 text-center`; } } // Added padding/text-center
+        function setStatus(message, cssClass) { /* ... same ... */ const el=document.getElementById('connection-status'); if(el) { el.textContent=message; el.className=`text-sm ${cssClass} p-2 text-center`; } }
 
         // --- Map Functions ---
         window.initMap = () => { /* ... same init with zoom 9 ... */ const e=document.getElementById('leaflet-map');if(!e){console.error("Map container #leaflet-map not found!");return}try{if(typeof L==='undefined'){console.error("Leaflet (L) not defined.");setStatus('שגיאה בטעינת מפת','text-red-500');return}if(!mapInstance){mapInstance=L.map(e,{zoomControl:true}).setView([31.7683,35.2137],9);L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:19}).addTo(mapInstance);mapInstance.on('load',()=>{console.log("Map initialized.");setStatus('מחובר | מפה טעונה','text-green-500')});mapInstance.on('tileerror',(e)=>{console.error('Tile error:',e);setStatus('שגיאת אריחי מפה','text-red-500')})}else{mapInstance.invalidateSize()}}catch(e){console.error("Map init failed:",e);e.innerHTML=`<div class="p-4 text-center text-red-500">Map Error: ${e.message}</div>`;setStatus('שגיאה קריטית במפה','text-red-500')} }
@@ -290,33 +260,52 @@
         function handleOrderDrop(event) { /* ... same ... */ if (!currentlyDraggedOrder) return; const m = event.target; const l = m.getLatLng(); const THRESHOLD = 50; let closest = null; let minDist = Infinity; Object.keys(driverMarkers).forEach(dId => { const dM = driverMarkers[dId]; const dist = l.distanceTo(dM.getLatLng()); if (dist < minDist) { minDist = dist; closest = { id: dId, name: allDrivers[dId]?.name || dId, marker: dM }; } }); if (closest && minDist <= THRESHOLD) { openConfirmAssignModal(currentlyDraggedOrder.id, closest.id, currentlyDraggedOrder.customer?.name || '?', closest.name); } else { m.setLatLng([currentlyDraggedOrder.latitude, currentlyDraggedOrder.longitude]); alert("לא נמצא נהג קרוב מספיק."); } currentlyDraggedOrder = null; }
         
         // --- CRUD ---
-        window.openAddOrderModal = () => { /* ... */ currentEditDoc = null; document.getElementById('addOrderModalTitle').textContent = "יצירת הזמנה חדשה"; document.getElementById('addOrderForm').reset(); document.getElementById('addOrderModal').style.display = 'flex'; }
-        window.openEditOrderModal = (orderJson) => { /* ... */ const order = JSON.parse(orderJson); currentEditDoc = order; const form = document.getElementById('addOrderForm'); form.customerName.value = order.customer?.name || ''; form.customerPhone.value = order.customer?.phone || ''; form.address.value = order.address || ''; form.latitude.value = order.latitude || ''; form.longitude.value = order.longitude || ''; form.deliveryType.value = order.deliveryType || ''; form.customerId.value = order.customer?.id || ''; document.getElementById('addOrderModalTitle').textContent = `עריכת הזמנה ${order.id}`; document.getElementById('addOrderModal').style.display = 'flex'; }
-        window.openAssignDriverModal = (orderId) => { /* ... */ currentEditDoc = { id: orderId }; document.getElementById('assignDriverModal').style.display = 'flex'; }
-        window.openConfirmAssignModal = (orderId, driverId, customerName, driverName) => { /* ... */ document.getElementById('confirmAssignText').innerHTML = `האם לשייך את ההזמנה של <b>${customerName}</b> לנהג <b>${driverName}</b>?`; const confirmBtn = document.getElementById('confirmAssignBtn'); confirmBtn.onclick = () => handleConfirmAssign(orderId, driverId, driverName); document.getElementById('confirmAssignModal').style.display = 'flex'; }
-        window.openSelectDriverModal = (orderId) => { /* ... */ currentEditDoc = { id: orderId }; const list = document.getElementById('driver-select-list'); list.innerHTML = ''; Object.values(driverMarkers).forEach(m => { const info = m._driverInfo; if(info) { const b = document.createElement('button'); b.textContent = info.name; b.onclick = () => { const oData = orderMarkers[orderId]?._orderData; closeModal('selectDriverModal'); openConfirmAssignModal(orderId, info.id, oData?.customer?.name || '?', info.name); }; list.appendChild(b); } }); if(list.innerHTML === '') list.innerHTML = '<p class="p-4 text-center text-gray-500">אין נהגים פעילים במפה.</p>'; document.getElementById('selectDriverModal').style.display = 'flex'; }
-        window.closeModal = (modalId) => { /* ... */ const el = document.getElementById(modalId); if(el) el.style.display = 'none'; }
-        
+        window.openAddOrderModal = () => { /* ... */ }
+        window.openEditOrderModal = (orderJson) => { /* ... */ }
+        window.openAssignDriverModal = (orderId) => { /* ... */ }
+        window.openConfirmAssignModal = (orderId, driverId, customerName, driverName) => { /* ... */ }
+        window.openSelectDriverModal = (orderId) => { /* ... */ }
+        window.closeModal = (modalId) => { /* ... */ }
         window.handleSaveOrder = async () => { /* ... same logic ... */ };
-        
-        window.handleAssignDriver = async (orderId, driverId, driverName) => { /* ... same logic + notification ... */ const ref = doc(db, "orders", orderId); try { if (!driverName) { driverName = document.getElementById('driverNameInput').value; driverId = Object.keys(allDrivers).find(id => allDrivers[id].name === driverName) || driverName; } const dData = { id: driverId, name: driverName }; await updateDoc(ref, { driver: dData, status: "שויך" }); drawAssignmentLine(orderId, driverId); closeModal('assignDriverModal'); closeModal('confirmAssignModal'); closeModal('selectDriverModal'); const input = document.getElementById('driverNameInput'); if(input) input.value = ''; currentEditDoc = null; addNotification(`שיוך: הזמנה ${orderId.slice(-4)} (${window.allOrders[orderId]?.customer?.name || 'לקוח'}) שויכה לנהג ${driverName}`, 'INFO'); } catch (e) { console.error("Assign Error:", e); alert("שגיאה בשיבוץ: " + e.message); } }
-        
+        window.handleAssignDriver = async (orderId, driverId, driverName) => { /* ... same logic + notification ... */ }
         window.handleConfirmAssign = (orderId, driverId, driverName) => { handleAssignDriver(orderId, driverId, driverName); }
-        window.handleMarkAsCompleted = async (orderId) => { /* ... same logic + notification ... */ if (!confirm(`...`)) return; const ref = doc(db, "orders", orderId); try { await updateDoc(ref, { status: "הושלם" }); removeAssignmentLine(orderId); addNotification(`הושלם: הזמנה ${orderId.slice(-4)} (${window.allOrders[orderId]?.customer?.name || 'לקוח'}) הושלמה`, 'INFO'); } catch (e) { console.error("Complete Error:", e); alert("שגיאה בסיום: " + e.message); } }
-        window.handleDelete = async (collectionName, docId) => { /* ... same logic + notification ... */ if (!confirm(`...`)) return; const ref = doc(db, collectionName, docId); try { await deleteDoc(ref); if(collectionName === 'orders') removeAssignmentLine(docId); addNotification(`נמחק: ${collectionName.slice(0,-1)} ${docId.slice(-4)} נמחק.`, 'WARN'); } catch (e) { console.error("Delete Error:", e); alert("שגיאה במחיקה: " + e.message); } }
+        window.handleMarkAsCompleted = async (orderId) => { /* ... same logic + notification ... */ }
+        window.handleDelete = async (collectionName, docId) => { /* ... same logic + notification ... */ }
         
         // --- Assignment Line ---
-        function drawAssignmentLine(orderId, driverId) { /* ... same ... */ if (!mapInstance || !orderMarkers[orderId] || !driverMarkers[driverId]) return; removeAssignmentLine(orderId); const oLatLng = orderMarkers[orderId].getLatLng(); const dLatLng = driverMarkers[driverId].getLatLng(); const line = L.polyline([oLatLng, dLatLng], { color: '#f59e0b', weight: 3, opacity: 0.7 }); const decorator = L.polylineDecorator(line, { patterns: [{ offset: '0%', repeat: 10, symbol: L.Symbol.dash({ pixelSize: 5, pathOptions: { color: '#f59e0b', weight: 3, opacity: 0.7 } }) }] }).addTo(mapInstance); assignmentLines[orderId] = { line, decorator }; setTimeout(() => removeAssignmentLine(orderId), 5000); }
-        function removeAssignmentLine(orderId) { /* ... same ... */ if (assignmentLines[orderId]) { if (assignmentLines[orderId].line) mapInstance?.removeLayer(assignmentLines[orderId].line); if (assignmentLines[orderId].decorator) mapInstance?.removeLayer(assignmentLines[orderId].decorator); delete assignmentLines[orderId]; } }
+        function drawAssignmentLine(orderId, driverId) { /* ... same ... */ }
+        function removeAssignmentLine(orderId) { /* ... same ... */ }
 
          // --- Notification Ticker ---
          function addNotification(message, level = 'INFO') { /* ... same queue logic ... */ const timestamp = new Date(); notificationQueue.unshift({ message, level, timestamp }); if (notificationQueue.length > MAX_NOTIFICATIONS) notificationQueue.pop(); renderNotifications(); }
          function renderNotifications() { /* ... same rendering + animation restart ... */ 
              const tickerList = document.getElementById('notification-ticker-list'); if (!tickerList) return;
-             tickerList.innerHTML = notificationQueue.map(n => `<li class="level-${n.level}"><span>${n.message}</span><span class="time">${n.timestamp.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</span></li>`).join('');
-             const ticker = document.getElementById('notification-ticker'); if (ticker) { const ul = ticker.querySelector('ul'); if (ul) { ul.style.animation = 'none'; ul.offsetHeight; if (ul.scrollHeight > ticker.offsetHeight) { const duration = (ul.scrollHeight / 40) * 5; ul.style.animation = `ticker-scroll-v41 ${duration}s linear infinite`; } else { ul.style.animation = ''; ul.style.transform = 'translateY(0)'; } } }
+             // Ensure queue exists and is an array
+             const currentQueue = Array.isArray(notificationQueue) ? notificationQueue : [];
+             tickerList.innerHTML = currentQueue.map(n => `<li class="level-${n.level}"><span>${n.message}</span><span class="time">${n.timestamp.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</span></li>`).join('');
+             
+             const ticker = document.getElementById('notification-ticker'); 
+             if (ticker) { 
+                 const ul = ticker.querySelector('ul'); 
+                 if (ul) { 
+                     // Stop any existing animation
+                     ul.style.animation = 'none'; 
+                     // Force reflow/repaint to apply the change immediately
+                     ul.offsetHeight; 
+                     // Check if scrolling is needed
+                     if (ul.scrollHeight > ticker.offsetHeight && currentQueue.length > 1) { 
+                         // Calculate duration based on number of items
+                         const duration = currentQueue.length * 3; // Approx 3s per item
+                         ul.style.animation = `ticker-scroll-v41 ${duration}s linear infinite`; 
+                     } else { 
+                         // No scroll needed, reset animation and position
+                         ul.style.animation = ''; 
+                         ul.style.transform = 'translateY(0)'; 
+                     } 
+                 } 
+             }
          }
-         // Removed initial render from DOMContentLoaded, relying on first addNotification or empty state
+         document.addEventListener('DOMContentLoaded', renderNotifications); 
 
         // --- Attach handlers ---
         window.handleMarkAsCompleted = handleMarkAsCompleted;
@@ -362,39 +351,60 @@
                 </div>
 
                 <!-- View 2: Orders Table -->
-                <div id="view-orders" class="app-view hidden h-full flex flex-col gap-4">
-                     <header class="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-200"> <h2 class="text-xl font-semibold text-gray-800">ניהול הזמנות</h2> <button class="btn btn-primary" onclick="openAddOrderModal()"> + הוסף הזמנה </button> </header>
-                     <div class="filter-input-wrapper px-4 pt-4"> 
-                        <span class="filter-input-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></span> 
+                <div id="view-orders" class="app-view hidden h-full flex flex-col gap-0"> {/* Reduced gap */}
+                     <header class="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-200"> 
+                         <h2 class="text-xl font-semibold text-gray-800">ניהול הזמנות</h2> 
+                         <button class="btn btn-primary btn-sm" onclick="openAddOrderModal()"> + הוסף הזמנה </button> {/* Smaller button */}
+                     </header>
+                     <div class="filter-input-wrapper px-4 pt-4 flex-shrink-0"> {/* No grow */}
+                        <span class="filter-input-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></span> 
                         <input type="text" id="filter-orders" class="filter-input" placeholder="חפש הזמנה..."> 
                     </div>
-                     <div class="overflow-hidden flex-grow view-content view-content-table"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="orders-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
+                     {/* Added border, removed card styling, adjust height */}
+                     <div class="overflow-hidden flex-grow view-content view-content-table border-t border-gray-200"> 
+                          <table class="w-full min-w-full text-right"> 
+                              <thead class="sticky top-0 bg-gray-50 z-10">...</thead> 
+                              <tbody id="orders-table-body" class="divide-y divide-gray-200"></tbody> 
+                          </table> 
+                     </div>
                 </div>
 
-                <!-- View 3: Drivers Table -->
-                <div id="view-drivers" class="app-view hidden h-full flex flex-col gap-4 p-4">
-                     <header class="flex-shrink-0 flex justify-between items-center"> <h2 class="text-xl font-semibold text-gray-800">ניהול נהגים</h2> </header>
-                      <div class="filter-input-wrapper"> 
+                 <!-- View 3: Drivers Table -->
+                <div id="view-drivers" class="app-view hidden h-full flex flex-col gap-0">
+                     <header class="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-200"> 
+                         <h2 class="text-xl font-semibold text-gray-800">ניהול נהגים</h2> 
+                     </header>
+                      <div class="filter-input-wrapper px-4 pt-4 flex-shrink-0"> 
                          <span class="filter-input-icon"><svg>...</svg></span> 
                          <input type="text" id="filter-drivers" class="filter-input" placeholder="חפש נהג..."> 
                      </div>
-                     <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content view-content-table"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="drivers-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
+                     <div class="overflow-hidden flex-grow view-content view-content-table border-t border-gray-200"> 
+                         <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="drivers-table-body" class="divide-y divide-gray-200"></tbody> </table> 
+                     </div>
                 </div>
                 
                 <!-- View 4: Customers Table -->
-                 <div id="view-customers" class="app-view hidden h-full flex flex-col gap-4 p-4">
-                     <header class="flex-shrink-0 flex justify-between items-center"> <h2 class="text-xl font-semibold text-gray-800">ניהול לקוחות</h2> </header>
-                     <div class="filter-input-wrapper"> 
+                 <div id="view-customers" class="app-view hidden h-full flex flex-col gap-0">
+                     <header class="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-200"> 
+                         <h2 class="text-xl font-semibold text-gray-800">ניהול לקוחות</h2> 
+                     </header>
+                     <div class="filter-input-wrapper px-4 pt-4 flex-shrink-0"> 
                         <span class="filter-input-icon"><svg>...</svg></span> 
                         <input type="text" id="filter-customers" class="filter-input" placeholder="חפש לקוח..."> 
                     </div>
-                     <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content view-content-table"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="customers-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
+                     <div class="overflow-hidden flex-grow view-content view-content-table border-t border-gray-200"> 
+                         <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="customers-table-body" class="divide-y divide-gray-200"></tbody> </table> 
+                     </div>
                 </div>
                 
                 <!-- View 5: Logs Table -->
-                 <div id="view-logs" class="app-view hidden h-full flex flex-col gap-4 p-4">
-                     <header class="flex-shrink-0 flex justify-between items-center"> <h2 class="text-xl font-semibold text-gray-800">צג לוגים</h2> </header>
-                     <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content view-content-table"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="logs-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
+                 <div id="view-logs" class="app-view hidden h-full flex flex-col gap-0">
+                     <header class="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-200"> 
+                         <h2 class="text-xl font-semibold text-gray-800">צג לוגים</h2> 
+                     </header>
+                     <div class="overflow-hidden flex-grow view-content view-content-table border-t border-gray-200"> 
+                         <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="logs-table-body" class="divide-y divide-gray-200"></tbody> </table> 
+                     </div>
                 </div>
             </div>
 
