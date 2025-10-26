@@ -3,490 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v45.2 - מרכז בקרה</title>
-
-    <!-- Leaflet (Map) CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <title>DeliveryMaster v45.2 - צג לוגים</title>
     
-    <!-- Google Fonts & Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
     <style>
-        /* v45.2: עיצוב בהיר חדש */
+        /* v45.2: עיצוב בהיר קבוע */
         :root {
             --m3-primary: #0066cc; /* כחול בהיר */
-            --m3-on-primary: #ffffff;
-            --m3-surface: #f8f9fa; /* רקע אפרפר בהיר */
-            --m3-on-surface: #202124; /* טקסט כהה */
-            --m3-surface-container: #ffffff; /* רקע כרטיסים (לבן) */
-            --m3-on-surface-variant: #5f6368; /* טקסט משני */
-            --m3-outline: #dee2e6; /* גבולות */
+            --m3-surface: #ffffff;
+            --m3-on-surface: #1a1a1a;
+            --m3-surface-container: #f0f4f8; /* רקע בהיר מאוד */
+            --m3-on-surface-variant: #5f6368;
+            --m3-outline: #d0d0d0;
             --m3-success: #1e8e3e;
             --m3-warning: #f9a825;
             --m3-error: #d93025;
+            --m3-info: var(--m3-primary);
         }
-        
-        body, html {
-            height: 100vh; width: 100vw; margin: 0;
+
+        body {
             font-family: 'Rubik', sans-serif;
             background-color: var(--m3-surface);
             color: var(--m3-on-surface);
-            overflow: hidden;
+            margin: 0;
+            padding: 1.5rem;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
-            vertical-align: middle;
-            font-size: 1.25rem;
-        }
-        
-        /* v45.2: כרטיס לבן במקום זכוכית */
-        .card {
-            background: var(--m3-surface-container);
-            border: 1px solid var(--m3-outline);
-            border-radius: 1.5rem; /* 24px */
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        
-        /* Layout */
-        .app-layout {
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            grid-template-rows: auto 1fr;
-            height: 100vh;
-            gap: 1rem;
-            padding: 1rem;
-            box-sizing: border-box;
-        }
-        
-        header {
-            grid-column: 1 / -1;
-            padding: 1rem 1.5rem;
+        .header-container {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
+
+        h1 { font-weight: 500; color: var(--m3-on-surface); }
+        h1 span { color: var(--m3-primary); }
         
-        nav {
-            grid-row: 2 / 3;
+        .filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            background-color: var(--m3-surface-container);
             padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-        
-        main {
-            grid-row: 2 / 3;
-            grid-column: 2 / 3;
-            overflow: hidden;
-            border-radius: 1.5rem; /* For map */
-            position: relative;
-        }
-        
-        /* Header */
-        #app-title { font-size: 1.5rem; font-weight: 500; }
-        #app-version { font-size: 0.8rem; color: var(--m3-primary); margin-right: 8px; }
-        #connection-status { 
-            font-size: 0.85rem; font-weight: 500; 
-            display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 99px;
-            transition: all 0.3s ease;
-        }
-        #connection-status .dot { width: 8px; height: 8px; border-radius: 50%; }
-        .status-connecting { background-color: rgba(249, 168, 37, 0.1); color: var(--m3-warning); }
-        .status-connecting .dot { background-color: var(--m3-warning); }
-        .status-connected { background-color: rgba(30, 142, 62, 0.1); color: var(--m3-success); }
-        .status-connected .dot { background-color: var(--m3-success); }
-        .status-error { background-color: rgba(217, 48, 37, 0.1); color: var(--m3-error); }
-        .status-error .dot { background-color: var(--m3-error); }
-        
-        /* Navigation (M3 Style) */
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 0.8rem 1.25rem;
-            border-radius: 99px;
-            text-decoration: none;
-            color: var(--m3-on-surface-variant);
-            font-weight: 500;
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-        .nav-link:hover {
-            background-color: rgba(0,0,0, 0.05);
-            color: var(--m3-on-surface);
-        }
-        .nav-link.active {
-            background-color: var(--m3-primary);
-            color: var(--m3-on-primary);
-            font-weight: 700;
-        }
-        
-        /* Views */
-        .app-view {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            box-sizing: border-box;
-        }
-        .app-view.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        /* Map View */
-        #view-map { padding: 0; }
-        #leaflet-map { width: 100%; height: 100%; z-index: 1; border-radius: 1.5rem; }
-        .leaflet-container { background: #eee; }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-            background: var(--m3-surface-container);
-            color: var(--m3-on-surface);
-            border: 1px solid var(--m3-outline);
-        }
-        
-        /* Table View */
-        .view-table { padding: 1.5rem; }
-        .table-container { 
-            flex-grow: 1; 
-            overflow-y: auto; 
-            border: 1px solid var(--m3-outline);
             border-radius: 1rem;
         }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { 
-            padding: 1rem; text-align: right; 
-            border-bottom: 1px solid var(--m3-outline);
+        
+        .form-control {
+            flex-grow: 1;
+            background-color: var(--m3-surface);
+            color: var(--m3-on-surface);
+            border: 1px solid var(--m3-outline);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-family: 'Rubik', sans-serif;
         }
+        .form-control::placeholder { color: var(--m3-on-surface-variant); }
+        
+        .log-container {
+            height: 75vh;
+            overflow-y: auto;
+            border: 1px solid var(--m3-outline);
+            border-radius: 1rem;
+            background-color: var(--m3-surface-container);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Fira Code', monospace;
+        }
+        
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: right;
+            border-bottom: 1px solid var(--m3-outline);
+            font-size: 0.85rem;
+            vertical-align: top;
+        }
+        
         thead {
             position: sticky; top: 0;
             background: var(--m3-surface-container);
         }
-        th { font-size: 0.8rem; color: var(--m3-on-surface-variant); }
+        th { font-family: 'Rubik'; color: var(--m3-on-surface-variant); }
         
+        tr:hover { background-color: rgba(0,0,0,0.03); }
+        
+        /* Log Levels */
+        .level-INFO { color: var(--m3-info); font-weight: 500; }
+        .level-WARN { color: var(--m3-warning); font-weight: 500; }
+        .level-ERROR { color: var(--m3-error); font-weight: 700; }
+        
+        .col-time { color: var(--m3-on-surface-variant); width: 150px; }
+        .col-level { width: 80px; }
+        .col-origin { color: var(--m3-success); width: 120px; }
+        .col-context { color: #888; font-size: 0.75rem; }
     </style>
 </head>
 <body>
 
-    <div class="app-layout">
-        
-        <!-- 1. Header -->
-        <header class="card">
-            <div id="app-title">
-                <span id="app-version">v45.2</span>DeliveryMaster
-            </div>
-            <div id="connection-status" class="status-connecting">
-                <div class="dot"></div>
-                <span>מאתחל חיבור...</span>
-            </div>
-        </header>
-
-        <!-- 2. Navigation -->
-        <nav class="card">
-            <a class="nav-link active" data-view="view-map">
-                <span class="material-symbols-outlined">map</span>
-                חדר מצב (מפה)
-            </a>
-            <a class="nav-link" data-view="view-orders">
-                <span class="material-symbols-outlined">list_alt</span>
-                ניהול הזמנות
-            </a>
-            <a class="nav-link" data-view="view-drivers">
-                <span class="material-symbols-outlined">local_shipping</span>
-                ניהול נהגים
-            </a>
-            <a class="nav-link" data-view="view-log">
-                <span class="material-symbols-outlined">terminal</span>
-                צג לוגים (בחלון חדש)
-            </a>
-        </nav>
-
-        <!-- 3. Main Content (Views) -->
-        <main>
-            <!-- View 1: Map (Default) -->
-            <div id="view-map" class="app-view active">
-                <!-- v45.2: המפה תהיה בהירה -->
-                <div id="leaflet-map"></div>
-            </div>
-
-            <!-- View 2: Orders -->
-            <div id="view-orders" class="app-view view-table card">
-                <h2>ניהול הזמנות</h2>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>מזהה</th>
-                                <th>לקוח</th>
-                                <th>כתובת</th>
-                                <th>נהג</th>
-                                <th>סטטוס</th>
-                                <th>פעולות</th>
-                            </tr>
-                        </thead>
-                        <tbody id="orders-table-body">
-                            <!-- Data יטען כאן -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <!-- View 3: Drivers -->
-            <div id="view-drivers" class="app-view view-table card">
-                <h2>ניהול נהגים</h2>
-                 <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>שם</th>
-                                <th>טלפון</th>
-                                <th>סטטוס</th>
-                                <th>מיקום אחרון</th>
-                            </tr>
-                        </thead>
-                        <tbody id="drivers-table-body">
-                            <!-- Data יטען כאן -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </main>
-
+    <div class="header-container">
+        <h1>
+            <span>[v45.2]</span> צג לוגים בזמן אמת
+            <span id="status" style="font-size: 0.9rem; color: var(--m3-warning); margin-right: 10px;">(מתחבר...)</span>
+        </h1>
+        <!-- v45.2: הסרת כפתור החלפת עיצוב לפשטות -->
+    </div>
+    
+    <div class="filters">
+        <input type="text" id="filter-text" class="form-control" placeholder="סנן לפי הודעה, מקור...">
+        <select id="filter-level" class="form-control">
+            <option value="">כל הרמות</option>
+            <option value="INFO">INFO</option>
+            <option value="WARN">WARN</option>
+            <option value="ERROR">ERROR</option>
+        </select>
     </div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- Firebase & App Logic (Modular) -->
+    <div class="log-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>זמן</th>
+                    <th>רמה</th>
+                    <th>מקור</th>
+                    <th>הודעה</th>
+                    <th>קונטקסט</th>
+                </tr>
+            </thead>
+            <tbody id="logs-table-body">
+                <!-- Logs יטענו כאן -->
+            </tbody>
+        </table>
+    </div>
+
     <script type="module">
         // v45.3: תיקון שגיאת ייבוא (חייב להיות סטטי)
-        // const APP_ROOT = "/admin-v44"; // <--- נמחק, גורם לשגיאת Syntax
-        
-        // ייבוא רכיבי Firebase והלוגר
+        // const APP_ROOT = "/admin-v44"; // <--- נמחק
+
         // v45.3: שינוי לייבוא סטטי קשיח
-        import { db, auth, authReady } from "/admin-v44/config.js"; 
+        import { db, authReady } from "/admin-v44/config.js"; 
         import { SmartLog } from "/admin-v44/SmartLog.js";
         import { 
             collection, 
-            doc, 
-            onSnapshot, 
             query, 
-            orderBy,
-            updateDoc 
+            orderBy, 
+            limit, 
+            onSnapshot 
         } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
-        // --- Globals ---
-        let map;
-        const state = {
-            drivers: {},
-            orders: {},
-            locations: {},
-            markers: {
-                drivers: {},
-                orders: {}
-            }
-        };
 
+        const LOG_COLLECTION = 'system_logs_v3';
+        const LOG_LIMIT = 200; 
+        
         const DOM = {
-            status: document.getElementById('connection-status'),
-            navLinks: document.querySelectorAll('.nav-link[data-view]'),
-            views: document.querySelectorAll('.app-view'),
-            ordersTable: document.getElementById('orders-table-body'),
-            driversTable: document.getElementById('drivers-table-body')
+            tableBody: document.getElementById('logs-table-body'),
+            filterText: document.getElementById('filter-text'),
+            filterLevel: document.getElementById('filter-level'),
+            status: document.getElementById('status'),
         };
         
-        // --- 1. Initialization ---
+        let allLogs = []; 
+        let unsubscribe = null; 
+
         function init() {
-            // v45.2: הפונקציה רצה רק אחרי אימות מוצלח
-            SmartLog.info("Auth Ready. Admin Hub v45.2 Initializing", "Init");
+            console.log("Auth Ready. Log Viewer v45.2 Initializing.");
             
-            try {
-                initNavigation();
-                initMap();
-                
-                // התחל האזנה לכל הנתונים
-                listenToDrivers();
-                listenToOrders();
-                listenToLocations();
-                
-                updateConnectionStatus(true, "מחובר ומאזין");
-                SmartLog.info("Initialization complete. Listeners attached.", "Init");
-
-            } catch (e) {
-                SmartLog.error(e, "Init");
-                updateConnectionStatus(false, "שגיאת אתחול קריטית");
-            }
+            DOM.filterText.addEventListener('input', renderLogs);
+            DOM.filterLevel.addEventListener('input', renderLogs);
+            
+            // v45.2: עיצוב בהיר הוא קבוע, אין צורך ב-initTheme()
+            
+            listenToLogs();
         }
         
-        function updateConnectionStatus(isConnected, message) {
-            const statusEl = DOM.status;
-            statusEl.querySelector('span').textContent = message;
-            if (isConnected) {
-                statusEl.className = 'status-connected';
-            } else {
-                statusEl.className = 'status-error';
-            }
-        }
+        function listenToLogs() {
+            if (unsubscribe) unsubscribe(); 
 
-        // --- 2. Navigation ---
-        function initNavigation() {
-            DOM.navLinks.forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const viewId = link.getAttribute('data-view');
+            const q = query(
+                collection(db, LOG_COLLECTION),
+                orderBy("timestamp", "desc"),
+                limit(LOG_LIMIT)
+            );
 
-                    if (viewId === 'view-log') {
-                        // v45.3: שימוש בנתיב קשיח
-                        window.open("/admin-v44/log.html", '_blank');
-                        SmartLog.info(`Opened log window`, "Navigation");
-                        return;
-                    }
+            DOM.status.textContent = '(מאזין לשינויים...)';
+            DOM.status.style.color = 'var(--m3-success)';
 
-                    DOM.views.forEach(v => v.classList.remove('active'));
-                    document.getElementById(viewId).classList.add('active');
-                    
-                    DOM.navLinks.forEach(l => l.classList.remove('active'));
-                    link.classList.add('active');
-                    
-                    if (viewId === 'view-map') {
-                        setTimeout(() => {
-                            if (map) map.invalidateSize();
-                        }, 10);
-                    }
-                    SmartLog.info(`Mapsd to ${viewId}`, "Navigation");
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                allLogs = []; 
+                snapshot.forEach(doc => {
+                    allLogs.push(doc.data());
                 });
+                renderLogs(); 
+            }, (error) => {
+                console.error("Error listening to logs:", error);
+                DOM.status.textContent = `(שגיאת האזנה: ${error.message})`;
+                DOM.status.style.color = 'var(--m3-error)';
             });
-            SmartLog.info("Navigation listeners attached", "Init.Navigation");
         }
-        
-        // --- 3. Map Logic (Leaflet) ---
-        function initMap() {
-            try {
-                if (map) map.remove();
-                map = L.map('leaflet-map').setView([32.109333, 34.855499], 10);
+
+        function renderLogs() {
+            const textFilter = DOM.filterText.value.toLowerCase();
+            const levelFilter = DOM.filterLevel.value;
+
+            const filteredLogs = allLogs.filter(log => {
+                const levelMatch = !levelFilter || log.level === levelFilter;
+                const textMatch = !textFilter ||
+                    (log.message && log.message.toLowerCase().includes(textFilter)) ||
+                    (log.origin && log.origin.toLowerCase().includes(textFilter));
+                return levelMatch && textMatch;
+            });
+
+            if (filteredLogs.length === 0) {
+                DOM.tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem;">אין לוגים תואמים...</td></tr>`;
+                return;
+            }
+
+            DOM.tableBody.innerHTML = filteredLogs.map(log => {
+                const time = log.timestamp ? 
+                    new Date(log.timestamp.toDate()).toLocaleString('he-IL', { timeStyle: 'medium' }) : '...';
                 
-                // v45.2: שכבת רקע בהירה
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap',
-                    maxZoom: 19
-                }).addTo(map);
-                SmartLog.info("Map Initialized (Light Theme)", "MapModule");
-            } catch(e) {
-                SmartLog.error(e, "MapModule.initMap");
-                document.getElementById('leaflet-map').innerHTML = "<h1>שגיאה בטעינת המפה</h1>";
-            }
-        }
-
-        // --- 4. Firestore Real-time Listeners ---
-        function listenToDrivers() {
-            const q = query(collection(db, "drivers"), orderBy("name"));
-            onSnapshot(q, (snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    const driverId = change.doc.id;
-                    const driverData = change.doc.data();
-                    if (change.type === "removed") {
-                        delete state.drivers[driverId];
+                const safeMessage = log.message ? String(log.message).replace(/</g, "&lt;").replace(/>/g, "&gt;") : '---';
+                
+                let context = '';
+                if (log.context) {
+                    if (log.context.stack) {
+                        context = log.context.stack.split('\n')[1] || 'Stack trace available';
                     } else {
-                        state.drivers[driverId] = { id: driverId, ...driverData };
+                        context = JSON.stringify(log.context);
+                        if (context.length > 100) context = context.substring(0, 100) + '...';
                     }
-                });
-                renderDriversTable();
-                SmartLog.info(`Drivers snapshot updated. Total: ${Object.keys(state.drivers).length}`, "Firestore.Drivers");
-            }, e => SmartLog.error(e, "Firestore.Drivers"));
-        }
-
-        function listenToOrders() {
-            const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
-            onSnapshot(q, (snapshot) => {
-                 snapshot.docChanges().forEach((change) => {
-                    const orderId = change.doc.id;
-                    const orderData = change.doc.data();
-                    if (change.type === "removed") {
-                        delete state.orders[orderId];
-                    } else {
-                        state.orders[orderId] = { id: orderId, ...orderData };
-                    }
-                });
-                renderOrdersTable();
-            }, e => SmartLog.error(e, "Firestore.Orders"));
-        }
-        
-        function listenToLocations() {
-            const q = query(collection(db, "driverLocations"));
-            onSnapshot(q, (snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    const driverId = change.doc.id;
-                    const locData = change.doc.data();
-                    if (change.type === "removed") {
-                        delete state.locations[driverId];
-                        // (כאן נסיר סמן מהמפה)
-                    } else {
-                        state.locations[driverId] = { id: driverId, ...locData };
-                        // (כאן נעדכן סמן על המפה)
-                    }
-                });
-                renderDriversTable(); // רענון הטבלה כדי להציג מיקום
-            }, e => SmartLog.error(e, "Firestore.Locations"));
-        }
-
-        // --- 5. Render Functions ---
-        function renderOrdersTable() {
-            if (!DOM.ordersTable) return;
-            const orders = Object.values(state.orders);
-            if (orders.length === 0) {
-                DOM.ordersTable.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem;">אין הזמנות פעילות</td></tr>`;
-                return;
-            }
-            DOM.ordersTable.innerHTML = orders.map(order => `
-                <tr>
-                    <td>${order.id.slice(-6)}</td>
-                    <td>${order.customer?.name || 'ללא שם'}</td>
-                    <td>${order.address || 'לא צוינה כתובת'}</td>
-                    <td>${order.driver?.name || '<i>טרם שויך</i>'}</td>
-                    <td><span style="color: var(--m3-primary); font-weight: 500;">${order.status || 'חדש'}</span></td>
-                    <td>
-                        <!-- כפתורי פעולות יבואו כאן -->
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        function renderDriversTable() {
-            if (!DOM.driversTable) return;
-            const drivers = Object.values(state.drivers);
-            if (drivers.length === 0) {
-                DOM.driversTable.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 2rem;">אין נהגים רשומים</td></tr>`;
-                return;
-            }
-            DOM.driversTable.innerHTML = drivers.map(driver => {
-                const location = state.locations[driver.id];
-                const lastUpdate = location?.lastUpdate ? 
-                    new Date(location.lastUpdate.toDate()).toLocaleTimeString('he-IL') : 'אין נתונים';
+                }
                 
                 return `
-                <tr>
-                    <td>${driver.name}</td>
-                    <td>${driver.phone || '---'}</td>
-                    <td><span style="color: var(--m3-success);">${driver.status || 'פעיל'}</span></td>
-                    <td>${lastUpdate}</td>
-                </tr>
-            `}).join('');
+                    <tr class="level-${log.level || 'INFO'}">
+                        <td class="col-time">${time}</td>
+                        <td class="col-level">${log.level || 'INFO'}</td>
+                        <td class="col-origin">[${log.origin || 'N/A'}]</td>
+                        <td>${safeMessage}</td>
+                        <td class="col-context">${context}</td>
+                    </tr>
+                `;
+            }).join('');
         }
-        
-        // --- v45.2: Start App ---
+
+        // --- Start App ---
         authReady.then(() => {
+            SmartLog.info("Log Viewer Page Loaded (v45.3)", "LogViewer");
             init();
         }).catch(err => {
-            SmartLog.error(err, "Auth.Fatal");
-            updateConnectionStatus(false, "שגיאת אימות Firebase");
+            console.error("Fatal Auth Error", err);
+            DOM.status.textContent = `(שגיאת אימות: ${err.message})`;
+            DOM.status.style.color = 'var(--m3-error)';
         });
-        
+
     </script>
 </body>
 </html>
