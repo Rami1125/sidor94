@@ -8,7 +8,8 @@
     <!-- PWA Manifest & Theme -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#3a86ff">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- v50.9: Replaced deprecated meta tag -->
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="https://i.postimg.cc/ryPT3r29/image.png">
 
@@ -98,12 +99,11 @@
 
     <!-- Combined & Inlined App Logic -->
     <script type="module">
-      // v50.8: Top-level try-catch
+      // v50.9: Top-level try-catch
       try {
-        console.log('Driver App script started (v50.8)'); // v50.8
+        console.log('Driver App script started (v50.9)'); // v50.9
 
         // --- Inlined Firebase SDK Imports ---
-        // (Assuming imports work correctly based on previous logs)
         import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc, where, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
@@ -118,7 +118,39 @@
         catch (error) { console.error("CRITICAL: FB init failed!", error); initializationError = error; }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
-        async function ensureAuth() { /* ... Same logic v50.7 ... */ }
+        // v50.9: Restored full function body
+        async function ensureAuth() {
+            console.log("ensureAuth (v50.9): Starting..."); let tries = 0;
+            while (tries < MAX_AUTH_RETRIES) {
+                tries++;
+                try {
+                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
+                    if (!auth) throw new Error("Auth object missing");
+                    console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
+                    const userCredential = await signInAnonymously(auth);
+
+                    // Stricter validation BEFORE resolving
+                    if (!userCredential || !userCredential.user || !userCredential.user.uid) {
+                         console.error("ensureAuth: signInAnonymously returned invalid user object!", { userCredential });
+                         const currentUser = auth.currentUser;
+                         if(currentUser && currentUser.uid) {
+                             console.log("ensureAuth: Fallback successful - using auth.currentUser.");
+                             return currentUser;
+                         }
+                         throw new Error("Invalid user object structure received from Firebase Auth.");
+                    }
+
+                    console.log("ensureAuth: Success.", userCredential.user.uid);
+                    return userCredential.user;
+
+                } catch (e) {
+                    console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
+                    if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; }
+                    console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+                }
+            }
+            throw new Error("ensureAuth: Unexpected exit from retry loop.");
+        }
         const authReadyPromise = ensureAuth();
         console.log("Config part executed.");
 
@@ -147,7 +179,7 @@
             };
             SmartLog.info("DOM elements referenced.", "Init.DOM");
             if (!DOM.driverNameDisplay || !DOM.statusText || !DOM.mapElement || !DOM.orderList) { throw new Error("Essential DOM elements missing!"); }
-            SmartLog.info("Initializing Driver App (v50.8)...", "Init"); // v50.8
+            SmartLog.info("Initializing Driver App (v50.9)...", "Init"); // v50.9
 
             // Wrap the entire initialization process for better error catching after DOM ready
             try {
@@ -161,7 +193,7 @@
                 updateStatus("ממתין לאימות Firebase...", "yellow", true);
                 SmartLog.info("Step 2: Waiting for Firebase Authentication...", "Init.Auth");
                 const user = await authReadyPromise;
-                console.log("User object received (v50.8):", user); SmartLog.info("User object received", "Auth.Debug", { userObject: JSON.stringify(user) });
+                console.log("User object received (v50.9):", user); SmartLog.info("User object received", "Auth.Debug", { userObject: JSON.stringify(user) }); // v50.9
                 if (!user || !user.uid) { throw new Error("Invalid user object received after authentication."); }
                 SmartLog.info(`Firebase Auth successful. User: ${user.uid}`, "Init.Auth");
 
@@ -211,28 +243,28 @@
         }
 
 
-         function updateFinalStatus() { /* ... */ }
-        function updateStatus(text, color = "gray", pulse = false) { /* ... */ }
-        async function checkAndRequestPermissions() { /* ... */ }
-        async function handlePermissionRequest() { /* ... */ }
-        function startGeolocation() { /* ... */ }
-        async function updateLocationInFirestore(lat, lng) { /* ... */ }
-        async function updateLocationText(lat, lng) { /* ... */ }
-        function initMap() { /* ... */ }
-        function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
-        function listenToOrders() { /* ... */ }
-        function renderOrderList() { /* ... */ }
-        function createOrderCard(order) { /* ... */ }
-        window.acknowledgeOrder = async (orderId) => { /* ... */ };
-        window.completeOrder = async (orderId) => { /* ... */ };
-        function initNotifications() { /* ... */ }
-        function handleNewOrderNotification() { /* ... */ }
-        function stopNotificationSound() { /* ... */ }
-        function registerServiceWorker() { /* ... */ }
+         function updateFinalStatus() { /* ... Implementation ... */ }
+        function updateStatus(text, color = "gray", pulse = false) { /* ... Implementation ... */ }
+        async function checkAndRequestPermissions() { /* ... Implementation ... */ }
+        async function handlePermissionRequest() { /* ... Implementation ... */ }
+        function startGeolocation() { /* ... Implementation ... */ }
+        async function updateLocationInFirestore(lat, lng) { /* ... Implementation ... */ }
+        async function updateLocationText(lat, lng) { /* ... Implementation ... */ }
+        function initMap() { /* ... Implementation ... */ }
+        function updateDriverMarkerOnMap(lat, lng) { /* ... Implementation ... */ }
+        function listenToOrders() { /* ... Implementation ... */ }
+        function renderOrderList() { /* ... Implementation ... */ }
+        function createOrderCard(order) { /* ... Implementation ... */ }
+        window.acknowledgeOrder = async (orderId) => { /* ... Implementation ... */ };
+        window.completeOrder = async (orderId) => { /* ... Implementation ... */ };
+        function initNotifications() { /* ... Implementation ... */ }
+        function handleNewOrderNotification() { /* ... Implementation ... */ }
+        function stopNotificationSound() { /* ... Implementation ... */ }
+        function registerServiceWorker() { /* ... Implementation ... */ }
 
         // --- Start Application ---
         function runInitialization() {
-             console.log('DOMContentLoaded fired (v50.8). Attaching main initialization.'); // v50.8
+             console.log('DOMContentLoaded fired (v50.9). Attaching main initialization.'); // v50.9
              try {
                 if (typeof SmartLog === 'undefined') { throw new Error("SmartLog module is missing!"); }
                 SmartLog.info("DOMContentLoaded fired.", "Init");
@@ -242,7 +274,6 @@
              } catch (criticalError) {
                  console.error("CRITICAL SYNCHRONOUS ERROR during runInitialization:", criticalError);
                  displayCriticalError(`שגיאה קריטית בהפעלת האפליקציה: ${criticalError.message}`, criticalError);
-                 // Log using fallback if SmartLog itself failed
                  if (typeof SmartLog?.error !== 'function') { console.error("[Fallback Log] Init Error:", criticalError); }
                  else { SmartLog.error(criticalError, "Init.SyncCritical"); }
              }
@@ -262,15 +293,12 @@
               const body = document.body;
               if (body) {
                    const errorDiv = document.createElement('div');
-                   errorDiv.style.position = 'fixed';
-                   errorDiv.style.top = '10px'; errorDiv.style.left='10px'; errorDiv.style.right='10px';
-                   errorDiv.style.padding = '10px'; errorDiv.style.backgroundColor = 'red'; errorDiv.style.color = 'white';
-                   errorDiv.style.zIndex = '9999'; errorDiv.textContent = `שגיאה קריטית בטעינת הקוד: ${topLevelError.message}`;
-                   body.prepend(errorDiv); // Add to top of body
+                   errorDiv.style.position = 'fixed'; errorDiv.style.top = '10px'; errorDiv.style.left='10px'; errorDiv.style.right='10px';
+                   errorDiv.style.padding = '10px'; errorDiv.style.backgroundColor = 'red'; errorDiv.style.color = 'white'; errorDiv.style.zIndex = '9999';
+                   errorDiv.textContent = `שגיאה קריטית בטעינת הקוד: ${topLevelError.message}`;
+                   body.prepend(errorDiv);
               }
-          } catch (displayError) {
-               console.error("Could not display top-level error in UI:", displayError);
-          }
+          } catch (displayError) { console.error("Could not display top-level error in UI:", displayError); }
       }
     </script>
 
