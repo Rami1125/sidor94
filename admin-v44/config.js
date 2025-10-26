@@ -1,14 +1,12 @@
-// config.js (v45.0)
-// v45.0: הוספת ייצוא של authReady Promise
-// קובץ הגדרות מרכזי לכלל האפליקציה
-// משתמש ב-SDK v9 (Modular)
+// config.js (v47.4)
+// הגדלת timeout להתחברות
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { getFunctions } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 
-// תצורת ה-Firebase שלך (מבוסס על קבצים קודמים v34-v43)
+// תצורת ה-Firebase שלך
 const firebaseConfig = {
   apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
   authDomain: "saban94-78949.firebaseapp.com",
@@ -20,24 +18,50 @@ const firebaseConfig = {
 };
 
 // אתחול רכיבים
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const functions = getFunctions(app, 'europe-west1'); // בחר את האזור שלך
+let app, auth, db, functions;
+let authReadyReject; // v47.4 Store reject function for external access if needed
 
-// v45.0: התחברות אנונימית אוטומטית, מחזירה Promise
+try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    functions = getFunctions(app, 'europe-west1');
+    console.log("Firebase app initialized successfully in config.js");
+} catch (error) {
+     console.error("CRITICAL ERROR: Firebase initialization failed in config.js!", error);
+     authReadyReject = () => Promise.reject(error); // Function to return rejected promise
+     // Continue exporting essentials, but authReady will be rejected
+     const authReady = authReadyReject();
+     export { app, auth, db, functions, authReady };
+     // No need to throw here, let the authReady rejection handle it
+}
+
+// --- v47.4: Authentication Promise with increased timeout and clearer logging ---
 const authReady = new Promise((resolve, reject) => {
+    // Save reject function in case initialization failed earlier
+    if (authReadyReject) {
+        reject(new Error("Firebase initialization failed before sign-in attempt."));
+        return;
+    }
+    console.log("authReady (v47.4): Attempting anonymous sign-in (30s timeout)...");
+    const authTimeout = setTimeout(() => {
+        console.error("authReady: Anonymous sign-in timed out after 30 seconds.");
+        reject(new Error("Firebase anonymous sign-in timed out (30s). Check network/config."));
+    }, 30000); // 30 second timeout
+
     signInAnonymously(auth)
         .then((userCredential) => {
-            console.log("Firebase Connected Anonymously.", userCredential.user.uid);
+            clearTimeout(authTimeout);
+            console.log("authReady: Anonymous sign-in successful.", userCredential.user.uid);
             resolve(userCredential.user);
         })
         .catch((error) => {
-            console.error("Firebase Anonymous Auth Failed", error);
-            reject(error);
+            clearTimeout(authTimeout);
+            console.error("authReady: Anonymous sign-in failed!", error.code, error.message); // Log code and message
+            reject(error); // Reject the promise on failure
         });
 });
 
-
 // ייצוא הרכיבים וה-Promise
 export { app, auth, db, functions, authReady };
+
