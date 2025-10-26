@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v49.0 - מרכז בקרה</title>
+    <title>DeliveryMaster v49.3 - מרכז בקרה</title>
 
     <!-- Leaflet (Map) CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -36,37 +36,20 @@
         .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 500; color: var(--on-primary); background-color: var(--primary-color); border: none; cursor: pointer; transition: background-color 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.5rem; } .btn:hover { background-color: #0b98d9; } .btn-icon { padding: 0.5rem; min-width: auto; } .btn-secondary { background-color: var(--surface); color: var(--on-surface-variant); border: 1px solid var(--outline); } .btn-secondary:hover { background-color: var(--hover-bg); } .btn-danger { background-color: var(--error); } .btn-danger:hover { background-color: #c5221f; }
         .table-container { flex-grow: 1; overflow-y: auto; border: 1px solid var(--outline); border-radius: 1rem; } table { width: 100%; border-collapse: collapse; } th, td { padding: 0.75rem 1rem; text-align: right; border-bottom: 1px solid var(--outline); white-space: nowrap; } td { max-width: 200px; overflow: hidden; text-overflow: ellipsis; } td.actions { max-width: none; white-space: normal; } thead { position: sticky; top: 0; background: var(--surface-container); z-index: 10; } th { font-size: 0.8rem; color: var(--on-surface-variant); font-weight: 500; } tbody tr:hover { background-color: var(--hover-bg); }
         .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 1000; display: none; opacity: 0; transition: opacity 0.3s ease; align-items: center; justify-content: center; } .modal-backdrop.visible { display: flex; opacity: 1; } .modal-content { background: var(--surface-container); border-radius: 1rem; padding: 2rem; width: 90%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); transform: scale(0.95); transition: transform 0.3s ease; max-height: 90vh; overflow-y: auto; } .modal-backdrop.visible .modal-content { transform: scale(1); } .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; } .modal-title { font-size: 1.25rem; font-weight: 700; } .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; } .form-group { margin-bottom: 1rem; } .form-group.full-width { grid-column: 1 / -1; } .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; } .form-input, .form-select, .form-textarea { width: 100%; padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--outline); background: var(--surface); box-sizing: border-box; font-size: 1rem; } .form-textarea { min-height: 80px; resize: vertical; } .modal-footer { margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem; }
-
-         /* v49.0: Style for Auth Error Message */
-        #auth-error-message {
-            position: fixed;
-            bottom: 1rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: var(--error);
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            z-index: 2000;
-            display: none; /* Hidden by default */
-            font-weight: 500;
-        }
+         #auth-error-message { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background-color: var(--error); color: white; padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 2000; display: none; font-weight: 500; }
     </style>
 </head>
 <body>
 
     <div class="app-layout">
-
         <!-- Header + Ticker -->
         <div class="header-with-ticker">
-            <div class="ticker-wrap" aria-hidden="true"><div class="ticker" id="ticker-messages"><span class="ticker-item">טוען הודעות...</span></div></div>
+            <div class="ticker-wrap" aria-hidden="true"><div class="ticker" id="ticker-messages">...</div></div>
             <header class="card">
-                 <div id="app-title"><span id="app-version">v49.0</span>DeliveryMaster</div>
-                 <div id="connection-status" class="status-connecting"><div class="dot"></div><span>מנסה להתחבר... (1/3)</span></div> <!-- v49.0: Initial message -->
+                 <div id="app-title"><span id="app-version">v49.3</span>DeliveryMaster</div>
+                 <div id="connection-status" class="status-connecting"><div class="dot"></div><span>ממתין ל-DOM...</span></div>
             </header>
         </div>
-
         <!-- Navigation -->
         <nav class="card">
             <a class="nav-link active" data-view="view-map"><span class="material-symbols-outlined">map</span>חדר מצב (מפה)</a>
@@ -74,288 +57,414 @@
             <a class="nav-link" data-view="view-drivers"><span class="material-symbols-outlined">local_shipping</span>ניהול נהגים</a>
             <a class="nav-link" data-view="view-log"><span class="material-symbols-outlined">terminal</span>צג לוגים (בחלון חדש)</a>
         </nav>
-
         <!-- Main Content -->
         <main>
             <div id="view-map" class="app-view active"><div id="leaflet-map" class="card" style="padding: 0;"></div></div>
-            <div id="view-orders" class="app-view view-table card"> /* ... */ </div>
-            <div id="view-drivers" class="app-view view-table card"> /* ... */ </div>
+            <div id="view-orders" class="app-view view-table card">
+                 <h2>ניהול הזמנות</h2>
+                 <div class="table-controls">
+                    <div class="search-container">
+                        <input type="text" id="orders-search" class="search-input" placeholder="חיפוש הזמנות...">
+                        <span class="material-symbols-outlined icon">search</span>
+                    </div>
+                    <button class="btn" id="add-order-btn">
+                        <span class="material-symbols-outlined">add</span>
+                        הוסף הזמנה
+                    </button>
+                 </div>
+                 <div class="table-container">
+                    <table><thead><tr><th>מזהה</th><th>לקוח</th><th>טלפון</th><th>כתובת</th><th>נהג</th><th>סטטוס</th><th>פעולות</th></tr></thead><tbody id="orders-table-body"><tr class="initial-loading"><td colspan="7" class="text-center p-4">טוען הזמנות...</td></tr></tbody></table>
+                 </div>
+            </div>
+            <div id="view-drivers" class="app-view view-table card">
+                 <h2>ניהול נהגים</h2>
+                 <div class="table-controls">
+                     <div class="search-container">
+                        <input type="text" id="drivers-search" class="search-input" placeholder="חיפוש נהגים...">
+                        <span class="material-symbols-outlined icon">search</span>
+                    </div>
+                 </div>
+                 <div class="table-container">
+                    <table><thead><tr><th>שם</th><th>טלפון</th><th>סטטוס</th><th>מיקום אחרון</th></tr></thead><tbody id="drivers-table-body"><tr class="initial-loading"><td colspan="4" class="text-center p-4">טוען נהגים...</td></tr></tbody></table>
+                 </div>
+            </div>
         </main>
-
     </div>
-
     <!-- Order Modal -->
-    <div id="orderModal" class="modal-backdrop"> /* ... */ </div>
-
-     <!-- v49.0: Auth Error Message Area -->
-     <div id="auth-error-message">
-         ⚠️ שגיאת תקשורת: לא ניתן להתחבר ל-Firebase כרגע. אנא בדוק חיבור רשת או נסה שוב בעוד רגע.
-     </div>
-
+     <div id="orderModal" class="modal-backdrop">
+        <div class="modal-content">
+             <form id="orderForm">
+                 <input type="hidden" id="orderId">
+                 <div class="modal-header">
+                     <h2 class="modal-title" id="modalTitle">טוען...</h2>
+                     <button type="button" class="btn-icon btn-secondary" id="closeModalBtn"><span class="material-symbols-outlined">close</span></button>
+                 </div>
+                 <div class="form-grid">
+                    <div class="form-group">
+                        <label for="customerName" class="form-label">שם לקוח*</label>
+                        <input type="text" id="customerName" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                         <label for="customerPhone" class="form-label">טלפון לקוח</label>
+                         <input type="tel" id="customerPhone" class="form-input">
+                    </div>
+                 </div>
+                 <div class="form-group full-width">
+                     <label for="address" class="form-label">כתובת*</label>
+                     <input type="text" id="address" class="form-input" required>
+                 </div>
+                 <div class="form-grid">
+                     <div class="form-group">
+                         <label for="latitude" class="form-label">Latitude</label>
+                         <input type="text" id="latitude" class="form-input" placeholder="32.123">
+                     </div>
+                     <div class="form-group">
+                         <label for="longitude" class="form-label">Longitude</label>
+                         <input type="text" id="longitude" class="form-input" placeholder="34.456">
+                     </div>
+                 </div>
+                 <div class="form-grid">
+                     <div class="form-group">
+                         <label for="deliveryType" class="form-label">סוג הובלה</label>
+                         <input type="text" id="deliveryType" class="form-input" placeholder="למשל: מנוף, פריקה ידנית">
+                     </div>
+                     <div class="form-group">
+                          <label for="warehouse" class="form-label">מחסן</label>
+                          <select id="warehouse" class="form-select">
+                              <option value="החרש">החרש</option>
+                              <option value="התלמיד">התלמיד</option>
+                              <option value="">אחר</option>
+                          </select>
+                     </div>
+                 </div>
+                 <div class="form-group full-width">
+                     <label for="notes" class="form-label">הערות</label>
+                     <textarea id="notes" class="form-textarea"></textarea>
+                 </div>
+                 <div class="form-grid edit-only" style="display: none;">
+                    <div class="form-group">
+                        <label for="editDriverName" class="form-label">נהג משויך</label>
+                        <input type="text" id="editDriverName" class="form-input" readonly>
+                    </div>
+                     <div class="form-group">
+                        <label for="editStatus" class="form-label">סטטוס נוכחי</label>
+                        <input type="text" id="editStatus" class="form-input" readonly>
+                    </div>
+                 </div>
+                 <div class="modal-footer">
+                     <button type="button" class="btn btn-secondary" id="cancelModalBtn">ביטול</button>
+                     <button type="submit" class="btn">שמור שינויים</button>
+                 </div>
+             </form>
+         </div>
+    </div>
+    <!-- Auth Error Message -->
+    <div id="auth-error-message"> </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Firebase & App Logic (Modular) -->
-    <script type="module">
-        console.log('Module script started (v49.0)'); // v49.0
+    <!-- v49.2: Combined & Inlined Modules + App Logic -->
+    <script type="module" id="app-combined">
+        console.log('Combined script started (v49.3)'); // v49.3
 
-        // --- Import Modules ---
-        let db, auth, authReadyPromise, SmartLog; // v49.0: Rename authReady to authReadyPromise
-        let collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc;
-        let mapReadyPromise = null; // v49.0: Promise for map readiness
-        let mapResolve, mapReject; // v49.0: Functions to resolve/reject map promise
+        // --- Inlined Config Module ---
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFunctions } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 
+        const firebaseConfig = {
+          apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
+          storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
+        };
+        let app, auth, db, functions;
+        let initializationError = null;
         try {
-            // Import config (which now handles auth retries) and logger
-            const firebaseImports = await import("./config.js");
-            db = firebaseImports.db; auth = firebaseImports.auth; authReadyPromise = firebaseImports.authReady; // v49.0
-            const smartLogImport = await import("./SmartLog.js");
-            SmartLog = smartLogImport.SmartLog;
-            console.log('Core modules imported successfully.');
-            if (!SmartLog) { console.error("SmartLog fallback."); SmartLog = { info: console.log, warn: console.warn, error: console.error }; }
+            app = getApps().length ? getApp() : initializeApp(firebaseConfig); console.log("Firebase app instance ensured (v49.3)");
+            auth = getAuth(app); db = getFirestore(app); functions = getFunctions(app, 'europe-west1');
+        } catch (error) { console.error("CRITICAL: Firebase init failed!", error); initializationError = error; }
 
-            // Import Firestore functions
-            const firestoreFunctions = await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js");
-            collection = firestoreFunctions.collection; doc = firestoreFunctions.doc; onSnapshot = firestoreFunctions.onSnapshot; query = firestoreFunctions.query; orderBy = firestoreFunctions.orderBy; addDoc = firestoreFunctions.addDoc; updateDoc = firestoreFunctions.updateDoc; serverTimestamp = firestoreFunctions.serverTimestamp; deleteDoc = firestoreFunctions.deleteDoc;
-            console.log('Firestore functions imported successfully.');
-        } catch (error) { console.error('CRITICAL ERROR importing modules!', error); throw new Error("Module import failed."); }
+        const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
+        async function ensureAuth() {
+            console.log("ensureAuth: Starting..."); let tries = 0;
+            while (tries < MAX_AUTH_RETRIES) {
+                tries++;
+                try {
+                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
+                    if (!auth) throw new Error("Auth object missing");
+                    console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
+                    const userCredential = await signInAnonymously(auth);
+                    console.log("ensureAuth: Success.", userCredential.user.uid); return userCredential.user;
+                } catch (e) {
+                    console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
+                    if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; }
+                    console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+                }
+            } throw new Error("ensureAuth: Max retries reached.");
+        }
+        const authReadyPromise = ensureAuth(); // Run auth
+        console.log("Config part executed.");
+
+        // --- Inlined SmartLog Module ---
+        import { collection as firestoreCollection, addDoc as firestoreAddDoc, serverTimestamp as firestoreServerTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // Alias imports
+
+        const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
+        let isDbAvailable = !!db; let authChecked = false;
+
+        const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => {
+            const consoleArgs = [`[${origin}] ${level}:`, message]; if (Object.keys(context).length > 0) consoleArgs.push(context); if (category) consoleArgs.push(`[Cat: ${category}]`); if (solution) consoleArgs.push(`[Sol: ${solution}]`);
+            switch (level) { case 'INFO': console.log(...consoleArgs); break; case 'WARN': console.warn(...consoleArgs); break; case 'ERROR': console.error(...consoleArgs); break; default: console.log(...consoleArgs); }
+
+            if (!isDbAvailable) { console.warn("SmartLog: DB unavailable.", { level, message, origin }); return; }
+
+            try {
+                if (!authChecked || !auth?.currentUser) {
+                    console.log("SmartLog: Awaiting auth..."); await authReadyPromise; authChecked = true; console.log("SmartLog: Auth ready.");
+                }
+                const user = auth?.currentUser; if (!user) { console.warn("SmartLog: User missing after authReady.", { level, message, origin }); return; }
+                const userContext = { uid: user.uid, isAnonymous: user.isAnonymous };
+                const logEntry = {
+                    timestamp: firestoreServerTimestamp(), level, message: String(message), origin,
+                    context: { ...JSON.parse(JSON.stringify(context || {})), sessionId, userAgent: navigator.userAgent || 'N/A', page: window.location.pathname || 'N/A' },
+                    user: userContext, category: category || null, solution: solution || null
+                };
+                await firestoreAddDoc(firestoreCollection(db, LOG_COLLECTION), logEntry);
+            } catch (error) {
+                console.error("SmartLog FATAL ERROR writing to Firestore.", error, { originalMessage: message });
+                if (error.code === 'permission-denied' || error.message.includes('permissions')) { console.warn("SmartLog: Disabling Firestore logging."); isDbAvailable = false; }
+            }
+        };
+        const SmartLog = {
+            info: (msg, origin, ctx = {}) => { writeLog('INFO', msg, origin, ctx); },
+            warn: (msg, origin, ctx = {}, cat = null, sol = null) => { writeLog('WARN', msg, origin, ctx, cat, sol); },
+            error: (err, origin, ctx = {}, cat = null, sol = null) => { const msg = err instanceof Error ? err.message : String(err); const stack = err instanceof Error ? err.stack : 'N/A'; writeLog('ERROR', msg, origin, { ...ctx, stack }, cat, sol); }
+        };
+        console.log("SmartLog part executed.");
+
+        // --- Main Application Logic ---
+        let collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc; // Declare again for app logic scope
+        try {
+            // Re-import firestore functions specifically for this scope
+             const firestoreFunctions = await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js");
+             collection = firestoreFunctions.collection; doc = firestoreFunctions.doc; onSnapshot = firestoreFunctions.onSnapshot; query = firestoreFunctions.query; orderBy = firestoreFunctions.orderBy; addDoc = firestoreFunctions.addDoc; updateDoc = firestoreFunctions.updateDoc; serverTimestamp = firestoreFunctions.serverTimestamp; deleteDoc = firestoreFunctions.deleteDoc;
+             console.log('Firestore functions imported for app logic.');
+        } catch(error) { SmartLog.error(error, "Import.Firestore.App"); throw new Error("Firestore functions import failed."); }
 
         // --- Helper Functions, Icons, Constants, Globals ---
-        function getCssVariable(varName) { /* ... */ } function hexToRgba(hex, opacity) { /* ... */ }
+        function getCssVariable(varName) { try { return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); } catch (e) { console.warn(`CSS var ${varName} err.`); return null; } }
+        function hexToRgba(hex, opacity) { let c; if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){ c= hex.substring(1).split(''); if(c.length== 3){ c= [c[0], c[0], c[1], c[1], c[2], c[2]]; } c= '0x'+c.join(''); return `rgba(${[(c>>16)&255, (c>>8)&255, c&255].join(',')},${opacity})`; } if (hex && hex.startsWith('rgb')) return hex; console.warn(`Invalid hex: ${hex}.`); return `rgba(255,255,255, ${opacity})`; }
         const orderIconUrl = 'https://i.ibb.co/3zdFhR7/order-pin.png';
-        const driverIcons = { /* ... */ }; const defaultIconSize = [50, 50]; const defaultIconAnchor = [25, 50];
-        const orderIcon = L.icon({ /* ... */ }); function createDriverIcon(driverName) { /* ... */ }
-        const WAREHOUSE_LOCATIONS = { /* ... */ };
-        let map; let layerGroup; // v49.0: Add layerGroup global
-        const state = { /* ... */ }; let assignmentLine = null; let selectedOrderMarker = null; let currentEditOrderId = null; let DOM = {};
+        const driverIcons = { 'חכמת': 'https://i.ibb.co/6wY3pD7/hikmet-truck.png', 'עלי': 'https://i.ibb.co/Yc5q0kP/ali-truck.png', 'default': 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png' };
+        const defaultIconSize = [50, 50]; const defaultIconAnchor = [25, 50];
+        const orderIcon = L.icon({ iconUrl: orderIconUrl, iconSize: defaultIconSize, iconAnchor: defaultIconAnchor, popupAnchor: [0, -50] });
+        function createDriverIcon(driverName) { const url = driverIcons[driverName] || driverIcons['default']; return L.icon({ iconUrl: url, iconSize: defaultIconSize, iconAnchor: defaultIconAnchor, popupAnchor: [0, -50] }); }
+        const WAREHOUSE_LOCATIONS = { "החרש": L.latLng(32.0573, 34.7963), "התלמיד": L.latLng(32.0853, 34.7818) };
+        let map; let layerGroup; const state = { drivers: {}, orders: {}, locations: {}, markers: { drivers: {}, orders: {} } };
+        let assignmentLine = null; let selectedOrderMarker = null; let currentEditOrderId = null; let DOM = {}; let mapReadyPromise = null; let mapResolve, mapReject;
 
-
-        // --- Initialization (v49.0: Reworked structure) ---
+        // --- Initialization ---
         async function initializeApplication() {
-            SmartLog.info("initializeApplication: Starting...", "Init");
-            try {
-                // 1. Initialize DOM references
-                DOM = { /* ... definition unchanged ... */ };
-                if (!DOM.status || !DOM.ordersTable || !DOM.driversTable) { throw new Error("Essential DOM elements missing!"); }
+            DOM = {
+                status: document.getElementById('connection-status'), navLinks: document.querySelectorAll('.nav-link[data-view]'), views: document.querySelectorAll('.app-view'),
+                ordersTable: document.getElementById('orders-table-body'), driversTable: document.getElementById('drivers-table-body'), tickerMessages: document.getElementById('ticker-messages'),
+                addOrderBtn: document.getElementById('add-order-btn'), orderModal: document.getElementById('orderModal'), orderForm: document.getElementById('orderForm'), modalTitle: document.getElementById('modalTitle'),
+                closeModalBtn: document.getElementById('closeModalBtn'), cancelModalBtn: document.getElementById('cancelModalBtn'), orderIdInput: document.getElementById('orderId'), editOnlyFields: document.querySelectorAll('.edit-only'),
+                ordersSearch: document.getElementById('orders-search'), driversSearch: document.getElementById('drivers-search'), authErrorMsg: document.getElementById('auth-error-message')
+            };
+            SmartLog.info("DOM elements referenced.", "Init.DOM");
+            if (!DOM.status || !DOM.ordersTable || !DOM.driversTable) { throw new Error("Essential DOM elements missing!"); }
+            SmartLog.info("DOM Ready. Admin Hub v49.3 Initializing", "Init"); // v49.3
 
-                // 2. Initialize UI Components (can run early)
+            try {
+                updateConnectionStatus(false, "ממתין לאימות...");
+                if (typeof collection !== 'function') { throw new Error("Firestore functions not loaded for app."); } // Check app logic scope
+                SmartLog.info("Waiting for Firebase Authentication...", "Init.Auth");
+                const user = await authReadyPromise; // Wait for the promise from the inlined config
+                SmartLog.info(`Firebase Auth successful. User: ${user.uid}`, "Init.Auth");
+                if (DOM.authErrorMsg) DOM.authErrorMsg.style.display = 'none';
+
+                updateConnectionStatus(false, "מאתחל מפה..."); SmartLog.info("Initializing Map...", "Init.Map");
+                mapReadyPromise = initMap(); await mapReadyPromise; SmartLog.info("Map initialization complete.", "Init.Map");
+
+                updateConnectionStatus(false, "מפעיל רכיבי UI...");
                 try { initNavigation(); } catch(e) { SmartLog.error(e, "Init.Navigation"); }
                 try { initTicker(); } catch(e) { SmartLog.error(e, "Init.Ticker"); }
                 try { initModals(); } catch(e) { SmartLog.error(e, "Init.Modals"); }
                 try { initSearch(); } catch(e) { SmartLog.error(e, "Init.Search"); }
 
-                // 3. Wait for Firebase Authentication (using the promise from config.js)
-                SmartLog.info("Waiting for Firebase Authentication (authReadyPromise)...", "Init.Auth");
-                const user = await authReadyPromise; // This now includes retries
-                SmartLog.info(`Firebase Authentication successful. User: ${user.uid}`, "Init.Auth");
+                updateConnectionStatus(false, "מחבר מאזינים...");
+                try { SmartLog.info("Attaching Firestore listeners...", "Init.Listeners"); listenToDrivers(); listenToOrders(); listenToLocations(); SmartLog.info("Firestore listeners attached.", "Init.Listeners"); }
+                catch (e) { SmartLog.error(e, "Init.Listeners"); throw e; }
 
-                // 4. Initialize Map (returns a promise now)
-                 SmartLog.info("Initializing Map...", "Init.Map");
-                 mapReadyPromise = initMap(); // Store the promise
-                 await mapReadyPromise; // Wait for the map to be fully ready
-                 SmartLog.info("Map initialization complete.", "Init.Map");
-
-                 // 5. Attach Firestore listeners (only after auth AND map are ready)
-                 SmartLog.info("Attaching Firestore listeners...", "Init.Listeners");
-                 listenToDrivers(); listenToOrders(); listenToLocations();
-                 SmartLog.info("Firestore listeners attached.", "Init.Listeners");
-
-                 // 6. Update final status
-                 updateConnectionStatus(true, "מחובר ומאזין");
-                 SmartLog.info("Application initialization complete.", "Init");
-
-             } catch (error) {
+                updateConnectionStatus(true, "מחובר ומאזין"); SmartLog.info("Application initialization complete.", "Init");
+            } catch (error) {
                  SmartLog.error(error, "Init.Critical", { message: "Application initialization failed." });
                  updateConnectionStatus(false, `שגיאת אתחול: ${error.message}`);
-
-                 // v49.0: Display specific error for auth failure
-                 if (error.message.includes("signInAnonymously") || error.message.includes("Maximum retries")) {
-                     const authErrorMsg = document.getElementById('auth-error-message');
-                     if (authErrorMsg) authErrorMsg.style.display = 'block';
-                 }
+                 if ((error.message.includes("signInAnonymously") || error.message.includes("Maximum retries")) && DOM.authErrorMsg) { DOM.authErrorMsg.style.display = 'block'; }
             }
         }
 
 
         // --- Connection Status Update ---
-        function updateConnectionStatus(isConnected, message) { /* ... implementation unchanged (with logging) ... */ }
+        function updateConnectionStatus(isConnected, message) {
+             const statusEl = DOM.status; if (!statusEl) return;
+             console.trace(`updateConnectionStatus: ${isConnected}, "${message}"`);
+             SmartLog.info(`Updating status`, "UI.Status", { isConnected, message });
+             const dot = statusEl.querySelector('.dot'); const span = statusEl.querySelector('span');
+             if (span) span.textContent = message;
+             if (isConnected) { statusEl.className = 'status-connected'; if(dot) dot.style.backgroundColor = 'var(--success)'; }
+             else { statusEl.className = 'status-error'; if(dot) dot.style.backgroundColor = 'var(--error)'; }
+        }
 
         // --- UI Modules ---
-        function initNavigation() { /* ... */ } function initTicker() { /* ... */ } function initModals() { /* ... */ } function openAddOrderModal() { /* ... */ } function openEditOrderModal(orderId) { /* ... */ } function closeModal() { /* ... */ } function initSearch() { /* ... */ }
+        function initNavigation() {
+            if (!DOM.navLinks) return; SmartLog.info("Init Navigation...", "Init.UI");
+            DOM.navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    SmartLog.info("Nav link clicked", "UI.Nav", { view: link.dataset.view }); e.preventDefault();
+                    const viewId = link.dataset.view; if (!viewId) return;
+                    if (viewId === 'view-log') { window.open('log.html', '_blank'); return; } // Simplified relative path
+                    DOM.views?.forEach(v => v.classList.toggle('active', v.id === viewId));
+                    DOM.navLinks.forEach(l => l.classList.toggle('active', l === link));
+                    if (viewId === 'view-map') { setTimeout(() => map?.invalidateSize(), 10); }
+                });
+            });
+        }
+        function initTicker() {
+             if (!DOM.tickerMessages) return; SmartLog.info("Init Ticker...", "Init.UI");
+             const items = DOM.tickerMessages.querySelectorAll('.ticker-item');
+             items.forEach(item => DOM.tickerMessages.appendChild(item.cloneNode(true)));
+        }
+        function initModals() {
+            if (!DOM.addOrderBtn || !DOM.orderModal || !DOM.closeModalBtn || !DOM.cancelModalBtn || !DOM.orderForm) return; SmartLog.info("Init Modals...", "Init.UI");
+            DOM.addOrderBtn.addEventListener('click', openAddOrderModal);
+            DOM.closeModalBtn.addEventListener('click', closeModal);
+            DOM.cancelModalBtn.addEventListener('click', closeModal);
+            DOM.orderForm.addEventListener('submit', handleSaveOrder);
+        }
+        function openAddOrderModal() {
+             if (!DOM.orderModal || !DOM.orderForm || !DOM.modalTitle || !DOM.orderIdInput || !DOM.editOnlyFields) return;
+             currentEditOrderId = null; DOM.orderForm.reset(); DOM.modalTitle.textContent = "יצירת הזמנה"; DOM.orderIdInput.value = '';
+             DOM.editOnlyFields.forEach(el => el.style.display = 'none'); DOM.orderModal.classList.add('visible');
+             SmartLog.info("Opened Add Order Modal", "UI.Modal");
+        }
+        function openEditOrderModal(orderId) {
+             if (!DOM.orderModal || !DOM.orderForm || !DOM.modalTitle || !DOM.orderIdInput || !DOM.editOnlyFields) return;
+             const orderData = state.orders[orderId]; if (!orderData) return;
+             currentEditOrderId = orderId; DOM.modalTitle.textContent = `עריכת הזמנה ${orderId.slice(-6)}`; DOM.orderIdInput.value = orderId;
+             DOM.orderForm.customerName.value = orderData.customer?.name || ''; DOM.orderForm.customerPhone.value = orderData.customer?.phone || '';
+             DOM.orderForm.address.value = orderData.address || ''; DOM.orderForm.latitude.value = orderData.latitude || ''; DOM.orderForm.longitude.value = orderData.longitude || '';
+             DOM.orderForm.deliveryType.value = orderData.deliveryType || ''; DOM.orderForm.warehouse.value = orderData.warehouse || ''; DOM.orderForm.notes.value = orderData.notes || '';
+             document.getElementById('editDriverName').value = orderData.driver?.name || 'טרם שויך'; document.getElementById('editStatus').value = orderData.status || 'חדש';
+             DOM.editOnlyFields.forEach(el => el.style.display = 'grid'); DOM.orderModal.classList.add('visible');
+             SmartLog.info("Opened Edit Order Modal", "UI.Modal", { orderId });
+        }
+        function closeModal() { if (!DOM.orderModal || !DOM.orderForm) return; DOM.orderModal.classList.remove('visible'); DOM.orderForm.reset(); currentEditOrderId = null; SmartLog.info("Closed Order Modal", "UI.Modal"); }
+        function initSearch() {
+             if (!DOM.ordersSearch || !DOM.driversSearch) return; SmartLog.info("Init Search...", "Init.UI");
+             DOM.ordersSearch.addEventListener('input', () => renderOrdersTable(DOM.ordersSearch.value));
+             DOM.driversSearch.addEventListener('input', () => renderDriversTable(DOM.driversSearch.value));
+        }
 
-        // --- Map Logic (v49.0: initMap uses layerGroup, returns Promise) ---
+        // --- Map Logic ---
         function initMap() {
-             return new Promise((resolve, reject) => { // Return promise
-                 mapResolve = resolve; // Store resolve/reject for later use
-                 mapReject = reject;
+             return new Promise((resolve, reject) => {
+                 mapResolve = resolve; mapReject = reject;
                  try {
-                    SmartLog.info("Initializing Leaflet map...", "Init.Map");
-                    if (map) { try { map.remove(); } catch(removeErr) { /* ... */ } map = null; layerGroup = null; } // v49.0: Reset layerGroup too
-
-                    const mapContainer = document.getElementById('leaflet-map');
-                    if (!mapContainer) throw new Error("Map container element not found.");
-
-                    // v49.0: Create map instance
-                    map = L.map('leaflet-map', { zoomControl: true }).setView([32.08, 34.78], 11); // Set initial view
-
-                    // v49.0: Create and add the layerGroup ONCE
-                    layerGroup = L.layerGroup().addTo(map);
-                    SmartLog.info("LayerGroup created and added to map.", "Init.Map");
-
-                    // Add tile layer
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
-
-                    // Add mousemove listener
+                    SmartLog.info("Init Leaflet map...", "Init.Map"); if (map) { try { map.remove(); } catch(e){} map = null; layerGroup = null; }
+                    const mapContainer = document.getElementById('leaflet-map'); if (!mapContainer) throw new Error("Map container missing.");
+                    map = L.map('leaflet-map', { zoomControl: true }).setView([32.08, 34.78], 11);
+                    layerGroup = L.layerGroup().addTo(map); SmartLog.info("LayerGroup added.", "Init.Map");
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 19 }).addTo(map);
                     map.on('mousemove', (e) => { if (assignmentLine) { assignmentLine.setLatLngs([selectedOrderMarker.getLatLng(), e.latlng]); } });
-
-                    // Resolve the promise when the map is ready
-                     map.whenReady(() => {
-                         SmartLog.info("Leaflet map 'whenReady' event fired. Resolving map promise.", "Init.Map");
-                         if (mapResolve) mapResolve(); // Resolve the promise
-                     });
-
-                    SmartLog.info("Leaflet map object created, layers/events added.", "Init.Map");
-
-                 } catch(e) {
-                    SmartLog.error(e, "Init.Map", { message: "CRITICAL: Failed to initialize Leaflet map!" }, 'MapEngine', 'בדוק קונסול שגיאות או נסה לרענן.');
-                    const mapDiv = document.getElementById('leaflet-map');
-                    if (mapDiv) mapDiv.innerHTML = '<h2 style="color: red; text-align: center; padding-top: 50px;">שגיאה קריטית בטעינת המפה!</h2>';
-                    if (mapReject) mapReject(e); // Reject the promise on error
-                 }
+                    map.whenReady(() => { SmartLog.info("Map ready.", "Init.Map"); if (mapResolve) mapResolve(); });
+                    SmartLog.info("Leaflet map object created.", "Init.Map");
+                 } catch(e) { SmartLog.error(e, "Init.Map", null, 'MapEngine', 'בדוק קונסול.'); if (document.getElementById('leaflet-map')) document.getElementById('leaflet-map').innerHTML = '<h2>Map Error!</h2>'; if (mapReject) mapReject(e); }
              });
          }
 
 
         // --- Firestore Listeners ---
-        function listenToDrivers() { /* ... */ } function listenToOrders() { /* ... */ } function listenToLocations() { /* ... */ }
+        function listenToDrivers() {
+            SmartLog.info("Listening to Drivers...", "Firestore.Listen"); const q = query(collection(db, "drivers"), orderBy("name"));
+            onSnapshot(q, (snapshot) => { SmartLog.info(`Drivers: ${snapshot.docChanges().length} changes.`, "Firestore.Snapshot"); let count = 0;
+                try { snapshot.docChanges().forEach((change) => { const id = change.doc.id; const data = { id, ...change.doc.data() }; SmartLog.info(`Driver change`, "Firestore.Process", { id, type: change.type });
+                    if (change.type === "added" || change.type === "modified") { state.drivers[id] = data; updateDriverMarker(id, data); } else if (change.type === "removed") { delete state.drivers[id]; removeDriverMarker(id); } count++; });
+                    SmartLog.info(`Processed ${count} driver changes. Rendering.`, "Firestore.Process"); renderDriversTable();
+                } catch (e) { SmartLog.error(e, "Firestore.Drivers.Processing"); updateConnectionStatus(false, "Driver processing error"); }
+            }, e => { SmartLog.error(e, "Firestore.Drivers.Listener"); updateConnectionStatus(false, "Driver listener error"); });
+        }
+        function listenToOrders() {
+            SmartLog.info("Listening to Orders...", "Firestore.Listen"); const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (snapshot) => { SmartLog.info(`Orders: ${snapshot.docChanges().length} changes.`, "Firestore.Snapshot"); let count = 0;
+                 try { snapshot.docChanges().forEach((change) => { const id = change.doc.id; const rawData = change.doc.data(); SmartLog.info(`Order change`, "Firestore.Process", { id, type: change.type });
+                    if (!rawData || typeof rawData !== 'object') { SmartLog.warn(`Invalid order data`, "Firestore.Process", { id, rawData }); return; } const data = { id, ...rawData };
+                    if (change.type === "added" || change.type === "modified") { state.orders[id] = data; updateOrderMarker(id, data); } else if (change.type === "removed") { delete state.orders[id]; removeOrderMarker(id); } count++; });
+                     SmartLog.info(`Processed ${count} order changes. Rendering.`, "Firestore.Process"); renderOrdersTable();
+                } catch (e) { SmartLog.error(e, "Firestore.Orders.Processing"); updateConnectionStatus(false, "Order processing error"); }
+            }, e => { SmartLog.error(e, "Firestore.Orders.Listener"); updateConnectionStatus(false, "Order listener error"); });
+        }
+        function listenToLocations() {
+             SmartLog.info("Listening to Locations...", "Firestore.Listen"); const q = query(collection(db, "driverLocations"));
+             onSnapshot(q, (snapshot) => { SmartLog.info(`Locations: ${snapshot.docChanges().length} changes.`, "Firestore.Snapshot"); let count = 0;
+                 try { snapshot.docChanges().forEach((change) => { const id = change.doc.id; const data = change.doc.data(); SmartLog.info(`Location change`, "Firestore.Process", { id, type: change.type });
+                    if (!data || typeof data.latitude !== 'number' || typeof data.longitude !== 'number') { SmartLog.warn(`Invalid location data`, "Firestore.Process", { id, data }); return; }
+                    if (change.type === "modified" || change.type === "added") { state.locations[id] = { id, ...data }; updateDriverMarkerLocation(id, data); } count++; });
+                     SmartLog.info(`Processed ${count} location changes. Rendering drivers.`, "Firestore.Process"); renderDriversTable();
+                 } catch (e) { SmartLog.error(e, "Firestore.Locations.Processing"); updateConnectionStatus(false, "Location processing error"); }
+             }, e => { SmartLog.error(e, "Firestore.Locations.Listener"); updateConnectionStatus(false, "Location listener error"); });
+        }
 
 
-        // --- v49.0: safeAddMarker Function ---
+        // --- Map Marker & Assignment ---
         async function safeAddMarker(marker) {
-            try {
-                // A.1: Safety check - Wait if map/layerGroup not ready
-                if (!map || !layerGroup || !map.addLayer) {
-                    SmartLog.warn('safeAddMarker: Map or layerGroup not ready, waiting...', "MapEngine");
-                    if (mapReadyPromise) {
-                        await mapReadyPromise; // Wait for the map init promise to resolve
-                        SmartLog.info('safeAddMarker: Map is now ready after waiting.', "MapEngine");
-                        // Re-check after waiting
-                        if (!map || !layerGroup || !map.addLayer) {
-                             throw new Error("Map or layerGroup still not available after waiting.");
-                        }
-                    } else {
-                         throw new Error("mapReadyPromise is not defined.");
-                    }
-                }
-                 // Add marker to the layerGroup
-                 layerGroup.addLayer(marker);
-                 SmartLog.info('Marker added successfully via layerGroup.', "MapEngine");
-
-            } catch (err) {
-                SmartLog.error(err, "Map.Marker.AddLayer", { markerDetails: marker?.options?.icon?.options?.iconUrl }, 'MapEngine', 'שגיאה בהוספת סמן למפה. בדוק אם המפה אותחלה כראוי.');
-            }
+            try { if (!map || !layerGroup || !map.addLayer) { SmartLog.warn('safeAddMarker: Map/layerGroup not ready, waiting...', "MapEngine"); if (mapReadyPromise) { await mapReadyPromise; SmartLog.info('safeAddMarker: Map ready after wait.', "MapEngine"); if (!map || !layerGroup || !map.addLayer) throw new Error("Map still not ready after wait."); } else throw new Error("mapReadyPromise undefined."); }
+                 layerGroup.addLayer(marker); SmartLog.info('Marker added via layerGroup.', "MapEngine");
+            } catch (err) { SmartLog.error(err, "Map.Marker.AddLayer", { markerDetails: marker?.options?.icon?.options?.iconUrl }, 'MapEngine', 'שגיאה בהוספת סמן.'); }
         }
-
-        // --- Map Marker & Assignment (v49.0: Uses safeAddMarker) ---
         function updateDriverMarker(driverId, driverData) {
-            SmartLog.info(`Attempting update/add for driver ${driverId}`, "Map.Marker.Driver");
-            try {
-                const location = state.locations[driverId];
-                const latLng = location ? [location.latitude, location.longitude] : null;
-                if (!latLng) { removeDriverMarker(driverId); return; }
-                const driverName = driverData.name || '?'; const iconToUse = createDriverIcon(driverName);
-                const marker = state.markers.drivers[driverId];
-
-                if (marker) {
-                    // Update existing marker (no need for safeAddMarker)
-                    marker.setLatLng(latLng); marker.setIcon(iconToUse); marker.getPopup().setContent(`<b>${driverName}</b><br>${driverData.phone}`); marker.driverData = driverData;
-                    SmartLog.info(`Driver marker updated: ${driverId}`, "Map.Marker.Driver");
-                } else {
-                    // Create new marker
-                    const newMarker = L.marker(latLng, { icon: iconToUse, draggable: false });
-                    newMarker.bindPopup(`<b>${driverName}</b><br>${driverData.phone}`); newMarker.driverData = driverData;
-                    newMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); if (selectedOrderMarker) { assignOrder(selectedOrderMarker.orderData, driverData); } else { zoomToMarker(newMarker, 17); } });
-                    state.markers.drivers[driverId] = newMarker;
-                    // v49.0: Use safeAddMarker to add to map
-                    safeAddMarker(newMarker);
-                    SmartLog.info(`Driver marker created: ${driverId}`, "Map.Marker.Driver");
-                }
-            } catch (e) { SmartLog.error(e, "Map.Marker.Driver.Update", { driverId }, 'MapEngine', 'שגיאה פנימית בעדכון סמן נהג.'); updateConnectionStatus(false, "שגיאה בסמן נהג"); }
+            SmartLog.info(`Update driver marker ${driverId}`, "Map.Marker"); try { const loc = state.locations[driverId]; const latLng = loc ? [loc.latitude, loc.longitude] : null; if (!latLng) { removeDriverMarker(driverId); return; } const name = driverData.name || '?'; const icon = createDriverIcon(name); const marker = state.markers.drivers[driverId];
+                if (marker) { marker.setLatLng(latLng); marker.setIcon(icon); marker.getPopup().setContent(`<b>${name}</b><br>${driverData.phone}`); marker.driverData = driverData; }
+                else { const newMarker = L.marker(latLng, { icon, draggable: false }); newMarker.bindPopup(`<b>${name}</b><br>${driverData.phone}`); newMarker.driverData = driverData; newMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); if (selectedOrderMarker) assignOrder(selectedOrderMarker.orderData, driverData); else zoomToMarker(newMarker, 17); }); state.markers.drivers[driverId] = newMarker; safeAddMarker(newMarker); }
+            } catch (e) { SmartLog.error(e, "Map.Marker.Driver.Update", { driverId }, 'MapEngine', 'שגיאת עדכון סמן נהג.'); updateConnectionStatus(false, "שגיאת סמן נהג"); }
         }
-
-        function removeDriverMarker(driverId) {
-             SmartLog.info(`Attempting remove for driver ${driverId}`, "Map.Marker.Driver");
-             try {
-                const marker = state.markers.drivers[driverId];
-                if (marker) {
-                    if (layerGroup && layerGroup.hasLayer(marker)) { // v49.0: Check layerGroup
-                        layerGroup.removeLayer(marker);
-                    } else if (map && map.hasLayer(marker)) { // Fallback if somehow not in layerGroup
-                        map.removeLayer(marker);
-                    }
-                    delete state.markers.drivers[driverId];
-                    SmartLog.info(`Driver marker removed: ${driverId}`, "Map.Marker.Driver");
-                }
-             } catch (e) { SmartLog.error(e, "Map.Marker.Driver.Remove", { driverId }, 'MapEngine', 'שגיאה בהסרת סמן נהג.'); }
-        }
-
-        function updateOrderMarker(orderId, orderData) {
-             SmartLog.info(`Attempting update/add for order ${orderId}`, "Map.Marker.Order");
-            try {
-                if (orderData.status === 'הושלם') { removeOrderMarker(orderId); return; }
-                const lat = parseFloat(orderData.latitude); const lng = parseFloat(orderData.longitude);
-                const latLng = (typeof lat === 'number' && !isNaN(lat) && typeof lng === 'number' && !isNaN(lng)) ? [lat, lng] : null;
-                if (!latLng) { /* ... warning & remove ... */ return; }
-                const distances = calculateDistances(latLng); const popupContent = `<b>${orderData.customer?.name || '?'}</b><br>${orderData.address}<br><b>סטטוס:</b> ${orderData.status || 'חדש'}<br><small>${distances}</small>`;
-                const marker = state.markers.orders[orderId];
-
-                if (marker) {
-                    // Update existing marker
-                    marker.setLatLng(latLng); marker.getPopup().setContent(popupContent); marker.orderData = orderData;
-                    SmartLog.info(`Order marker updated: ${orderId}`, "Map.Marker.Order");
-                } else {
-                    // Create new marker
-                    const newMarker = L.marker(latLng, { icon: orderIcon, draggable: true });
-                    newMarker.bindPopup(popupContent); newMarker.orderData = orderData;
-                    newMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); handleOrderClick(newMarker); if (!selectedOrderMarker) { zoomToMarker(newMarker, 17); } });
-                    newMarker.on('dragend', (e) => handleOrderDrop(e.target, orderData));
-                    state.markers.orders[orderId] = newMarker;
-                     // v49.0: Use safeAddMarker
-                     safeAddMarker(newMarker);
-                     SmartLog.info(`Order marker created: ${orderId}`, "Map.Marker.Order");
-                }
-            } catch (e) { SmartLog.error(e, "Map.Marker.Order.Update", { orderId }, 'MapEngine', 'שגיאה פנימית בעדכון סמן הזמנה.'); updateConnectionStatus(false, "שגיאה בסמן הזמנה"); }
-        }
-
-
-        function removeOrderMarker(orderId) {
-            SmartLog.info(`Attempting remove for order ${orderId}`, "Map.Marker.Order");
-             try {
-                const marker = state.markers.orders[orderId];
-                if (marker) {
-                    if (layerGroup && layerGroup.hasLayer(marker)) { // v49.0: Check layerGroup
-                        layerGroup.removeLayer(marker);
-                    } else if (map && map.hasLayer(marker)) {
-                        map.removeLayer(marker);
-                    }
-                    delete state.markers.orders[orderId];
-                    SmartLog.info(`Order marker removed: ${orderId}`, "Map.Marker.Order");
-                }
-             } catch (e) { SmartLog.error(e, "Map.Marker.Order.Remove", { orderId }, 'MapEngine', 'שגיאה בהסרת סמן הזמנה.'); }
-        }
-        function updateDriverMarkerLocation(driverId, locData) { /* ... */ }
-        function calculateDistances(orderLatLng) { /* ... */ } function handleOrderClick(marker) { /* ... */ } function handleOrderDrop(orderMarker, orderData) { /* ... */ } async function assignOrder(orderData, driverData) { /* ... */ } function zoomToMarker(marker, zoomLevel) { /* ... */ }
+        function removeDriverMarker(driverId) { SmartLog.info(`Remove driver marker ${driverId}`, "Map.Marker"); try { const marker = state.markers.drivers[driverId]; if (marker) { if (layerGroup?.hasLayer(marker)) layerGroup.removeLayer(marker); else if (map?.hasLayer(marker)) map.removeLayer(marker); delete state.markers.drivers[driverId]; } } catch (e) { SmartLog.error(e, "Map.Marker.Driver.Remove", { driverId }, 'MapEngine'); } }
+        function updateOrderMarker(orderId, orderData) { SmartLog.info(`Update order marker ${orderId}`, "Map.Marker"); try { if (orderData.status === 'הושלם') { removeOrderMarker(orderId); return; } const lat = parseFloat(orderData.latitude); const lng = parseFloat(orderData.longitude); const latLng = (typeof lat === 'number' && !isNaN(lat) && typeof lng === 'number' && !isNaN(lng)) ? [lat, lng] : null; if (!latLng) { const ctx = { lat: String(orderData.latitude), lng: String(orderData.longitude) }; SmartLog.warn(`Invalid location for order ${orderId}.`, "Map.Marker.Order", ctx); removeOrderMarker(orderId); return; } const dist = calculateDistances(latLng); const pop = `<b>${orderData.customer?.name || '?'}</b><br>${orderData.address}<br><b>סטטוס:</b> ${orderData.status || 'חדש'}<br><small>${dist}</small>`; const marker = state.markers.orders[orderId];
+                if (marker) { marker.setLatLng(latLng); marker.getPopup().setContent(pop); marker.orderData = orderData; }
+                else { const newMarker = L.marker(latLng, { icon: orderIcon, draggable: true }); newMarker.bindPopup(pop); newMarker.orderData = orderData; newMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); handleOrderClick(newMarker); if (!selectedOrderMarker) zoomToMarker(newMarker, 17); }); newMarker.on('dragend', (e) => handleOrderDrop(e.target, orderData)); state.markers.orders[orderId] = newMarker; safeAddMarker(newMarker); }
+            } catch (e) { SmartLog.error(e, "Map.Marker.Order.Update", { orderId }, 'MapEngine', 'שגיאת עדכון סמן הזמנה.'); updateConnectionStatus(false, "שגיאת סמן הזמנה"); } }
+        function removeOrderMarker(orderId) { SmartLog.info(`Remove order marker ${orderId}`, "Map.Marker"); try { const marker = state.markers.orders[orderId]; if (marker) { if (layerGroup?.hasLayer(marker)) layerGroup.removeLayer(marker); else if (map?.hasLayer(marker)) map.removeLayer(marker); delete state.markers.orders[orderId]; } } catch (e) { SmartLog.error(e, "Map.Marker.Order.Remove", { orderId }, 'MapEngine'); } }
+        function updateDriverMarkerLocation(driverId, locData) { SmartLog.info(`Update driver location ${driverId}`, "Map.Marker"); try { const marker = state.markers.drivers[driverId]; if (marker && locData.latitude && locData.longitude) marker.setLatLng([locData.latitude, locData.longitude]); else if (marker) SmartLog.warn(`Invalid loc data for driver ${driverId}`, "Map.Marker", { locData }); } catch (e) { SmartLog.error(e, "Map.Marker.DriverLoc.Update", { driverId }); } }
+        function calculateDistances(orderLatLng) { let str = "מרחקים: "; try { const p = L.latLng(orderLatLng); for (const [name, loc] of Object.entries(WAREHOUSE_LOCATIONS)) { str += `<b>${name}:</b> ${(p.distanceTo(loc) / 1000).toFixed(1)} ק"מ | `; } return str.slice(0, -3); } catch (e) { return "שגיאה בחישוב"; } }
+        function handleOrderClick(marker) { if (selectedOrderMarker === marker) { if (assignmentLine) map?.removeLayer(assignmentLine); assignmentLine = null; selectedOrderMarker = null; } else { selectedOrderMarker = marker; if (!assignmentLine) assignmentLine = L.polyline([marker.getLatLng(), marker.getLatLng()], { className: 'assignment-line' }).addTo(map); else assignmentLine.setLatLngs([marker.getLatLng(), marker.getLatLng()]); SmartLog.info(`Order ${marker.orderData.id} selected`, "Map.Assign"); } }
+        function handleOrderDrop(orderMarker, orderData) { const dropLatLng = orderMarker.getLatLng(); let closestDriver = null; let minDistance = Infinity; Object.values(state.markers.drivers).forEach(driverMarker => { const dist = map?.latLngToContainerPoint(driverMarker.getLatLng()).distanceTo(map.latLngToContainerPoint(dropLatLng)); if (dist < minDistance && dist < 50) { minDistance = dist; closestDriver = driverMarker.driverData; } }); if (closestDriver) assignOrder(orderData, closestDriver); else SmartLog.warn(`Order ${orderData.id} dropped, no driver found.`, "Map.Assign"); }
+        async function assignOrder(orderData, driverData) { SmartLog.info(`Assigning ${orderData.id} to ${driverData.name}`, "Map.Assign"); const ref = doc(db, "orders", orderData.id); try { await updateDoc(ref, { status: "שויך", driver: { id: driverData.id, name: driverData.name } }); SmartLog.info("Assignment success", "Map.Assign", { order: orderData.id, driver: driverData.id }); } catch (e) { SmartLog.error(e, "Map.Assign", { order: orderData.id, driver: driverData.id }); } if (assignmentLine) map?.removeLayer(assignmentLine); assignmentLine = null; selectedOrderMarker = null; }
+        function zoomToMarker(marker, zoomLevel) { if (!map || !marker) return; map.flyTo(marker.getLatLng(), zoomLevel, { animate: true, duration: 1 }); }
 
         // --- CRUD & Render ---
-        async function handleSaveOrder(e) { /* ... */ } function renderOrdersTable(filter = '') { /* ... */ } async function handleDeleteOrder(orderId) { /* ... */ } function getStatusColor(status) { /* ... */ } function renderDriversTable(filter = '') { /* ... */ }
+        async function handleSaveOrder(e) { e.preventDefault(); const isEdit = !!currentEditOrderId; const formData = { customer: { name: DOM.orderForm.customerName.value, phone: DOM.orderForm.customerPhone.value || null }, address: DOM.orderForm.address.value, latitude: parseFloat(DOM.orderForm.latitude.value) || null, longitude: parseFloat(DOM.orderForm.longitude.value) || null, deliveryType: DOM.orderForm.deliveryType.value || null, warehouse: DOM.orderForm.warehouse.value || null, notes: DOM.orderForm.notes.value || null, ...(!isEdit && { status: "חדש", createdAt: serverTimestamp(), orderDate: new Date().toLocaleDateString('en-GB') }), lastModified: serverTimestamp() }; try { if (isEdit) { const ref = doc(db, "orders", currentEditOrderId); await updateDoc(ref, formData); SmartLog.info("Order updated", "CRUD.Order", { id: currentEditOrderId }); } else { const ref = await addDoc(collection(db, "orders"), formData); SmartLog.info("Order created", "CRUD.Order", { id: ref.id }); } closeModal(); } catch (e) { SmartLog.error(e, isEdit ? "CRUD.Order.Update" : "CRUD.Order.Create", { data: formData }); alert(`שגיאה: ${e.message}`); } }
+        function renderOrdersTable(filter = '') { SmartLog.info(`Rendering orders table`, "UI.Render", { filter }); if (!DOM.ordersTable) return; try { const lcFilter = filter.toLowerCase(); const orders = Object.values(state.orders).filter(o => !lcFilter || (o.customer?.name?.toLowerCase().includes(lcFilter)) || (o.address?.toLowerCase().includes(lcFilter)) || (o.driver?.name?.toLowerCase().includes(lcFilter)) || (o.id?.includes(lcFilter))); let html = ''; if (orders.length === 0) { html = `<tr><td colspan="7" class="text-center p-4">אין הזמנות${filter ? ' תואמות' : ''}</td></tr>`; } else { html = orders.map(o => `<tr><td>${o.id.slice(-6)}</td><td>${o.customer?.name || '-'}</td><td>${o.customer?.phone || '-'}</td><td title="${o.address || ''}">${o.address || '-'}</td><td>${o.driver?.name || '<i>לא שויך</i>'}</td><td><span style="color: ${getStatusColor(o.status)}; font-weight: 500;">${o.status || 'חדש'}</span></td><td class="actions"><button class="btn btn-secondary btn-icon" title="ערוך" onclick="window.openEditOrderModal('${o.id}')"><span class="material-symbols-outlined">edit</span></button><button class="btn btn-danger btn-icon" title="מחק" onclick="window.handleDeleteOrder('${o.id}')"><span class="material-symbols-outlined">delete</span></button></td></tr>`).join(''); } DOM.ordersTable.innerHTML = html; SmartLog.info(`Orders table rendered (${orders.length} items)`, "UI.Render"); } catch (e) { SmartLog.error(e, "UI.Render.Orders"); DOM.ordersTable.innerHTML = `<tr><td colspan="7" class="text-error p-4">Render Error!</td></tr>`; updateConnectionStatus(false, "שגיאת רינדור הזמנות"); } }
+        async function handleDeleteOrder(orderId) { if (!confirm(`למחוק הזמנה ${orderId.slice(-6)}?`)) return; const ref = doc(db, "orders", orderId); try { await deleteDoc(ref); SmartLog.info(`Order deleted`, "CRUD.Order", { id: orderId }); } catch (e) { SmartLog.error(e, "CRUD.Order.Delete", { id: orderId }); alert(`שגיאה: ${e.message}`); } }
+        function getStatusColor(status) { switch(status) { case 'חדש': return 'var(--primary-color)'; case 'שויך': return 'var(--warning)'; case 'בדרך': return '#ff7f0e'; case 'הושלם': return 'var(--success)'; case 'בוטל': return 'var(--error)'; default: return 'var(--on-surface-variant)'; } }
+        function renderDriversTable(filter = '') { SmartLog.info(`Rendering drivers table`, "UI.Render", { filter }); if (!DOM.driversTable) return; try { const lcFilter = filter.toLowerCase(); const drivers = Object.values(state.drivers).filter(d => !lcFilter || (d.name?.toLowerCase().includes(lcFilter))); let html = ''; if (drivers.length === 0) { html = `<tr><td colspan="4" class="text-center p-4">אין נהגים${filter ? ' תואמים' : ''}</td></tr>`; } else { html = drivers.map(d => { const loc = state.locations[d.id]; const lu = loc?.lastUpdate ? new Date(loc.lastUpdate.toDate()).toLocaleTimeString('he-IL') : '-'; return `<tr><td>${d.name}</td><td>${d.phone || '-'}</td><td><span style="color: var(--success);">${d.status || 'פעיל'}</span></td><td>${lu}</td></tr>`; }).join(''); } DOM.driversTable.innerHTML = html; SmartLog.info(`Drivers table rendered (${drivers.length} items)`, "UI.Render"); } catch (e) { SmartLog.error(e, "UI.Render.Drivers"); DOM.driversTable.innerHTML = `<tr><td colspan="4" class="text-error p-4">Render Error!</td></tr>`; updateConnectionStatus(false, "שגיאת רינדור נהגים"); } }
 
         // --- Global Functions ---
         window.openEditOrderModal = openEditOrderModal; window.handleDeleteOrder = handleDeleteOrder;
 
 
-        // --- Start App ---
-        initializeApplication(); // v49.0: Call the main async initializer
+        // --- Start App (Wrapped in DOMContentLoaded) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOMContentLoaded fired. Starting application initialization (v49.3)...'); // v49.3
+            if (typeof SmartLog === 'undefined' || typeof authReadyPromise === 'undefined') {
+                 console.error("CRITICAL: Inlined modules haven't executed! Retrying...");
+                 const tempStatus = document.getElementById('connection-status'); if(tempStatus){tempStatus.innerHTML=`<div class="dot" style="background-color: var(--error);"></div><span>שגיאת טעינה!</span>`; tempStatus.className = 'status-error';}
+                 setTimeout(initializeApplication, 100); return;
+            }
+             SmartLog.info("DOMContentLoaded fired.", "Init.DOM");
+             updateConnectionStatus(false, "טוען אפליקציה...");
+             initializeApplication();
+        });
 
     </script>
 </body>
