@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster v44.0 - צג לוגים</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --m3-surface: #1f2937;
+            --m3-on-surface: #e5e7eb;
+            --m3-surface-container: #374151;
+            --m3-on-surface-variant: #9ca3af;
+            --m3-outline: #4b5563;
+            --m3-success: #22c55e;
+            --m3-warning: #f59e0b;
+            --m3-error: #ef4444;
+            --m3-info: #0ea5e9;
+        }
+        
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--m3-surface);
+            color: var(--m3-on-surface);
+            margin: 0;
+            padding: 1.5rem;
+        }
+        
+        h1 { font-weight: 500; }
+        
+        .filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            background-color: var(--m3-surface-container);
+            padding: 1rem;
+            border-radius: 1rem;
+        }
+        
+        .form-control {
+            flex-grow: 1;
+            background-color: var(--m3-surface);
+            color: var(--m3-on-surface);
+            border: 1px solid var(--m3-outline);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-family: 'Rubik', sans-serif;
+        }
+        
+        .log-container {
+            height: 75vh;
+            overflow-y: auto;
+            border: 1px solid var(--m3-outline);
+            border-radius: 1rem;
+            background-color: #111827; /* Darker for contrast */
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Fira Code', monospace;
+        }
+        
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: right;
+            border-bottom: 1px solid var(--m3-outline);
+            font-size: 0.85rem;
+            vertical-align: top;
+        }
+        
+        thead {
+            position: sticky; top: 0;
+            background: var(--m3-surface-container);
+        }
+        th { font-family: 'Rubik'; }
+        
+        tr:hover { background-color: rgba(255,255,255,0.03); }
+        
+        /* Log Levels */
+        .level-INFO { color: var(--m3-info); font-weight: 500; }
+        .level-WARN { color: var(--m3-warning); font-weight: 500; }
+        .level-ERROR { color: var(--m3-error); font-weight: 700; background-color: rgba(239, 68, 68, 0.05); }
+        
+        .col-time { color: var(--m3-on-surface-variant); width: 150px; }
+        .col-level { width: 80px; }
+        .col-origin { color: var(--m3-success); width: 120px; }
+        .col-context { color: #888; font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+
+    <h1>
+        <span style="color: var(--m3-primary);">[v44.0]</span> צג לוגים בזמן אמת
+        <span id="status" style="font-size: 0.9rem; color: var(--m3-warning); margin-right: 10px;">(מתחבר...)</span>
+    </h1>
+    
+    <div class="filters">
+        <input type="text" id="filter-text" class="form-control" placeholder="סנן לפי הודעה, מקור...">
+        <select id="filter-level" class="form-control">
+            <option value="">כל הרמות</option>
+            <option value="INFO">INFO</option>
+            <option value="WARN">WARN</option>
+            <option value="ERROR">ERROR</option>
+        </select>
+    </div>
+
+    <div class="log-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>זמן</th>
+                    <th>רמה</th>
+                    <th>מקור</th>
+                    <th>הודעה</th>
+                    <th>קונטקסט</th>
+                </tr>
+            </thead>
+            <tbody id="logs-table-body">
+                </tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { db } from './config.js';
+        import { 
+            collection, 
+            query, 
+            orderBy, 
+            limit, 
+            onSnapshot 
+        } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+        const LOG_COLLECTION = 'system_logs_v3';
+        const LOG_LIMIT = 200; // הצג 200 לוגים אחרונים
+        
+        const DOM = {
+            tableBody: document.getElementById('logs-table-body'),
+            filterText: document.getElementById('filter-text'),
+            filterLevel: document.getElementById('filter-level'),
+            status: document.getElementById('status')
+        };
+        
+        let allLogs = []; // Cache
+        let unsubscribe = null; // שומר את פונקציית ביטול ההאזנה
+
+        function init() {
+            // האזנה לפילטרים
+            DOM.filterText.addEventListener('input', renderLogs);
+            DOM.filterLevel.addEventListener('input', renderLogs);
+            
+            // התחלת האזנה ל-Firestore
+            listenToLogs();
+        }
+
+        function listenToLogs() {
+            if (unsubscribe) unsubscribe(); // בטל האזנה קודמת אם קיימת
+
+            const q = query(
+                collection(db, LOG_COLLECTION),
+                orderBy("timestamp", "desc"),
+                limit(LOG_LIMIT)
+            );
+
+            DOM.status.textContent = '(מאזין לשינויים...)';
+            DOM.status.style.color = 'var(--m3-success)';
+
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                allLogs = []; // נקה מטמון
+                snapshot.forEach(doc => {
+                    allLogs.push(doc.data());
+                });
+                renderLogs(); // רנדר מחדש עם הנתונים המעודכנים
+            }, (error) => {
+                console.error("Error listening to logs:", error);
+                DOM.status.textContent = `(שגיאת האזנה: ${error.message})`;
+                DOM.status.style.color = 'var(--m3-error)';
+            });
+        }
+
+        function renderLogs() {
+            const textFilter = DOM.filterText.value.toLowerCase();
+            const levelFilter = DOM.filterLevel.value;
+
+            const filteredLogs = allLogs.filter(log => {
+                const levelMatch = !levelFilter || log.level === levelFilter;
+                const textMatch = !textFilter ||
+                    log.message.toLowerCase().includes(textFilter) ||
+                    log.origin.toLowerCase().includes(textFilter);
+                return levelMatch && textMatch;
+            });
+
+            if (filteredLogs.length === 0) {
+                DOM.tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 2rem;">אין לוגים תואמים...</td></tr>`;
+                return;
+            }
+
+            DOM.tableBody.innerHTML = filteredLogs.map(log => {
+                const time = log.timestamp ? 
+                    new Date(log.timestamp.toDate()).toLocaleString('he-IL', { timeStyle: 'medium' }) : '...';
+                
+                // נטרול תגי HTML בהודעה
+                const safeMessage = log.message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                
+                // הצגת קונטקסט (למשל, stack trace)
+                let context = '';
+                if (log.context) {
+                    if (log.context.stack) {
+                        context = log.context.stack.split('\n')[1] || 'Stack trace available';
+                    } else {
+                        context = JSON.stringify(log.context);
+                        if (context.length > 100) context = context.substring(0, 100) + '...';
+                    }
+                }
+                
+                return `
+                    <tr class="level-${log.level}">
+                        <td class="col-time">${time}</td>
+                        <td class="col-level">${log.level}</td>
+                        <td class="col-origin">[${log.origin}]</td>
+                        <td>${safeMessage}</td>
+                        <td class="col-context">${context}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
