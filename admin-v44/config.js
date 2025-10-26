@@ -1,5 +1,5 @@
-// config.js (v47.5)
-// תיקון שגיאת ייצוא (export) בבלוק catch
+// config.js (v47.6)
+// עדכון מספר גרסה בהערה
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
@@ -26,7 +26,7 @@ try {
     auth = getAuth(app);
     db = getFirestore(app);
     functions = getFunctions(app, 'europe-west1');
-    console.log("Firebase app initialized successfully in config.js (v47.5)");
+    console.log("Firebase app initialized successfully in config.js (v47.6)"); // Updated version log
 } catch (error) {
      console.error("CRITICAL ERROR: Firebase initialization failed in config.js!", error);
      initializationError = error; // v47.5: Save the error
@@ -48,7 +48,7 @@ const authReady = new Promise((resolve, reject) => {
          return;
     }
 
-    console.log("authReady (v47.5): Attempting anonymous sign-in (30s timeout)...");
+    console.log("authReady (v47.6): Attempting anonymous sign-in (30s timeout)..."); // Updated version log
     const authTimeout = setTimeout(() => {
         console.error("authReady: Anonymous sign-in timed out after 30 seconds.");
         reject(new Error("Firebase anonymous sign-in timed out (30s). Check network/config."));
