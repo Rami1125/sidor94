@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v45.2 - צג לוגים</title>
+    <title>DeliveryMaster v45.5 - צג לוגים</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -106,19 +106,19 @@
 
     <div class="header-container">
         <h1>
-            <span>[v45.2]</span> צג לוגים בזמן אמת
+            <span>[v45.5]</span> צג לוגים (מתורגם)
             <span id="status" style="font-size: 0.9rem; color: var(--m3-warning); margin-right: 10px;">(מתחבר...)</span>
         </h1>
-        <!-- v45.2: הסרת כפתור החלפת עיצוב לפשטות -->
     </div>
     
     <div class="filters">
         <input type="text" id="filter-text" class="form-control" placeholder="סנן לפי הודעה, מקור...">
         <select id="filter-level" class="form-control">
             <option value="">כל הרמות</option>
-            <option value="INFO">INFO</option>
-            <option value="WARN">WARN</option>
-            <option value="ERROR">ERROR</option>
+            <!-- v45.5: תרגום הטקסט באפשרויות -->
+            <option value="INFO">מידע (INFO)</option>
+            <option value="WARN">אזהרה (WARN)</option>
+            <option value="ERROR">שגיאה (ERROR)</option>
         </select>
     </div>
 
@@ -140,9 +140,6 @@
     </div>
 
     <script type="module">
-        // v45.3: תיקון שגיאת ייבוא (חייב להיות סטטי)
-        // const APP_ROOT = "/admin-v44"; // <--- נמחק
-
         // v45.3: שינוי לייבוא סטטי קשיח
         import { db, authReady } from "/admin-v44/config.js"; 
         import { SmartLog } from "/admin-v44/SmartLog.js";
@@ -169,16 +166,69 @@
         let unsubscribe = null; 
 
         function init() {
-            console.log("Auth Ready. Log Viewer v45.2 Initializing.");
-            
-            DOM.filterText.addEventListener('input', renderLogs);
-            DOM.filterLevel.addEventListener('input', renderLogs);
-            
-            // v45.2: עיצוב בהיר הוא קבוע, אין צורך ב-initTheme()
-            
-            listenToLogs();
+            try {
+                console.log("Auth Ready. Log Viewer v45.5 Initializing.");
+                
+                DOM.filterText.addEventListener('input', renderLogs);
+                DOM.filterLevel.addEventListener('input', renderLogs);
+                
+                listenToLogs();
+                
+                SmartLog.info("Log Viewer Initialized Successfully.", "LogViewer.Init");
+
+            } catch (error) {
+                console.error("Fatal Error during Log Viewer init:", error);
+                DOM.status.textContent = `(שגיאת אתחול קריטית: ${error.message})`;
+                DOM.status.style.color = 'var(--m3-error)';
+                SmartLog.error(error, "LogViewer.Init.Catch");
+            }
         }
         
+        // --- v45.5: מנוע תרגום לוגים ---
+        /**
+         * מתרגם שדות טכניים לעברית קלילה
+         * @param {object} log - אובייקט הלוג המקורי
+         * @returns {object} - אובייקט עם שדות מתורגמים
+         */
+        function translateLogEntry(log) {
+            let hebrewLevel = log.level;
+            let levelClass = `level-${log.level || 'INFO'}`;
+            let hebrewOrigin = log.origin || 'לא ידוע';
+
+            // תרגום רמת הלוג
+            switch (log.level) {
+                case 'INFO':
+                    hebrewLevel = 'מידע';
+                    levelClass = 'level-INFO';
+                    break;
+                case 'WARN':
+                    hebrewLevel = 'אזהרה';
+                    levelClass = 'level-WARN';
+                    break;
+                case 'ERROR':
+                    hebrewLevel = 'שגיאה';
+                    levelClass = 'level-ERROR';
+                    break;
+            }
+
+            // תרגום "קל" למקורות (אפשר להרחיב בקלות)
+            switch (log.origin) {
+                case 'Init': hebrewOrigin = 'אתחול מערכת'; break;
+                case 'MapModule': hebrewOrigin = 'מודול מפה'; break;
+                case 'Firestore.Drivers': hebrewOrigin = 'DB נהגים'; break;
+                case 'Firestore.Orders': hebrewOrigin = 'DB הזמנות'; break;
+                case 'Firestore.Locations': hebrewOrigin = 'DB מיקומים'; break;
+                case 'Navigation': hebrewOrigin = 'ניווט דפים'; break;
+                case 'LogViewer': hebrewOrigin = 'צג לוגים'; break;
+                case 'LogViewer.Init': hebrewOrigin = 'אתחול צג לוגים'; break;
+                case 'Auth.Fatal': hebrewOrigin = 'שגיאת חיבור'; break;
+                // הוסף עוד תרגומים לפי הצורך
+            }
+            
+            return { hebrewLevel, levelClass, hebrewOrigin };
+        }
+        // --- סוף מנוע תרגום ---
+
         function listenToLogs() {
             if (unsubscribe) unsubscribe(); 
 
@@ -209,10 +259,18 @@
             const levelFilter = DOM.filterLevel.value;
 
             const filteredLogs = allLogs.filter(log => {
+                // v45.5: סינון לפי המידע המקורי (באנגלית)
                 const levelMatch = !levelFilter || log.level === levelFilter;
+                
+                // v45.5: תרגום המקור לצורך חיפוש
+                const t = translateLogEntry(log);
+                const hebrewOriginForSearch = t.hebrewOrigin.toLowerCase();
+
                 const textMatch = !textFilter ||
                     (log.message && log.message.toLowerCase().includes(textFilter)) ||
-                    (log.origin && log.origin.toLowerCase().includes(textFilter));
+                    (log.origin && log.origin.toLowerCase().includes(textFilter)) ||
+                    (hebrewOriginForSearch.includes(textFilter)); // מאפשר חיפוש גם בעברית
+                
                 return levelMatch && textMatch;
             });
 
@@ -222,6 +280,9 @@
             }
 
             DOM.tableBody.innerHTML = filteredLogs.map(log => {
+                // v45.5: הפעלת התרגום על כל לוג
+                const t = translateLogEntry(log);
+                
                 const time = log.timestamp ? 
                     new Date(log.timestamp.toDate()).toLocaleString('he-IL', { timeStyle: 'medium' }) : '...';
                 
@@ -238,10 +299,10 @@
                 }
                 
                 return `
-                    <tr class="level-${log.level || 'INFO'}">
+                    <tr class="${t.levelClass}">
                         <td class="col-time">${time}</td>
-                        <td class="col-level">${log.level || 'INFO'}</td>
-                        <td class="col-origin">[${log.origin || 'N/A'}]</td>
+                        <td class="col-level">${t.hebrewLevel}</td>
+                        <td class="col-origin">[${t.hebrewOrigin}]</td>
                         <td>${safeMessage}</td>
                         <td class="col-context">${context}</td>
                     </tr>
@@ -251,7 +312,8 @@
 
         // --- Start App ---
         authReady.then(() => {
-            SmartLog.info("Log Viewer Page Loaded (v45.3)", "LogViewer");
+            // v45.5: שיניתי את ההודעה כדי לבדוק את התרגום
+            SmartLog.info("דף הלוגים עלה בהצלחה", "LogViewer.Init");
             init();
         }).catch(err => {
             console.error("Fatal Auth Error", err);
@@ -262,5 +324,4 @@
     </script>
 </body>
 </html>
-
 
