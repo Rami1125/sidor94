@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v47.6 - מרכז בקרה</title>
+    <title>DeliveryMaster v47.8 - מרכז בקרה</title>
 
     <!-- Leaflet (Map) CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -104,7 +104,7 @@
         <div class="header-with-ticker">
             <div class="ticker-wrap" aria-hidden="true"><div class="ticker" id="ticker-messages"><span class="ticker-item">טוען הודעות...</span></div></div>
             <header class="card">
-                 <div id="app-title"><span id="app-version">v47.6</span>DeliveryMaster</div>
+                 <div id="app-title"><span id="app-version">v47.8</span>DeliveryMaster</div>
                  <div id="connection-status" class="status-connecting"><div class="dot"></div><span>מאתחל חיבור...</span></div>
             </header>
         </div>
@@ -156,13 +156,13 @@
     <div id="orderModal" class="modal-backdrop">
         <div class="modal-content">
              <form id="orderForm">
-                <input type="hidden" id="orderId">
-                <div class="modal-header">
-                    <h2 class="modal-title" id="modalTitle">טוען...</h2>
-                    <button type="button" class="btn-icon btn-secondary" id="closeModalBtn"><span class="material-symbols-outlined">close</span></button>
-                </div>
-                {/* ... שאר תוכן המודאל ... */}
-                <div class="form-grid">
+                 <input type="hidden" id="orderId">
+                 <div class="modal-header">
+                     <h2 class="modal-title" id="modalTitle">טוען...</h2>
+                     <button type="button" class="btn-icon btn-secondary" id="closeModalBtn"><span class="material-symbols-outlined">close</span></button>
+                 </div>
+                 {/* ... שאר תוכן המודאל ... */}
+                 <div class="form-grid">
                     <div class="form-group">
                         <label for="customerName" class="form-label">שם לקוח*</label>
                         <input type="text" id="customerName" class="form-input" required>
@@ -227,7 +227,7 @@
 
     <!-- Firebase & App Logic (Modular) -->
     <script type="module">
-        console.log('Module script started (v47.6)');
+        console.log('Module script started (v47.8)');
 
         // --- Import Modules ---
         let db, auth, authReady, SmartLog;
@@ -238,7 +238,7 @@
             const firebaseImports = await import("./config.js");
             db = firebaseImports.db;
             auth = firebaseImports.auth;
-            authReady = firebaseImports.authReady; // Get the promise from config (with 30s timeout)
+            authReady = firebaseImports.authReady; // Get the promise from config (v47.7 no timeout)
 
             const smartLogImport = await import("./SmartLog.js");
             SmartLog = smartLogImport.SmartLog;
@@ -318,32 +318,68 @@
                  return;
              }
 
-             if (typeof SmartLog?.info !== 'function') { /* ... */ return; }
-             SmartLog.info("Auth Ready. Admin Hub v47.6 Initializing", "Init");
+             if (typeof SmartLog?.info !== 'function') { return; } // Already logged error if SmartLog missing
+             SmartLog.info("Auth Ready. Admin Hub v47.8 Initializing", "Init");
 
             try {
                 if (typeof collection !== 'function') { throw new Error("Firestore functions not loaded."); }
 
-                initNavigation();
-                initMap();
-                initTicker();
-                initModals();
-                initSearch();
+                // v47.8: Wrap individual init steps in try-catch
+                try { initNavigation(); } catch(e) { SmartLog.error(e, "Init.Navigation"); }
+                try { initMap(); } catch(e) { SmartLog.error(e, "Init.Map"); }
+                try { initTicker(); } catch(e) { SmartLog.error(e, "Init.Ticker"); }
+                try { initModals(); } catch(e) { SmartLog.error(e, "Init.Modals"); }
+                try { initSearch(); } catch(e) { SmartLog.error(e, "Init.Search"); }
 
-                listenToDrivers();
-                listenToOrders();
-                listenToLocations();
+                // v47.8: Wrap listener setup in try-catch
+                try {
+                    listenToDrivers();
+                    listenToOrders();
+                    listenToLocations();
+                } catch (e) {
+                     SmartLog.error(e, "Init.Listeners");
+                     updateConnectionStatus(false, "שגיאה בהפעלת מאזינים");
+                     return; // Stop if listeners fail critically
+                }
 
+                // v47.8: Only update status if NO critical errors occurred before this point
                 updateConnectionStatus(true, "מחובר ומאזין");
                 SmartLog.info("Initialization complete. Listeners attached.", "Init");
 
             } catch (e) {
-                SmartLog.error(e, "Init");
+                // This catch block handles errors from the main try block (e.g., Firestore check)
+                SmartLog.error(e, "Init.Critical");
                 updateConnectionStatus(false, "שגיאת אתחול קריטית");
             }
         }
 
-        function updateConnectionStatus(isConnected, message) { /* ... implementation unchanged ... */ }
+        // v47.8: Added logging to updateConnectionStatus
+        function updateConnectionStatus(isConnected, message) {
+            const statusEl = DOM.status;
+            if (!statusEl) {
+                 console.error("updateConnectionStatus called but status element not found in DOM object.");
+                 return;
+            }
+            // v47.8: Log the update attempt
+            console.log(`updateConnectionStatus called: isConnected=${isConnected}, message="${message}"`);
+            SmartLog.info(`Updating connection status`, "UI.Status", { isConnected, message });
+
+
+            const dot = statusEl.querySelector('.dot');
+            const span = statusEl.querySelector('span');
+
+            if (span) span.textContent = message;
+
+            // Apply classes AFTER logging
+            if (isConnected) {
+                statusEl.className = 'status-connected'; // Reset classes first
+                if(dot) dot.style.backgroundColor = 'var(--success)';
+            } else {
+                statusEl.className = 'status-error'; // Reset classes first
+                 if(dot) dot.style.backgroundColor = 'var(--error)';
+            }
+         }
+
 
         // --- UI Modules ---
         function initNavigation() { /* ... implementation unchanged ... */ }
@@ -385,18 +421,19 @@
         window.openEditOrderModal = openEditOrderModal;
         window.handleDeleteOrder = handleDeleteOrder;
 
+
         // --- Start App ---
-        console.log('Waiting for authReady (v47.6)...');
+        console.log('Waiting for authReady (v47.8)...');
         if (authReady) {
-            // v47.6: Removed the redundant Promise.race and local timeout
             authReady
-                .then((user) => { // authReady now resolves with the user object
+                .then((user) => {
                     console.log('authReady resolved successfully. User:', user.uid, 'Starting init()...');
-                    init(); // Call init only after auth is ready
+                    init();
                 })
                 .catch(err => {
-                    console.error('authReady Promise failed!', err); // Log the actual error from config.js
-                    SmartLog.error(err, "Auth.Fatal", { message: "Firebase Authentication failed or timed out (30s)."});
+                    console.error('authReady Promise failed!', err);
+                    (typeof SmartLog?.error === 'function' ? SmartLog.error : console.error)(err, "Auth.Fatal", { message: "Firebase Authentication failed or timed out."});
+                    // v47.8: Call updateConnectionStatus directly on auth failure
                     updateConnectionStatus(false, `שגיאת אימות: ${err.message}`);
                 });
         } else {
