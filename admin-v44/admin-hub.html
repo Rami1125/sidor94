@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
     <style>
-        /* --- Styles unchanged --- */
+        /* --- Styles --- */
          :root { --primary-color: #0ea5e9; --on-primary: #ffffff; --surface: #f8f9fa; --on-surface: #202124; --surface-container: #ffffff; --on-surface-variant: #5f6368; --outline: #dee2e6; --success: #1e8e3e; --warning: #f9a825; --error: #d93025; --shadow: 0 4px 12px rgba(0,0,0,0.05); --hover-bg: rgba(0, 0, 0, 0.03); }
         body, html { height: 100vh; width: 100vw; margin: 0; font-family: 'Inter', sans-serif; background-color: var(--surface); color: var(--on-surface); overflow: hidden; }
         .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; vertical-align: middle; font-size: 1.25rem; }
@@ -164,16 +164,17 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- v49.2: Combined & Inlined Modules + App Logic -->
+    <!-- v49.3: Single Combined Script -->
     <script type="module" id="app-combined">
-        console.log('Combined script started (v49.3)'); // v49.3
+        console.log('Combined script started (v49.3)');
 
-        // --- Inlined Config Module ---
+        // --- Inlined Firebase SDK Imports ---
         import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getFunctions } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 
+        // --- Inlined Config Logic ---
         const firebaseConfig = {
           apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
           storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
@@ -203,33 +204,30 @@
                 }
             } throw new Error("ensureAuth: Max retries reached.");
         }
-        const authReadyPromise = ensureAuth(); // Run auth
+        const authReadyPromise = ensureAuth();
         console.log("Config part executed.");
 
-        // --- Inlined SmartLog Module ---
-        import { collection as firestoreCollection, addDoc as firestoreAddDoc, serverTimestamp as firestoreServerTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // Alias imports
-
+        // --- Inlined SmartLog Logic ---
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
         let isDbAvailable = !!db; let authChecked = false;
 
         const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => {
             const consoleArgs = [`[${origin}] ${level}:`, message]; if (Object.keys(context).length > 0) consoleArgs.push(context); if (category) consoleArgs.push(`[Cat: ${category}]`); if (solution) consoleArgs.push(`[Sol: ${solution}]`);
             switch (level) { case 'INFO': console.log(...consoleArgs); break; case 'WARN': console.warn(...consoleArgs); break; case 'ERROR': console.error(...consoleArgs); break; default: console.log(...consoleArgs); }
-
-            if (!isDbAvailable) { console.warn("SmartLog: DB unavailable.", { level, message, origin }); return; }
-
+            if (!isDbAvailable) { /* console.warn("SmartLog: DB unavailable."); */ return; } // Reduced noise
             try {
                 if (!authChecked || !auth?.currentUser) {
-                    console.log("SmartLog: Awaiting auth..."); await authReadyPromise; authChecked = true; console.log("SmartLog: Auth ready.");
+                    // console.log("SmartLog: Awaiting auth..."); // Reduced noise
+                    await authReadyPromise; authChecked = true; /* console.log("SmartLog: Auth ready."); */
                 }
-                const user = auth?.currentUser; if (!user) { console.warn("SmartLog: User missing after authReady.", { level, message, origin }); return; }
+                const user = auth?.currentUser; if (!user) { console.warn("SmartLog: User missing after authReady."); return; }
                 const userContext = { uid: user.uid, isAnonymous: user.isAnonymous };
                 const logEntry = {
-                    timestamp: firestoreServerTimestamp(), level, message: String(message), origin,
+                    timestamp: serverTimestamp(), level, message: String(message), origin,
                     context: { ...JSON.parse(JSON.stringify(context || {})), sessionId, userAgent: navigator.userAgent || 'N/A', page: window.location.pathname || 'N/A' },
                     user: userContext, category: category || null, solution: solution || null
                 };
-                await firestoreAddDoc(firestoreCollection(db, LOG_COLLECTION), logEntry);
+                await addDoc(collection(db, LOG_COLLECTION), logEntry);
             } catch (error) {
                 console.error("SmartLog FATAL ERROR writing to Firestore.", error, { originalMessage: message });
                 if (error.code === 'permission-denied' || error.message.includes('permissions')) { console.warn("SmartLog: Disabling Firestore logging."); isDbAvailable = false; }
@@ -243,13 +241,6 @@
         console.log("SmartLog part executed.");
 
         // --- Main Application Logic ---
-        let collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc; // Declare again for app logic scope
-        try {
-            // Re-import firestore functions specifically for this scope
-             const firestoreFunctions = await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js");
-             collection = firestoreFunctions.collection; doc = firestoreFunctions.doc; onSnapshot = firestoreFunctions.onSnapshot; query = firestoreFunctions.query; orderBy = firestoreFunctions.orderBy; addDoc = firestoreFunctions.addDoc; updateDoc = firestoreFunctions.updateDoc; serverTimestamp = firestoreFunctions.serverTimestamp; deleteDoc = firestoreFunctions.deleteDoc;
-             console.log('Firestore functions imported for app logic.');
-        } catch(error) { SmartLog.error(error, "Import.Firestore.App"); throw new Error("Firestore functions import failed."); }
 
         // --- Helper Functions, Icons, Constants, Globals ---
         function getCssVariable(varName) { try { return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); } catch (e) { console.warn(`CSS var ${varName} err.`); return null; } }
@@ -278,9 +269,9 @@
 
             try {
                 updateConnectionStatus(false, "ממתין לאימות...");
-                if (typeof collection !== 'function') { throw new Error("Firestore functions not loaded for app."); } // Check app logic scope
+                if (typeof collection !== 'function') { throw new Error("Firestore functions not loaded for app."); }
                 SmartLog.info("Waiting for Firebase Authentication...", "Init.Auth");
-                const user = await authReadyPromise; // Wait for the promise from the inlined config
+                const user = await authReadyPromise;
                 SmartLog.info(`Firebase Auth successful. User: ${user.uid}`, "Init.Auth");
                 if (DOM.authErrorMsg) DOM.authErrorMsg.style.display = 'none';
 
@@ -324,7 +315,7 @@
                 link.addEventListener('click', (e) => {
                     SmartLog.info("Nav link clicked", "UI.Nav", { view: link.dataset.view }); e.preventDefault();
                     const viewId = link.dataset.view; if (!viewId) return;
-                    if (viewId === 'view-log') { window.open('log.html', '_blank'); return; } // Simplified relative path
+                    if (viewId === 'view-log') { window.open('log.html', '_blank'); return; } // Use relative path
                     DOM.views?.forEach(v => v.classList.toggle('active', v.id === viewId));
                     DOM.navLinks.forEach(l => l.classList.toggle('active', l === link));
                     if (viewId === 'view-map') { setTimeout(() => map?.invalidateSize(), 10); }
@@ -455,12 +446,8 @@
 
         // --- Start App (Wrapped in DOMContentLoaded) ---
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired. Starting application initialization (v49.3)...'); // v49.3
-            if (typeof SmartLog === 'undefined' || typeof authReadyPromise === 'undefined') {
-                 console.error("CRITICAL: Inlined modules haven't executed! Retrying...");
-                 const tempStatus = document.getElementById('connection-status'); if(tempStatus){tempStatus.innerHTML=`<div class="dot" style="background-color: var(--error);"></div><span>שגיאת טעינה!</span>`; tempStatus.className = 'status-error';}
-                 setTimeout(initializeApplication, 100); return;
-            }
+            console.log('DOMContentLoaded fired. Starting application initialization (v49.3)...');
+            // No need for module check now, they are inlined
              SmartLog.info("DOMContentLoaded fired.", "Init.DOM");
              updateConnectionStatus(false, "טוען אפליקציה...");
              initializeApplication();
