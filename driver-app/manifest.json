@@ -1,43 +1,43 @@
 {
-"short_name": "נהגים",
-"name": "DeliveryMaster - אפליקציית נהגים",
-"lang": "he-IL",
-"description": "אפליקציית נהגים לניהול משימות, ניווט ועדכונים בזמן אמת.",
-"icons": [
-{
-"src": "https://i.postimg.cc/ryPT3r29/image.png",
-"type": "image/png",
-"sizes": "192x192",
-"purpose": "any maskable"
-},
-{
-"src": "https://i.postimg.cc/ryPT3r29/image.png",
-"type": "image/png",
-"sizes": "512x512",
-"purpose": "any maskable"
-}
-],
-"start_url": "./index.html",
-"scope": "./",
-"display": "standalone",
-"orientation": "portrait-primary",
-"background_color": "#f0f2f5",
-"theme_color": "#3a86ff",
-"categories": ["business", "productivity", "navigation"],
-"screenshots": [
-{
-"src": "https://www.google.com/search?q=https://placehold.co/1080x1920/3a86ff/ffffff%3Ftext%3D%D7%9E%D7%A1%D7%9A%2B%D7%9E%D7%A9%D7%99%D7%9E%D7%95%D7%AA",
-"sizes": "1080x1920",
-"type": "image/png",
-"form_factor": "narrow",
-"label": "רשימת משימות יומית"
-},
-{
-"src": "https://www.google.com/search?q=https://placehold.co/1080x1920/f0f2f5/333333%3Ftext%3D%D7%A4%D7%A8%D7%98%D7%99%2B%D7%94%D7%96%D7%9E%D7%A0%D7%94",
-"sizes": "1080x1920",
-"type": "image/png",
-"form_factor": "narrow",
-"label": "פרטי משימה וניווט"
-}
-]
+    "short_name": "DM נהג",
+    "name": "DeliveryMaster - אפליקציית נהגים",
+    "lang": "he-IL",
+    "description": "אפליקציית נהגים לניהול משימות, ניווט ועדכונים בזמן אמת.",
+    "icons": [
+        {
+            "src": "https://i.postimg.cc/ryPT3r29/image.png",
+            "type": "image/png",
+            "sizes": "192x192",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "https://i.postimg.cc/ryPT3r29/image.png",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "any maskable"
+        }
+    ],
+    "start_url": ".",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#f0f2f5",
+    "theme_color": "#3a86ff",
+    "categories": ["business", "productivity", "navigation"],
+    "screenshots": [
+        {
+          "src": "https://placehold.co/1080x1920/3a86ff/ffffff?text=%D7%9E%D7%A1%D7%9A%20%D7%9E%D7%A9%D7%99%D7%9E%D7%95%D7%AA",
+          "sizes": "1080x1920",
+          "type": "image/png",
+          "form_factor": "narrow",
+          "label": "רשימת משימות יומית"
+        },
+        {
+          "src": "https://placehold.co/1080x1920/f0f2f5/333333?text=%D7%A4%D7%A8%D7%98%D7%99%20%D7%94%D7%96%D7%9E%D7%A0%D7%94",
+          "sizes": "1080x1920",
+          "type": "image/png",
+          "form_factor": "narrow",
+          "label": "פרטי משימה וניווט"
+        }
+      ]
 }
