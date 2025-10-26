@@ -98,8 +98,7 @@
 
     <!-- Combined & Inlined App Logic -->
     <script type="module">
-        // v51.1: Removed top-level try-catch, added logging around DOMContentLoaded
-        console.log('Driver App script started (v51.1)');
+        console.log('Driver App script started (v51.2)'); // v51.2
 
         // --- Firebase SDK Imports ---
         const { initializeApp, getApps, getApp } = await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js");
@@ -124,6 +123,7 @@
         const SmartLog = { info: (msg, origin, ctx = {}) => { writeLog('INFO', msg, origin, ctx); }, warn: (msg, origin, ctx = {}, cat = null, sol = null) => { writeLog('WARN', msg, origin, ctx, cat, sol); }, error: (err, origin, ctx = {}, cat = null, sol = null) => { const msg = err instanceof Error ? err.message : String(err); const stack = err instanceof Error ? err.stack : 'N/A'; writeLog('ERROR', msg, origin, { ...ctx, stack }, cat, sol); } };
         console.log("SmartLog part done.");
 
+
         // --- Driver App Logic ---
         let map; let driverMarker; let currentDriverId = null; let currentDriverName = null; let watchId = null; let currentOrders = {}; let notificationAudio = null; let hasNotificationPermission = false; let hasGeolocationPermission = false; let lastLocationUpdate = 0;
         let DOM = {};
@@ -133,7 +133,7 @@
             DOM = { /* ... DOM elements ... */ };
             SmartLog.info("DOM referenced.", "Init.DOM");
             if (!DOM.driverNameDisplay || !DOM.statusText || !DOM.mapElement || !DOM.orderList) { throw new Error("DOM elements missing!"); }
-            SmartLog.info("Initializing Driver App (v51.1)...", "Init"); // v51.1
+            SmartLog.info("Initializing Driver App (v51.2)...", "Init"); // v51.2
 
             // No top-level try-catch here, rely on the one in runInitialization
             // Step 1: Check driver ID
@@ -192,28 +192,39 @@
         function stopNotificationSound() { /* ... */ }
         function registerServiceWorker() { /* ... */ }
 
-        // --- Start Application ---
-        function runInitialization() {
-             // v51.1: Added try-catch specifically around the body
+        // --- Start Application (v51.2: Direct execution in listener) ---
+        console.log("Attaching DOMContentLoaded listener (v51.2)..."); // v51.2
+        document.addEventListener('DOMContentLoaded', () => {
+             console.log('DOMContentLoaded event handler executing (v51.2). Starting initialization...'); // v51.2: Log start
+             // v51.2: Added try-catch directly around the initialization logic
              try {
-                console.log('DOMContentLoaded fired (v51.1). Running initialization...'); // v51.1
-                if (typeof SmartLog === 'undefined') { throw new Error("SmartLog module is missing!"); }
-                SmartLog.info("DOMContentLoaded fired.", "Init");
-                registerServiceWorker();
-                initializeDriverApp(); // Call async initializer
-                try {
-                    if(typeof feather !== 'undefined' && feather?.replace) {
-                         feather.replace();
-                         SmartLog.info("Feather icons replaced.", "UI");
-                     } else {
-                         SmartLog.warn("Feather library not found or replace method missing.", "UI");
-                     }
-                 } catch (e) {
-                     SmartLog.warn("Feather replace failed.", "UI", e);
+                // Ensure SmartLog is available (basic check)
+                if (typeof SmartLog === 'undefined') {
+                     throw new Error("SmartLog module is missing!");
                  }
+                 SmartLog.info("DOMContentLoaded fired.", "Init"); // Log event fired via SmartLog
+
+                 // Register Service Worker
+                 registerServiceWorker();
+
+                 // Call the main async initialization function
+                 initializeDriverApp(); // Don't await here, let it run
+
+                 // Initialize Feather Icons
+                 try {
+                     if(typeof feather !== 'undefined' && feather?.replace) {
+                          feather.replace();
+                          SmartLog.info("Feather icons replaced.", "UI");
+                      } else {
+                          SmartLog.warn("Feather library not found or replace method missing.", "UI");
+                      }
+                  } catch (e) {
+                      SmartLog.warn("Feather replace failed.", "UI", e);
+                  }
+
              } catch (criticalError) {
-                 console.error("CRITICAL ERROR during runInitialization:", criticalError);
-                 // Use basic DOM manipulation if possible, as SmartLog might rely on things not yet ready
+                 console.error("CRITICAL ERROR during DOMContentLoaded handler:", criticalError); // Log raw error
+                 // Use basic DOM manipulation if possible
                  try {
                      displayCriticalError(`שגיאה קריטית בהפעלת האפליקציה: ${criticalError.message}`, criticalError);
                  } catch (displayErr) {
@@ -221,20 +232,14 @@
                      alert(`שגיאה קריטית: ${criticalError.message}`); // Fallback alert
                  }
                  // Log using fallback if SmartLog itself might have failed
-                 if (typeof SmartLog?.error !== 'function') { console.error("[Fallback Log] Init Error:", criticalError); }
-                 else { SmartLog.error(criticalError, "Init.SyncCritical"); }
+                 if (typeof SmartLog?.error !== 'function') { console.error("[Fallback Log] DOMContentLoaded Error:", criticalError); }
+                 else { SmartLog.error(criticalError, "Init.DOMContentLoaded"); } // Log error via SmartLog
              }
-        }
-
-        // v51.1: Simplified DOMContentLoaded listener attachment with logging
-        console.log("Attaching DOMContentLoaded listener (v51.1)...");
-        document.addEventListener('DOMContentLoaded', () => {
-             console.log("DOMContentLoaded event handler executing (v51.1)."); // Log that the handler fired
-             runInitialization();
         });
-        console.log("DOMContentLoaded listener attached (v51.1).");
+        console.log("DOMContentLoaded listener attached (v51.2)."); // v51.2
 
-      // Removed top-level try-catch for v51.1
+
+      // Removed top-level try-catch
     </script>
 
 </body>
