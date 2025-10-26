@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster v44.0 - מרכז בקרה</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+    <style>
+        :root {
+            --m3-primary: #0ea5e9; /* sky-500 */
+            --m3-on-primary: #ffffff;
+            --m3-surface: #1f2937; /* gray-800 */
+            --m3-on-surface: #e5e7eb; /* gray-200 */
+            --m3-surface-container: #374151; /* gray-700 */
+            --m3-on-surface-variant: #9ca3af; /* gray-400 */
+            --m3-outline: #4b5563; /* gray-600 */
+            --m3-success: #22c55e; /* green-500 */
+            --m3-warning: #f59e0b; /* amber-500 */
+            --m3-error: #ef4444; /* red-500 */
+            
+            --glass-bg: rgba(55, 65, 81, 0.6); /* gray-700 60% */
+            --glass-blur: blur(12px);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        body, html {
+            height: 100vh; width: 100vw; margin: 0;
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--m3-surface);
+            color: var(--m3-on-surface);
+            overflow: hidden;
+        }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 1.25rem;
+        }
+        
+        /* Glass UI Component */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: var(--glass-border);
+            border-radius: 1.5rem; /* 24px */
+        }
+        
+        /* Layout */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            gap: 1rem;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        
+        header {
+            grid-column: 1 / -1; /* Full width */
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        nav {
+            grid-row: 2 / 3;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        main {
+            grid-row: 2 / 3;
+            grid-column: 2 / 3;
+            overflow: hidden;
+            border-radius: 1.5rem; /* For map */
+            position: relative;
+        }
+        
+        /* Header */
+        #app-title { font-size: 1.5rem; font-weight: 500; }
+        #app-version { font-size: 0.8rem; color: var(--m3-primary); margin-right: 8px; }
+        #connection-status { 
+            font-size: 0.85rem; font-weight: 500; 
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 99px;
+            transition: all 0.3s ease;
+        }
+        #connection-status .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-connecting { background-color: rgba(245, 158, 11, 0.1); color: var(--m3-warning); }
+        .status-connecting .dot { background-color: var(--m3-warning); }
+        .status-connected { background-color: rgba(34, 197, 94, 0.1); color: var(--m3-success); }
+        .status-connected .dot { background-color: var(--m3-success); }
+        .status-error { background-color: rgba(239, 68, 68, 0.1); color: var(--m3-error); }
+        .status-error .dot { background-color: var(--m3-error); }
+        
+        /* Navigation (M3 Style) */
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.8rem 1.25rem;
+            border-radius: 99px;
+            text-decoration: none;
+            color: var(--m3-on-surface-variant);
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .nav-link:hover {
+            background-color: rgba(255,255,255, 0.05);
+            color: var(--m3-on-surface);
+        }
+        .nav-link.active {
+            background-color: var(--m3-primary);
+            color: var(--m3-on-primary);
+            font-weight: 700;
+        }
+        
+        /* Views */
+        .app-view {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            box-sizing: border-box;
+        }
+        .app-view.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Map View */
+        #view-map { padding: 0; }
+        #leaflet-map { width: 100%; height: 100%; z-index: 1; }
+        .leaflet-container { background: #000; }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: var(--m3-surface-container);
+            color: var(--m3-on-surface);
+            border: 1px solid var(--m3-outline);
+        }
+        
+        /* Table View (Orders/Drivers) */
+        .view-table { padding: 1.5rem; }
+        .table-container { 
+            flex-grow: 1; 
+            overflow-y: auto; 
+            border: 1px solid var(--m3-outline);
+            border-radius: 1rem;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { 
+            padding: 1rem; text-align: right; 
+            border-bottom: 1px solid var(--m3-outline);
+        }
+        thead {
+            position: sticky; top: 0;
+            background: var(--m3-surface-container);
+        }
+        th { font-size: 0.8rem; color: var(--m3-on-surface-variant); }
+        
+    </style>
+</head>
+<body>
+
+    <div class="app-layout">
+        
+        <header class="glass-card">
+            <div id="app-title">
+                <span id="app-version">v44.0</span>DeliveryMaster
+            </div>
+            <div id="connection-status" class="status-connecting">
+                <div class="dot"></div>
+                <span>מאתחל חיבור...</span>
+            </div>
+        </header>
+
+        <nav class="glass-card">
+            <a href="#map" class="nav-link active" data-view="view-map">
+                <span class="material-symbols-outlined">map</span>
+                חדר מצב (מפה)
+            </a>
+            <a href="#orders" class="nav-link" data-view="view-orders">
+                <span class="material-symbols-outlined">list_alt</span>
+                ניהול הזמנות
+            </a>
+            <a href="#drivers" class="nav-link" data-view="view-drivers">
+                <span class="material-symbols-outlined">local_shipping</span>
+                ניהול נהגים
+            </a>
+            <a href="log.html" target="_blank" class="nav-link">
+                <span class="material-symbols-outlined">terminal</span>
+                צג לוגים (בחלון חדש)
+            </a>
+        </nav>
+
+        <main>
+            <div id="view-map" class="app-view active">
+                <div id="leaflet-map"></div>
+            </div>
+
+            <div id="view-orders" class="app-view view-table glass-card">
+                <h2>ניהול הזמנות</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>מזהה</th>
+                                <th>לקוח</th>
+                                <th>כתובת</th>
+                                <th>נהג</th>
+                                <th>סטטוס</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="view-drivers" class="app-view view-table glass-card">
+                <h2>ניהול נהגים</h2>
+                 <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>שם</th>
+                                <th>טלפון</th>
+                                <th>סטטוס</th>
+                                <th>מיקום אחרון</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drivers-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script type="module">
+        // ייבוא רכיבי Firebase והלוגר
+        import { db, auth } from './config.js';
+        import { SmartLog } from './SmartLog.js';
+        import { 
+            collection, 
+            doc, 
+            onSnapshot, 
+            query, 
+            orderBy,
+            updateDoc // (נצטרך בהמשך לפעולות)
+        } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+        // --- Globals ---
+        let map;
+        const state = {
+            drivers: {},
+            orders: {},
+            locations: {},
+            markers: {
+                drivers: {},
+                orders: {}
+            }
+        };
+
+        const DOM = {
+            status: document.getElementById('connection-status'),
+            navLinks: document.querySelectorAll('.nav-link[data-view]'),
+            views: document.querySelectorAll('.app-view'),
+            ordersTable: document.getElementById('orders-table-body'),
+            driversTable: document.getElementById('drivers-table-body')
+        };
+        
+        // --- 1. Initialization ---
+        function init() {
+            try {
+                initNavigation();
+                initMap();
+                SmartLog.info("Admin Hub v44.0 Initializing", "Init");
+                
+                // התחל האזנה לכל הנתונים
+                listenToDrivers();
+                listenToOrders();
+                listenToLocations();
+                
+                updateConnectionStatus(true, "מחובר ומאזין");
+            } catch (e) {
+                SmartLog.error(e, "Init");
+                updateConnectionStatus(false, "שגיאת אתחול קריטית");
+            }
+        }
+        
+        function updateConnectionStatus(isConnected, message) {
+            const statusEl = DOM.status;
+            statusEl.querySelector('span').textContent = message;
+            if (isConnected) {
+                statusEl.className = 'status-connected';
+            } else {
+                statusEl.className = 'status-error';
+            }
+        }
+
+        // --- 2. Navigation ---
+        function initNavigation() {
+            DOM.navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (link.hasAttribute('target')) return; // Ignore external links
+
+                    const viewId = link.getAttribute('data-view');
+                    
+                    DOM.views.forEach(v => v.classList.remove('active'));
+                    document.getElementById(viewId).classList.add('active');
+                    
+                    DOM.navLinks.forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                    
+                    if (viewId === 'view-map') {
+                        // חובה לרענן את המפה
+                        map.invalidateSize();
+                    }
+                    SmartLog.info(`Mapsd to ${viewId}`, "Navigation");
+                });
+            });
+        }
+        
+        // --- 3. Map Logic (Leaflet) ---
+        function initMap() {
+            try {
+                map = L.map('leaflet-map').setView([32.109333, 34.855499], 10); // מרכז ישראל
+                
+                // שכבת רקע כהה (Material 3 Dark)
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; OpenStreetMap &copy; CARTO',
+                    subdomains: 'abcd',
+                    maxZoom: 19
+                }).addTo(map);
+                SmartLog.info("Map Initialized", "MapModule");
+            } catch(e) {
+                SmartLog.error(e, "MapModule.initMap");
+                document.getElementById('leaflet-map').innerHTML = "<h1>שגיאה בטעינת המפה</h1>";
+            }
+        }
+
+        // --- 4. Firestore Real-time Listeners ---
+        function listenToDrivers() {
+            const q = query(collection(db, "drivers"), orderBy("name"));
+            onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const driverId = change.doc.id;
+                    const driverData = change.doc.data();
+                    if (change.type === "removed") {
+                        delete state.drivers[driverId];
+                    } else {
+                        state.drivers[driverId] = { id: driverId, ...driverData };
+                    }
+                });
+                renderDriversTable();
+                SmartLog.info(`Drivers snapshot updated. Total: ${Object.keys(state.drivers).length}`, "Firestore.Drivers");
+            }, e => SmartLog.error(e, "Firestore.Drivers"));
+        }
+
+        function listenToOrders() {
+            // (במערכת אמיתית, נסנן רק הזמנות פעילות)
+            const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (snapshot) => {
+                 snapshot.docChanges().forEach((change) => {
+                    const orderId = change.doc.id;
+                    const orderData = change.doc.data();
+                    if (change.type === "removed") {
+                        delete state.orders[orderId];
+                    } else {
+                        state.orders[orderId] = { id: orderId, ...orderData };
+                    }
+                });
+                renderOrdersTable();
+            }, e => SmartLog.error(e, "Firestore.Orders"));
+        }
+        
+        function listenToLocations() {
+            const q = query(collection(db, "driverLocations"));
+            onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const driverId = change.doc.id;
+                    const locData = change.doc.data();
+                    if (change.type === "removed") {
+                        delete state.locations[driverId];
+                        // (כאן נסיר סמן מהמפה)
+                    } else {
+                        state.locations[driverId] = { id: driverId, ...locData };
+                        // (כאן נעדכן סמן על המפה)
+                    }
+                });
+                renderDriversTable(); // רענון הטבלה כדי להציג מיקום
+            }, e => SmartLog.error(e, "Firestore.Locations"));
+        }
+
+        // --- 5. Render Functions ---
+        function renderOrdersTable() {
+            const orders = Object.values(state.orders);
+            if (orders.length === 0) {
+                DOM.ordersTable.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem;">אין הזמנות פעילות</td></tr>`;
+                return;
+            }
+            DOM.ordersTable.innerHTML = orders.map(order => `
+                <tr>
+                    <td>${order.id.slice(-6)}</td>
+                    <td>${order.customer?.name || 'ללא שם'}</td>
+                    <td>${order.address || 'לא צוינה כתובת'}</td>
+                    <td>${order.driver?.name || '<i>טרם שויך</i>'}</td>
+                    <td><span style="color: var(--m3-primary); font-weight: 500;">${order.status || 'חדש'}</span></td>
+                    <td>
+                        </td>
+                </tr>
+            `).join('');
+        }
+        
+        function renderDriversTable() {
+            const drivers = Object.values(state.drivers);
+            if (drivers.length === 0) {
+                DOM.driversTable.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 2rem;">אין נהגים רשומים</td></tr>`;
+                return;
+            }
+            DOM.driversTable.innerHTML = drivers.map(driver => {
+                const location = state.locations[driver.id];
+                const lastUpdate = location?.lastUpdate ? 
+                    new Date(location.lastUpdate.toDate()).toLocaleTimeString('he-IL') : 'אין נתונים';
+                
+                return `
+                <tr>
+                    <td>${driver.name}</td>
+                    <td>${driver.phone || '---'}</td>
+                    <td><span style="color: var(--m3-success);">${driver.status || 'פעיל'}</span></td>
+                    <td>${lastUpdate}</td>
+                </tr>
+            `}).join('');
+        }
+        
+        // --- Start App ---
+        init();
+        
+    </script>
+</body>
+</html>
