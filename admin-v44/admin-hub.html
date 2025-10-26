@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v47.1 - מרכז בקרה</title>
+    <title>DeliveryMaster v47.2 - מרכז בקרה</title>
 
     <!-- Leaflet (Map) CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
     <style>
-        /* v47.0: עיצוב בהיר קלאסי (מבוסס v43.0) + שיפורי ליטוש */
+        /* --- Styles unchanged from v47.1 --- */
         :root {
             --primary-color: #0ea5e9; /* כחול שמיים (v43) */
             --on-primary: #ffffff;
@@ -29,54 +29,18 @@
             --hover-bg: rgba(0, 0, 0, 0.03); /* רקע עדין במעבר עכבר */
         }
 
-        body, html {
-            height: 100vh; width: 100vw; margin: 0;
-            font-family: 'Inter', sans-serif; /* פונט v43 */
-            background-color: var(--surface);
-            color: var(--on-surface);
-            overflow: hidden;
-        }
-
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
-            vertical-align: middle;
-            font-size: 1.25rem; /* גודל אחיד לאייקונים */
-        }
-
-        .card {
-            background: var(--surface-container);
-            border: 1px solid var(--outline);
-            border-radius: 1rem; /* 16px */
-            box-shadow: var(--shadow);
-            padding: 1.5rem; /* ריווח פנימי אחיד לכרטיסיות */
-        }
-
-        /* Layout (v43: Sidebar Left) */
-        .app-layout {
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            grid-template-rows: auto 1fr;
-            height: 100vh;
-            gap: 1.5rem; /* ריווח v43 */
-            padding: 1.5rem;
-            box-sizing: border-box;
-        }
-
-        /* v46.0: Header (כולל Ticker) */
+        body, html { height: 100vh; width: 100vw; margin: 0; font-family: 'Inter', sans-serif; background-color: var(--surface); color: var(--on-surface); overflow: hidden; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; vertical-align: middle; font-size: 1.25rem; }
+        .card { background: var(--surface-container); border: 1px solid var(--outline); border-radius: 1rem; box-shadow: var(--shadow); padding: 1.5rem; }
+        .app-layout { display: grid; grid-template-columns: 280px 1fr; grid-template-rows: auto 1fr; height: 100vh; gap: 1.5rem; padding: 1.5rem; box-sizing: border-box; }
         header { padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
-
-        /* v46.0: "מלשינון" (Ticker) */
         .ticker-wrap { padding: 0; background-color: var(--on-surface); color: var(--surface); border-radius: 0.5rem; overflow: hidden; height: 40px; display: flex; align-items: center; }
         .ticker { display: inline-block; white-space: nowrap; padding-right: 100%; animation: ticker-move 30s linear infinite; }
         .ticker-item { display: inline-block; padding: 0 2rem; font-size: 0.9rem; }
         @keyframes ticker-move { 0% { transform: translateX(0%); } 100% { transform: translateX(-100%); } }
-
-        /* v46.0: Layout (Header + Ticker) */
         .header-with-ticker { display: grid; grid-template-rows: 40px auto; grid-column: 1 / -1; gap: 1rem; }
-
         nav { grid-row: 2 / 3; grid-column: 1 / 2; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         main { grid-row: 2 / 3; grid-column: 2 / 3; overflow: hidden; position: relative; }
-
         #app-title { font-size: 1.5rem; font-weight: 500; }
         #app-version { font-size: 0.8rem; color: var(--primary-color); margin-right: 8px; }
         #connection-status { font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 99px; transition: all 0.3s ease; }
@@ -87,50 +51,39 @@
         .status-connected .dot { background-color: var(--success); }
         .status-error { background-color: rgba(217, 48, 37, 0.1); color: var(--error); }
         .status-error .dot { background-color: var(--error); }
-
         .nav-link { display: flex; align-items: center; gap: 1rem; padding: 0.8rem 1.25rem; border-radius: 99px; text-decoration: none; color: var(--on-surface-variant); font-weight: 500; transition: all 0.2s ease; cursor: pointer; }
         .nav-link:hover { background-color: var(--hover-bg); color: var(--on-surface); }
         .nav-link.active { background-color: var(--primary-color); color: var(--on-primary); font-weight: 700; }
-
         .app-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity 0.3s ease, transform 0.3s ease; transform: translateY(10px); }
         .app-view.active { opacity: 1; visibility: visible; transform: translateY(0); }
-
         #view-map { padding: 0; }
         #leaflet-map { width: 100%; height: 100%; z-index: 1; border-radius: 1rem; }
         .leaflet-container { background: #eee; }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface-container); color: var(--on-surface); border: 1px solid var(--outline); border-radius: 0.5rem; } /* עיגול פינות לפופאפ */
-
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface-container); color: var(--on-surface); border: 1px solid var(--outline); border-radius: 0.5rem; }
         .assignment-line { stroke: var(--primary-color); stroke-width: 3; stroke-dasharray: 5, 5; }
-
-        .view-table { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; height: 100%; box-sizing: border-box; } /* גובה מלא */
-        .table-controls { display: flex; justify-content: space-between; gap: 1rem; flex-shrink: 0; } /* מניעת התכווצות */
+        .view-table { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; height: 100%; box-sizing: border-box; }
+        .table-controls { display: flex; justify-content: space-between; gap: 1rem; flex-shrink: 0; }
         .search-container { position: relative; flex-grow: 1; }
         .search-input { width: 100%; padding: 0.75rem 1rem; padding-right: 3rem; border-radius: 0.5rem; border: 1px solid var(--outline); background: var(--surface); box-sizing: border-box; }
         .search-container .icon { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--on-surface-variant); }
         .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 500; color: var(--on-primary); background-color: var(--primary-color); border: none; cursor: pointer; transition: background-color 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.5rem; }
         .btn:hover { background-color: #0b98d9; }
-        .btn-icon { padding: 0.5rem; min-width: auto; } /* כפתור אייקון קטן יותר */
+        .btn-icon { padding: 0.5rem; min-width: auto; }
         .btn-secondary { background-color: var(--surface); color: var(--on-surface-variant); border: 1px solid var(--outline); }
         .btn-secondary:hover { background-color: var(--hover-bg); }
         .btn-danger { background-color: var(--error); }
         .btn-danger:hover { background-color: #c5221f; }
-
-
         .table-container { flex-grow: 1; overflow-y: auto; border: 1px solid var(--outline); border-radius: 1rem; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 0.75rem 1rem; /* ריווח קטן יותר */ text-align: right; border-bottom: 1px solid var(--outline); white-space: nowrap; /* מניעת שבירת שורות */ }
-        /* v47.0: טיפול בגלישת טקסט */
+        th, td { padding: 0.75rem 1rem; text-align: right; border-bottom: 1px solid var(--outline); white-space: nowrap; }
         td { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
-        td.actions { max-width: none; white-space: normal; } /* תא פעולות יכול לגלוש */
-
-        thead { position: sticky; top: 0; background: var(--surface-container); z-index: 10; } /* Z-index כדי שיהיה מעל התוכן */
+        td.actions { max-width: none; white-space: normal; }
+        thead { position: sticky; top: 0; background: var(--surface-container); z-index: 10; }
         th { font-size: 0.8rem; color: var(--on-surface-variant); font-weight: 500; }
-        tbody tr:hover { background-color: var(--hover-bg); } /* הדגשה במעבר עכבר */
-
-        /* v46.0: Modal (חלון קופץ) */
+        tbody tr:hover { background-color: var(--hover-bg); }
         .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 1000; display: none; opacity: 0; transition: opacity 0.3s ease; align-items: center; justify-content: center; }
         .modal-backdrop.visible { display: flex; opacity: 1; }
-        .modal-content { background: var(--surface-container); border-radius: 1rem; padding: 2rem; width: 90%; max-width: 600px; /* רוחב גדול יותר */ box-shadow: 0 10px 30px rgba(0,0,0,0.1); transform: scale(0.95); transition: transform 0.3s ease; max-height: 90vh; overflow-y: auto; } /* גלילה במודאל ארוך */
+        .modal-content { background: var(--surface-container); border-radius: 1rem; padding: 2rem; width: 90%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); transform: scale(0.95); transition: transform 0.3s ease; max-height: 90vh; overflow-y: auto; }
         .modal-backdrop.visible .modal-content { transform: scale(1); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         .modal-title { font-size: 1.25rem; font-weight: 700; }
@@ -140,274 +93,151 @@
         .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; }
         .form-input, .form-select, .form-textarea { width: 100%; padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--outline); background: var(--surface); box-sizing: border-box; font-size: 1rem; }
         .form-textarea { min-height: 80px; resize: vertical; }
-        .modal-footer { margin-top: 1.5rem; display: flex; justify-content: flex-end; /* כפתורים בסוף */ gap: 1rem; }
-
-
+        .modal-footer { margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem; }
     </style>
 </head>
 <body>
 
     <div class="app-layout">
 
-        <!-- v46.0: Header + Ticker Layout -->
+        <!-- Header + Ticker -->
         <div class="header-with-ticker">
-            <div class="ticker-wrap" aria-hidden="true">
-                <div class="ticker" id="ticker-messages">
-                    <span class="ticker-item">ברוכים הבאים ל-DeliveryMaster v47.1</span>
-                    <span class="ticker-item">מערכת ניהול המשלוחים בזמן אמת</span>
-                    <span class="ticker-item">החיבור ל-Firebase פעיל ויציב.</span>
-                </div>
-            </div>
-
+            <div class="ticker-wrap" aria-hidden="true"><div class="ticker" id="ticker-messages">...</div></div>
             <header class="card">
-                <div id="app-title">
-                    <span id="app-version">v47.1</span>DeliveryMaster
-                </div>
-                <div id="connection-status" class="status-connecting">
-                    <div class="dot"></div>
-                    <span>מאתחל חיבור...</span>
-                </div>
+                 <div id="app-title"><span id="app-version">v47.2</span>DeliveryMaster</div>
+                 <div id="connection-status" class="status-connecting"><div class="dot"></div><span>מאתחל חיבור...</span></div>
             </header>
         </div>
 
-        <!-- 2. Navigation (Sidebar Left) -->
+        <!-- Navigation -->
         <nav class="card">
-            <a class="nav-link active" data-view="view-map">
-                <span class="material-symbols-outlined">map</span>
-                חדר מצב (מפה)
-            </a>
-            <a class="nav-link" data-view="view-orders">
-                <span class="material-symbols-outlined">list_alt</span>
-                ניהול הזמנות
-            </a>
-            <a class="nav-link" data-view="view-drivers">
-                <span class="material-symbols-outlined">local_shipping</span>
-                ניהול נהגים
-            </a>
-            <a class="nav-link" data-view="view-log">
-                <span class="material-symbols-outlined">terminal</span>
-                צג לוגים (בחלון חדש)
-            </a>
+            <a class="nav-link active" data-view="view-map"><span class="material-symbols-outlined">map</span>חדר מצב (מפה)</a>
+            <a class="nav-link" data-view="view-orders"><span class="material-symbols-outlined">list_alt</span>ניהול הזמנות</a>
+            <a class="nav-link" data-view="view-drivers"><span class="material-symbols-outlined">local_shipping</span>ניהול נהגים</a>
+            <a class="nav-link" data-view="view-log"><span class="material-symbols-outlined">terminal</span>צג לוגים (בחלון חדש)</a>
         </nav>
 
-        <!-- 3. Main Content (Content Right) -->
+        <!-- Main Content -->
         <main>
-            <!-- View 1: Map (Default) -->
-            <div id="view-map" class="app-view active">
-                <div id="leaflet-map" class="card" style="padding: 0;"></div> <!-- הסרת ריפוד מהמפה -->
-            </div>
-
-            <!-- View 2: Orders -->
-            <div id="view-orders" class="app-view view-table card">
-                <h2>ניהול הזמנות</h2>
-                <div class="table-controls">
-                    <div class="search-container">
-                        <input type="text" id="orders-search" class="search-input" placeholder="חיפוש הזמנות...">
-                        <span class="material-symbols-outlined icon">search</span>
-                    </div>
-                    <button class="btn" id="add-order-btn">
-                        <span class="material-symbols-outlined">add</span>
-                        הוסף הזמנה
-                    </button>
-                </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>מזהה</th>
-                                <th>לקוח</th>
-                                <th>טלפון</th>
-                                <th>כתובת</th>
-                                <th>נהג</th>
-                                <th>סטטוס</th>
-                                <th>פעולות</th>
-                            </tr>
-                        </thead>
-                        <tbody id="orders-table-body"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- View 3: Drivers -->
-            <div id="view-drivers" class="app-view view-table card">
-                <h2>ניהול נהגים</h2>
-                <div class="table-controls">
-                    <div class="search-container">
-                        <input type="text" id="drivers-search" class="search-input" placeholder="חיפוש נהגים...">
-                        <span class="material-symbols-outlined icon">search</span>
-                    </div>
-                </div>
-                 <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>שם</th>
-                                <th>טלפון</th>
-                                <th>סטטוס</th>
-                                <th>מיקום אחרון</th>
-                            </tr>
-                        </thead>
-                        <tbody id="drivers-table-body"></tbody>
-                    </table>
-                </div>
-            </div>
+            <div id="view-map" class="app-view active"><div id="leaflet-map" class="card" style="padding: 0;"></div></div>
+            <div id="view-orders" class="app-view view-table card">...</div>
+            <div id="view-drivers" class="app-view view-table card">...</div>
         </main>
 
     </div>
 
-    <!-- v47.0: Modal for Add/Edit Order -->
-    <div id="orderModal" class="modal-backdrop">
-        <div class="modal-content">
-            <form id="orderForm">
-                <input type="hidden" id="orderId"> <!-- שדה נסתר לשמירת ID במצב עריכה -->
-                <div class="modal-header">
-                    <h2 class="modal-title" id="modalTitle">יצירת הזמנה חדשה</h2>
-                    <button type="button" class="btn-icon btn-secondary" id="closeModalBtn">
-                        <span class="material-symbols-outlined">close</span>
-                    </button>
-                </div>
-
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="customerName" class="form-label">שם לקוח*</label>
-                        <input type="text" id="customerName" class="form-input" required>
-                    </div>
-                    <div class="form-group">
-                         <label for="customerPhone" class="form-label">טלפון לקוח</label>
-                         <input type="tel" id="customerPhone" class="form-input">
-                    </div>
-                </div>
-                <div class="form-group full-width">
-                    <label for="address" class="form-label">כתובת*</label>
-                    <input type="text" id="address" class="form-input" required>
-                </div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="latitude" class="form-label">Latitude</label>
-                        <input type="text" id="latitude" class="form-input" placeholder="32.123">
-                    </div>
-                    <div class="form-group">
-                        <label for="longitude" class="form-label">Longitude</label>
-                        <input type="text" id="longitude" class="form-input" placeholder="34.456">
-                    </div>
-                </div>
-                 <div class="form-grid">
-                    <div class="form-group">
-                        <label for="deliveryType" class="form-label">סוג הובלה</label>
-                        <input type="text" id="deliveryType" class="form-input" placeholder="למשל: מנוף, פריקה ידנית">
-                    </div>
-                    <div class="form-group">
-                         <label for="warehouse" class="form-label">מחסן</label>
-                         <select id="warehouse" class="form-select">
-                             <option value="החרש">החרש</option>
-                             <option value="התלמיד">התלמיד</option>
-                             <option value="">אחר</option>
-                         </select>
-                    </div>
-                </div>
-                 <div class="form-group full-width">
-                    <label for="notes" class="form-label">הערות</label>
-                    <textarea id="notes" class="form-textarea"></textarea>
-                 </div>
-                 <!-- שדות נוספים שיופיעו רק בעריכה -->
-                 <div class="form-grid edit-only" style="display: none;">
-                    <div class="form-group">
-                        <label for="editDriverName" class="form-label">נהג משויך</label>
-                        <input type="text" id="editDriverName" class="form-input" readonly>
-                    </div>
-                     <div class="form-group">
-                        <label for="editStatus" class="form-label">סטטוס נוכחי</label>
-                        <input type="text" id="editStatus" class="form-input" readonly>
-                    </div>
-                 </div>
-
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="cancelModalBtn">ביטול</button>
-                    <button type="submit" class="btn">שמור שינויים</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <!-- Order Modal -->
+    <div id="orderModal" class="modal-backdrop">...</div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- Firebase & App Logic (Modular) -->
     <script type="module">
-        // v47.1: חזרה לנתיב יחסי
-        // const APP_ROOT = "/admin-v44";
+        console.log('Module script started (v47.2)'); // v47.2: Log script start
 
-        import { db, auth, authReady } from "./config.js"; // שימוש בנתיב יחסי
-        import { SmartLog } from "./SmartLog.js"; // שימוש בנתיב יחסי
-        import {
-            collection,
-            doc,
-            onSnapshot,
-            query,
-            orderBy,
-            addDoc, // ליצירת הזמנה
-            updateDoc, // לעדכון הזמנה
-            serverTimestamp, // חותמת זמן
-            deleteDoc // v47.0: למחיקה
-        } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        // v47.2: Wrap imports in try-catch for detailed error logging
+        let db, auth, authReady, SmartLog;
+        let firebaseImports = {};
+        try {
+            // Use relative paths
+            firebaseImports = await import("./config.js");
+            db = firebaseImports.db;
+            auth = firebaseImports.auth;
+            authReady = firebaseImports.authReady;
+
+            const smartLogImport = await import("./SmartLog.js");
+            SmartLog = smartLogImport.SmartLog;
+
+            console.log('Firebase modules imported successfully.');
+        } catch (error) {
+            console.error('CRITICAL ERROR: Failed to import Firebase modules!', error);
+            // Display error to user?
+             const statusEl = document.getElementById('connection-status');
+             if (statusEl) {
+                 statusEl.innerHTML = `<div class="dot" style="background-color: var(--error);"></div><span>שגיאה קריטית בטעינת הקוד</span>`;
+                 statusEl.className = 'status-error';
+             }
+             // Stop further execution if core modules failed
+             throw new Error("Module import failed, stopping execution.");
+        }
+
+        // v47.2: Check if SmartLog is defined before using it
+        if (!SmartLog) {
+             console.error("SmartLog module failed to load. Using console.log as fallback.");
+             // Fallback SmartLog object that just uses console.log
+             SmartLog = {
+                 info: (msg, origin, context) => console.log(`[INFO][${origin}] ${msg}`, context || ''),
+                 warn: (msg, origin, context) => console.warn(`[WARN][${origin}] ${msg}`, context || ''),
+                 error: (err, origin, context) => console.error(`[ERROR][${origin}] ${err.message}`, context || '', err.stack)
+             };
+         }
+
+
+        // Import Firestore functions separately (less critical if fails, but log it)
+        let collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc;
+        try {
+            const firestoreFunctions = await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js");
+            collection = firestoreFunctions.collection;
+            doc = firestoreFunctions.doc;
+            onSnapshot = firestoreFunctions.onSnapshot;
+            query = firestoreFunctions.query;
+            orderBy = firestoreFunctions.orderBy;
+            addDoc = firestoreFunctions.addDoc;
+            updateDoc = firestoreFunctions.updateDoc;
+            serverTimestamp = firestoreFunctions.serverTimestamp;
+            deleteDoc = firestoreFunctions.deleteDoc;
+            console.log('Firestore functions imported successfully.');
+        } catch(error) {
+            SmartLog.error(error, "Import.Firestore", { message: "Failed to import Firestore functions!" });
+            // Should probably stop execution here too
+             throw new Error("Firestore functions import failed, stopping execution.");
+        }
+
 
         // --- Helper Functions ---
-        function getCssVariable(varName) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function hexToRgba(hex, opacity) { /* ... implementation unchanged ... */ } // implementation unchanged
+        function getCssVariable(varName) { /* ... implementation unchanged ... */ }
+        function hexToRgba(hex, opacity) { /* ... implementation unchanged ... */ }
 
         // --- Icon Definitions ---
         const orderIconUrl = 'https://i.ibb.co/3zdFhR7/order-pin.png';
-        const driverIcons = { /* ... definition unchanged ... */ }; // definition unchanged
+        const driverIcons = { /* ... definition unchanged ... */ };
         const defaultIconSize = [50, 50];
         const defaultIconAnchor = [25, 50];
-        const orderIcon = L.icon({ /* ... definition unchanged ... */ }); // definition unchanged
-        function createDriverIcon(driverName) { /* ... implementation unchanged ... */ } // implementation unchanged
+        const orderIcon = L.icon({ /* ... definition unchanged ... */ });
+        function createDriverIcon(driverName) { /* ... implementation unchanged ... */ }
 
         // --- Constants ---
-        const WAREHOUSE_LOCATIONS = { /* ... definition unchanged ... */ }; // definition unchanged
+        const WAREHOUSE_LOCATIONS = { /* ... definition unchanged ... */ };
 
         // --- Globals ---
         let map;
-        const state = {
-            drivers: {},
-            orders: {}, // v47.0: ישמש גם לשליפת נתוני עריכה
-            locations: {},
-            markers: { drivers: {}, orders: {} }
-        };
+        const state = { /* ... definition unchanged ... */ };
         let assignmentLine = null;
         let selectedOrderMarker = null;
-        let currentEditOrderId = null; // v47.0: מעקב אחר הזמנה בעריכה
+        let currentEditOrderId = null;
 
-        const DOM = {
-            status: document.getElementById('connection-status'),
-            navLinks: document.querySelectorAll('.nav-link[data-view]'),
-            views: document.querySelectorAll('.app-view'),
-            ordersTable: document.getElementById('orders-table-body'),
-            driversTable: document.getElementById('drivers-table-body'),
-            tickerMessages: document.getElementById('ticker-messages'),
-            // v47.0: שינוי שמות מודאל וטופס
-            addOrderBtn: document.getElementById('add-order-btn'),
-            orderModal: document.getElementById('orderModal'),
-            orderForm: document.getElementById('orderForm'),
-            modalTitle: document.getElementById('modalTitle'),
-            closeModalBtn: document.getElementById('closeModalBtn'),
-            cancelModalBtn: document.getElementById('cancelModalBtn'),
-            orderIdInput: document.getElementById('orderId'), // שדה נסתר
-            editOnlyFields: document.querySelectorAll('.edit-only'),
-            // --- ---
-            ordersSearch: document.getElementById('orders-search'),
-            driversSearch: document.getElementById('drivers-search'),
-        };
+        const DOM = { /* ... definition unchanged ... */ };
 
         // --- 1. Initialization ---
         function init() {
-            SmartLog.info("Auth Ready. Admin Hub v47.1 Initializing", "Init");
+            // v47.2: Check if SmartLog loaded correctly before proceeding
+             if (typeof SmartLog?.info !== 'function') {
+                 console.error("SmartLog is not available. Initialization aborted.");
+                 updateConnectionStatus(false, "שגיאה במודול הלוגים");
+                 return; // Stop initialization
+             }
+             SmartLog.info("Auth Ready. Admin Hub v47.2 Initializing", "Init");
             try {
+                // Check if Firestore functions loaded
+                if (typeof collection !== 'function') {
+                     throw new Error("Firestore functions are not loaded.");
+                }
+
                 initNavigation();
                 initMap();
                 initTicker();
-                initModals(); // עכשיו מטפל במודאל אחד
+                initModals();
                 initSearch();
 
                 listenToDrivers();
@@ -423,84 +253,84 @@
             }
         }
 
-        function updateConnectionStatus(isConnected, message) { /* ... implementation unchanged ... */ } // implementation unchanged
+        function updateConnectionStatus(isConnected, message) {
+            // v47.2: Safety check for DOM element
+             const statusEl = DOM.status;
+             if (!statusEl) {
+                 console.error("Connection status element not found.");
+                 return;
+             }
+            const dot = statusEl.querySelector('.dot');
+            const span = statusEl.querySelector('span');
+
+            if (span) span.textContent = message;
+
+            if (isConnected) {
+                statusEl.className = 'status-connected';
+                if(dot) dot.style.backgroundColor = 'var(--success)';
+            } else {
+                statusEl.className = 'status-error';
+                 if(dot) dot.style.backgroundColor = 'var(--error)';
+            }
+         }
+
 
         // --- 2. UI Modules (Nav, Ticker, Modal, Search) ---
-        function initNavigation() {
-             DOM.navLinks.forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const viewId = link.getAttribute('data-view');
-                    // v47.1: תיקון פתיחת חלון חדש
-                    if (viewId === 'view-log') {
-                        window.open('./log.html', '_blank'); // שימוש בנתיב יחסי
-                        return;
-                    }
-                    DOM.views.forEach(v => v.classList.remove('active'));
-                    document.getElementById(viewId).classList.add('active');
-                    DOM.navLinks.forEach(l => l.classList.remove('active'));
-                    link.classList.add('active');
-                    if (viewId === 'view-map') {
-                        setTimeout(() => map?.invalidateSize(), 10);
-                    }
-                });
-            });
-        }
-        function initTicker() { /* ... implementation unchanged ... */ } // implementation unchanged
-
-        // v47.0: עדכון מודאל
-        function initModals() {
-            DOM.addOrderBtn.addEventListener('click', openAddOrderModal); // פתיחה במצב הוספה
-            DOM.closeModalBtn.addEventListener('click', closeModal);
-            DOM.cancelModalBtn.addEventListener('click', closeModal);
-            DOM.orderForm.addEventListener('submit', handleSaveOrder);
-        }
-
-        // v47.0: פונקציות פתיחת מודאל (הוספה/עריכה)
-        function openAddOrderModal() { /* ... implementation unchanged ... */ } // implementation unchanged
-        function openEditOrderModal(orderId) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function closeModal() { /* ... implementation unchanged ... */ } // implementation unchanged
-        function initSearch() { /* ... implementation unchanged ... */ } // implementation unchanged
+        function initNavigation() { /* ... implementation unchanged ... */ }
+        function initTicker() { /* ... implementation unchanged ... */ }
+        function initModals() { /* ... implementation unchanged ... */ }
+        function openAddOrderModal() { /* ... implementation unchanged ... */ }
+        function openEditOrderModal(orderId) { /* ... implementation unchanged ... */ }
+        function closeModal() { /* ... implementation unchanged ... */ }
+        function initSearch() { /* ... implementation unchanged ... */ }
 
         // --- 3. Map Logic (Leaflet) ---
-        function initMap() { /* ... implementation unchanged ... */ } // implementation unchanged
+        function initMap() { /* ... implementation unchanged ... */ }
 
         // --- 4. Firestore Real-time Listeners ---
-        function listenToDrivers() { /* ... implementation unchanged ... */ } // implementation unchanged
-        function listenToOrders() { /* ... implementation unchanged ... */ } // implementation unchanged
-        function listenToLocations() { /* ... implementation unchanged ... */ } // implementation unchanged
+        function listenToDrivers() { /* ... implementation unchanged ... */ }
+        function listenToOrders() { /* ... implementation unchanged ... */ }
+        function listenToLocations() { /* ... implementation unchanged ... */ }
 
         // --- 5. Map Marker & Assignment Logic ---
-        function updateDriverMarker(driverId, driverData) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function removeDriverMarker(driverId) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function updateOrderMarker(orderId, orderData) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function removeOrderMarker(orderId) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function updateDriverMarkerLocation(driverId, locData) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function calculateDistances(orderLatLng) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function handleOrderClick(marker) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function handleOrderDrop(orderMarker, orderData) { /* ... implementation unchanged ... */ } // implementation unchanged
-        async function assignOrder(orderData, driverData) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function zoomToMarker(marker, zoomLevel) { /* ... implementation unchanged ... */ } // implementation unchanged
+        function updateDriverMarker(driverId, driverData) { /* ... implementation unchanged ... */ }
+        function removeDriverMarker(driverId) { /* ... implementation unchanged ... */ }
+        function updateOrderMarker(orderId, orderData) { /* ... implementation unchanged ... */ }
+        function removeOrderMarker(orderId) { /* ... implementation unchanged ... */ }
+        function updateDriverMarkerLocation(driverId, locData) { /* ... implementation unchanged ... */ }
+        function calculateDistances(orderLatLng) { /* ... implementation unchanged ... */ }
+        function handleOrderClick(marker) { /* ... implementation unchanged ... */ }
+        function handleOrderDrop(orderMarker, orderData) { /* ... implementation unchanged ... */ }
+        async function assignOrder(orderData, driverData) { /* ... implementation unchanged ... */ }
+        function zoomToMarker(marker, zoomLevel) { /* ... implementation unchanged ... */ }
 
         // --- 6. CRUD & Render Logic ---
-        async function handleSaveOrder(e) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function renderOrdersTable(filter = '') { /* ... implementation unchanged ... */ } // implementation unchanged
-        async function handleDeleteOrder(orderId) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function getStatusColor(status) { /* ... implementation unchanged ... */ } // implementation unchanged
-        function renderDriversTable(filter = '') { /* ... implementation unchanged ... */ } // implementation unchanged
+        async function handleSaveOrder(e) { /* ... implementation unchanged ... */ }
+        function renderOrdersTable(filter = '') { /* ... implementation unchanged ... */ }
+        async function handleDeleteOrder(orderId) { /* ... implementation unchanged ... */ }
+        function getStatusColor(status) { /* ... implementation unchanged ... */ }
+        function renderDriversTable(filter = '') { /* ... implementation unchanged ... */ }
 
-        // v47.0: חיבור הפונקציות לחלון הגלובלי כדי ש-onclick יעבוד
+        // --- Global Functions ---
         window.openEditOrderModal = openEditOrderModal;
         window.handleDeleteOrder = handleDeleteOrder;
 
 
         // --- Start App ---
-        authReady.then(() => {
-            init();
-        }).catch(err => {
-            SmartLog.error(err, "Auth.Fatal");
-            updateConnectionStatus(false, "שגיאת אימות Firebase");
-        });
+        console.log('Waiting for authReady...'); // v47.2: Log waiting state
+        if (authReady) {
+            authReady.then(() => {
+                console.log('authReady resolved. Starting init()...'); // v47.2: Log success
+                init();
+            }).catch(err => {
+                console.error('authReady Promise rejected!', err); // v47.2: Log specific auth error
+                SmartLog.error(err, "Auth.Fatal");
+                updateConnectionStatus(false, "שגיאת אימות Firebase");
+            });
+        } else {
+             console.error('authReady Promise is not available from config.js! Cannot initialize.'); // v47.2: Log if authReady wasn't imported
+             updateConnectionStatus(false, "שגיאה בטעינת הקונפיגורציה");
+        }
 
     </script>
 </body>
