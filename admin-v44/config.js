@@ -1,7 +1,7 @@
-// config.js (v47.7)
-// הסרת timeout ידני מהתחברות
+// config.js (v49.0)
+// הטמעת מנגנון ניסיון חוזר (retry) לאימות
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js"; // v49.0: Import getApps, getApp
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 import { getFunctions } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
@@ -22,47 +22,64 @@ let app, auth, db, functions;
 let initializationError = null;
 
 try {
-    app = initializeApp(firebaseConfig);
+    // v49.0: Initialize Firebase app safely (ensure only once)
+    if (!getApps().length) {
+        app = initializeApp(firebaseConfig);
+        console.log("Firebase app initialized successfully in config.js (v49.0)");
+    } else {
+        app = getApp(); // Get existing app
+        console.log("Firebase app already initialized, getting existing instance (v49.0).");
+    }
+
     auth = getAuth(app);
     db = getFirestore(app);
     functions = getFunctions(app, 'europe-west1');
-    console.log("Firebase app initialized successfully in config.js (v47.7)");
+
 } catch (error) {
      console.error("CRITICAL ERROR: Firebase initialization failed in config.js!", error);
      initializationError = error;
 }
 
-// --- Authentication Promise - Handles initialization errors ---
-const authReady = new Promise((resolve, reject) => {
-    if (initializationError) {
-        console.error("authReady: Failing early due to initialization error.");
-        reject(new Error(`Firebase initialization failed: ${initializationError.message}`));
-        return;
-    }
-    if (!auth) {
-         console.error("authReady: Firebase auth object is not available.");
-         reject(new Error("Firebase auth object failed to initialize."));
-         return;
-    }
+// --- v49.0: Authentication Promise with Retry Mechanism ---
+const MAX_AUTH_RETRIES = 3;
+const RETRY_DELAY_MS = 3000;
 
-    console.log("authReady (v47.7): Attempting anonymous sign-in..."); // Removed timeout mention
-
-    // v47.7: Rely directly on signInAnonymously promise, remove manual setTimeout
-    signInAnonymously(auth)
-        .then((userCredential) => {
-            console.log("authReady: Anonymous sign-in successful.", userCredential.user.uid);
-            resolve(userCredential.user); // Resolve with the user object
-        })
-        .catch((error) => {
-            console.error("authReady: Anonymous sign-in failed!", error.code, error.message);
-            // Optionally customize error based on code for better user feedback
-            if (error.code === 'auth/network-request-failed') {
-                 reject(new Error("Firebase sign-in failed: Network error. Please check your internet connection."));
-            } else {
-                 reject(error); // Reject with the original Firebase error
+async function ensureAuth() {
+    console.log("ensureAuth (v49.0): Starting authentication process...");
+    let tries = 0;
+    while (tries < MAX_AUTH_RETRIES) {
+        tries++;
+        try {
+            if (initializationError) {
+                console.error("ensureAuth: Failing early due to initialization error.");
+                throw new Error(`Firebase initialization failed: ${initializationError.message}`);
             }
-        });
-});
+            if (!auth) {
+                 console.error("ensureAuth: Firebase auth object is not available.");
+                 throw new Error("Firebase auth object failed to initialize.");
+            }
+
+            console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES} - Calling signInAnonymously...`);
+            const userCredential = await signInAnonymously(auth);
+            console.log("ensureAuth: Anonymous sign-in successful.", userCredential.user.uid);
+            return userCredential.user; // Resolve with the user object on success
+
+        } catch (e) {
+            console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
+            if (tries >= MAX_AUTH_RETRIES) {
+                console.error("ensureAuth: All sign-in attempts failed.");
+                throw e; // Re-throw the last error after max retries
+            }
+            console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS)); // Wait before retrying
+        }
+    }
+    // Should not reach here if successful, but as a fallback:
+    throw new Error("ensureAuth: Maximum retries reached without successful authentication.");
+}
+
+// authReady is now the result of calling ensureAuth
+const authReady = ensureAuth();
 
 // Single export statement at the top level
 export { app, auth, db, functions, authReady };
