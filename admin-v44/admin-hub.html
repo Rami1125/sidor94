@@ -265,12 +265,13 @@
     
     <!-- Firebase & App Logic (Modular) -->
     <script type="module">
-        // v45.2: נתיב אבסולוטי קבוע
-        const APP_ROOT = "/admin-v44"; 
+        // v45.3: תיקון שגיאת ייבוא (חייב להיות סטטי)
+        // const APP_ROOT = "/admin-v44"; // <--- נמחק, גורם לשגיאת Syntax
         
         // ייבוא רכיבי Firebase והלוגר
-        import { db, auth, authReady } from `${APP_ROOT}/config.js`; 
-        import { SmartLog } from `${APP_ROOT}/SmartLog.js`;
+        // v45.3: שינוי לייבוא סטטי קשיח
+        import { db, auth, authReady } from "/admin-v44/config.js"; 
+        import { SmartLog } from "/admin-v44/SmartLog.js";
         import { 
             collection, 
             doc, 
@@ -341,7 +342,8 @@
                     const viewId = link.getAttribute('data-view');
 
                     if (viewId === 'view-log') {
-                        window.open(`${APP_ROOT}/log.html`, '_blank');
+                        // v45.3: שימוש בנתיב קשיח
+                        window.open("/admin-v44/log.html", '_blank');
                         SmartLog.info(`Opened log window`, "Navigation");
                         return;
                     }
@@ -488,4 +490,5 @@
     </script>
 </body>
 </html>
+
 
