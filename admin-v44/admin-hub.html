@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v47.3 - מרכז בקרה</title>
+    <title>DeliveryMaster v47.6 - מרכז בקרה</title>
 
     <!-- Leaflet (Map) CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -102,9 +102,9 @@
 
         <!-- Header + Ticker -->
         <div class="header-with-ticker">
-            <div class="ticker-wrap" aria-hidden="true"><div class="ticker" id="ticker-messages">...</div></div>
+            <div class="ticker-wrap" aria-hidden="true"><div class="ticker" id="ticker-messages"><span class="ticker-item">טוען הודעות...</span></div></div>
             <header class="card">
-                 <div id="app-title"><span id="app-version">v47.3</span>DeliveryMaster</div>
+                 <div id="app-title"><span id="app-version">v47.6</span>DeliveryMaster</div>
                  <div id="connection-status" class="status-connecting"><div class="dot"></div><span>מאתחל חיבור...</span></div>
             </header>
         </div>
@@ -161,19 +161,65 @@
                     <h2 class="modal-title" id="modalTitle">טוען...</h2>
                     <button type="button" class="btn-icon btn-secondary" id="closeModalBtn"><span class="material-symbols-outlined">close</span></button>
                 </div>
-                <!-- Form content structure -->
-                <div class="form-grid">...</div>
-                <div class="form-group full-width">...</div>
-                <div class="form-grid">...</div>
-                <div class="form-grid">...</div>
-                <div class="form-group full-width">...</div>
-                <div class="form-grid edit-only" style="display: none;">...</div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="cancelModalBtn">ביטול</button>
-                    <button type="submit" class="btn">שמור שינויים</button>
-                </div>
-            </form>
-        </div>
+                {/* ... שאר תוכן המודאל ... */}
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="customerName" class="form-label">שם לקוח*</label>
+                        <input type="text" id="customerName" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                         <label for="customerPhone" class="form-label">טלפון לקוח</label>
+                         <input type="tel" id="customerPhone" class="form-input">
+                    </div>
+                 </div>
+                 <div class="form-group full-width">
+                     <label for="address" class="form-label">כתובת*</label>
+                     <input type="text" id="address" class="form-input" required>
+                 </div>
+                 <div class="form-grid">
+                     <div class="form-group">
+                         <label for="latitude" class="form-label">Latitude</label>
+                         <input type="text" id="latitude" class="form-input" placeholder="32.123">
+                     </div>
+                     <div class="form-group">
+                         <label for="longitude" class="form-label">Longitude</label>
+                         <input type="text" id="longitude" class="form-input" placeholder="34.456">
+                     </div>
+                 </div>
+                 <div class="form-grid">
+                     <div class="form-group">
+                         <label for="deliveryType" class="form-label">סוג הובלה</label>
+                         <input type="text" id="deliveryType" class="form-input" placeholder="למשל: מנוף, פריקה ידנית">
+                     </div>
+                     <div class="form-group">
+                          <label for="warehouse" class="form-label">מחסן</label>
+                          <select id="warehouse" class="form-select">
+                              <option value="החרש">החרש</option>
+                              <option value="התלמיד">התלמיד</option>
+                              <option value="">אחר</option>
+                          </select>
+                     </div>
+                 </div>
+                 <div class="form-group full-width">
+                     <label for="notes" class="form-label">הערות</label>
+                     <textarea id="notes" class="form-textarea"></textarea>
+                 </div>
+                 <div class="form-grid edit-only" style="display: none;">
+                    <div class="form-group">
+                        <label for="editDriverName" class="form-label">נהג משויך</label>
+                        <input type="text" id="editDriverName" class="form-input" readonly>
+                    </div>
+                     <div class="form-group">
+                        <label for="editStatus" class="form-label">סטטוס נוכחי</label>
+                        <input type="text" id="editStatus" class="form-input" readonly>
+                    </div>
+                 </div>
+                 <div class="modal-footer">
+                     <button type="button" class="btn btn-secondary" id="cancelModalBtn">ביטול</button>
+                     <button type="submit" class="btn">שמור שינויים</button>
+                 </div>
+             </form>
+         </div>
     </div>
 
     <!-- Leaflet JS -->
@@ -181,7 +227,7 @@
 
     <!-- Firebase & App Logic (Modular) -->
     <script type="module">
-        console.log('Module script started (v47.3)');
+        console.log('Module script started (v47.6)');
 
         // --- Import Modules ---
         let db, auth, authReady, SmartLog;
@@ -192,7 +238,7 @@
             const firebaseImports = await import("./config.js");
             db = firebaseImports.db;
             auth = firebaseImports.auth;
-            authReady = firebaseImports.authReady; // Get the promise
+            authReady = firebaseImports.authReady; // Get the promise from config (with 30s timeout)
 
             const smartLogImport = await import("./SmartLog.js");
             SmartLog = smartLogImport.SmartLog;
@@ -201,7 +247,7 @@
              // Fallback for SmartLog if needed
             if (!SmartLog) {
                  console.error("SmartLog module failed to load. Using console.log as fallback.");
-                 SmartLog = { /* ... Fallback definition ... */ }; // Fallback definition unchanged
+                 SmartLog = { info: (msg, origin, context) => console.log(`[INFO][${origin}] ${msg}`, context || ''), warn: (msg, origin, context) => console.warn(`[WARN][${origin}] ${msg}`, context || ''), error: (err, origin, context) => console.error(`[ERROR][${origin}] ${err.message}`, context || '', err.stack) };
              }
 
             // Import Firestore functions
@@ -220,54 +266,62 @@
         } catch (error) {
             console.error('CRITICAL ERROR: Failed to import necessary modules!', error);
              const statusEl = document.getElementById('connection-status');
-             if (statusEl) { /* ... Update status UI ... */ } // Update status UI unchanged
+             if (statusEl) { statusEl.innerHTML = `<div class="dot" style="background-color: var(--error);"></div><span>שגיאה קריטית בטעינת הקוד</span>`; statusEl.className = 'status-error'; }
              throw new Error("Module import failed, stopping execution.");
         }
 
         // --- Helper Functions, Icons, Constants, Globals ---
-        // (These sections remain largely unchanged from v47.2)
+        // (These sections remain largely unchanged)
         function getCssVariable(varName) { /* ... */ }
         function hexToRgba(hex, opacity) { /* ... */ }
         const orderIconUrl = 'https://i.ibb.co/3zdFhR7/order-pin.png';
-        const driverIcons = { 'חכמת': '...', 'עלי': '...', 'default': '...' };
+        const driverIcons = { 'חכמת': 'https://i.ibb.co/6wY3pD7/hikmet-truck.png', 'עלי': 'https://i.ibb.co/Yc5q0kP/ali-truck.png', 'default': 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png' };
         const defaultIconSize = [50, 50];
         const defaultIconAnchor = [25, 50];
-        const orderIcon = L.icon({ /* ... */ });
-        function createDriverIcon(driverName) { /* ... */ }
-        const WAREHOUSE_LOCATIONS = { /* ... */ };
+        const orderIcon = L.icon({ iconUrl: orderIconUrl, iconSize: defaultIconSize, iconAnchor: defaultIconAnchor, popupAnchor: [0, -50] });
+        function createDriverIcon(driverName) { const iconUrl = driverIcons[driverName] || driverIcons['default']; return L.icon({ iconUrl: iconUrl, iconSize: defaultIconSize, iconAnchor: defaultIconAnchor, popupAnchor: [0, -50] }); }
+        const WAREHOUSE_LOCATIONS = { "החרש": L.latLng(32.0573, 34.7963), "התלמיד": L.latLng(32.0853, 34.7818) };
         let map;
         const state = { drivers: {}, orders: {}, locations: {}, markers: { drivers: {}, orders: {} } };
         let assignmentLine = null;
         let selectedOrderMarker = null;
         let currentEditOrderId = null;
-        const DOM = { // Get all DOM elements needed
-            status: document.getElementById('connection-status'),
-            navLinks: document.querySelectorAll('.nav-link[data-view]'),
-            views: document.querySelectorAll('.app-view'),
-            ordersTable: document.getElementById('orders-table-body'),
-            driversTable: document.getElementById('drivers-table-body'),
-            tickerMessages: document.getElementById('ticker-messages'),
-            addOrderBtn: document.getElementById('add-order-btn'),
-            orderModal: document.getElementById('orderModal'),
-            orderForm: document.getElementById('orderForm'),
-            modalTitle: document.getElementById('modalTitle'),
-            closeModalBtn: document.getElementById('closeModalBtn'),
-            cancelModalBtn: document.getElementById('cancelModalBtn'),
-            orderIdInput: document.getElementById('orderId'),
-            editOnlyFields: document.querySelectorAll('.edit-only'),
-            ordersSearch: document.getElementById('orders-search'),
-            driversSearch: document.getElementById('drivers-search'),
-        };
+        let DOM = {};
 
 
         // --- Initialization ---
         function init() {
-            // Safety check for SmartLog
-            if (typeof SmartLog?.info !== 'function') { /* ... */ return; }
-            SmartLog.info("Auth Ready. Admin Hub v47.3 Initializing", "Init");
+            // Define DOM object *after* DOM is likely ready
+            DOM = {
+                status: document.getElementById('connection-status'),
+                navLinks: document.querySelectorAll('.nav-link[data-view]'),
+                views: document.querySelectorAll('.app-view'),
+                ordersTable: document.getElementById('orders-table-body'),
+                driversTable: document.getElementById('drivers-table-body'),
+                tickerMessages: document.getElementById('ticker-messages'),
+                addOrderBtn: document.getElementById('add-order-btn'),
+                orderModal: document.getElementById('orderModal'),
+                orderForm: document.getElementById('orderForm'),
+                modalTitle: document.getElementById('modalTitle'),
+                closeModalBtn: document.getElementById('closeModalBtn'),
+                cancelModalBtn: document.getElementById('cancelModalBtn'),
+                orderIdInput: document.getElementById('orderId'),
+                editOnlyFields: document.querySelectorAll('.edit-only'),
+                ordersSearch: document.getElementById('orders-search'),
+                driversSearch: document.getElementById('drivers-search'),
+            };
+
+             // Safety check AFTER defining DOM
+             if (!DOM.status || !DOM.navLinks || !DOM.views || !DOM.ordersTable || !DOM.driversTable) {
+                 console.error("CRITICAL: One or more essential DOM elements not found!");
+                 updateConnectionStatus(false, "שגיאה בטעינת ממשק המשתמש");
+                 return;
+             }
+
+             if (typeof SmartLog?.info !== 'function') { /* ... */ return; }
+             SmartLog.info("Auth Ready. Admin Hub v47.6 Initializing", "Init");
 
             try {
-                // Safety check for Firestore functions
                 if (typeof collection !== 'function') { throw new Error("Firestore functions not loaded."); }
 
                 initNavigation();
@@ -289,10 +343,10 @@
             }
         }
 
-        function updateConnectionStatus(isConnected, message) { /* ... Safety checks added in v47.2 ... */ }
+        function updateConnectionStatus(isConnected, message) { /* ... implementation unchanged ... */ }
 
         // --- UI Modules ---
-        function initNavigation() { /* ... Implementation with relative path for log.html ... */ }
+        function initNavigation() { /* ... implementation unchanged ... */ }
         function initTicker() { /* ... implementation unchanged ... */ }
         function initModals() { /* ... implementation unchanged ... */ }
         function openAddOrderModal() { /* ... implementation unchanged ... */ }
@@ -332,21 +386,17 @@
         window.handleDeleteOrder = handleDeleteOrder;
 
         // --- Start App ---
-        console.log('Waiting for authReady...');
+        console.log('Waiting for authReady (v47.6)...');
         if (authReady) {
-             // v47.3: Add timeout for authReady
-            const authTimeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("authReady timed out after 10 seconds")), 10000)
-            );
-
-            Promise.race([authReady, authTimeoutPromise])
-                .then(() => {
-                    console.log('authReady resolved. Starting init()...');
+            // v47.6: Removed the redundant Promise.race and local timeout
+            authReady
+                .then((user) => { // authReady now resolves with the user object
+                    console.log('authReady resolved successfully. User:', user.uid, 'Starting init()...');
                     init(); // Call init only after auth is ready
                 })
                 .catch(err => {
-                    console.error('authReady Promise failed or timed out!', err);
-                    SmartLog.error(err, "Auth.Fatal");
+                    console.error('authReady Promise failed!', err); // Log the actual error from config.js
+                    SmartLog.error(err, "Auth.Fatal", { message: "Firebase Authentication failed or timed out (30s)."});
                     updateConnectionStatus(false, `שגיאת אימות: ${err.message}`);
                 });
         } else {
