@@ -478,8 +478,8 @@
         // v45.3: נתיב סטטי קשיח
         const APP_ROOT = "/admin-v44"; 
         
-        import { db, auth, authReady } from `${APP_ROOT}/config.js`; 
-        import { SmartLog } from `${APP_ROOT}/SmartLog.js`;
+        import { db, auth, authReady } from "/admin-v44/config.js"; 
+        import { SmartLog } from "/admin-v44/SmartLog.js";
         import { 
             collection, 
             doc, 
@@ -519,16 +519,20 @@
             return `rgba(255, 255, 255, ${opacity})`; // Default fallback (white)
         }
         
-        // --- v46.1: Define Variables & Icons (Moved outside authReady) ---
+        // --- v46.2: Define Colors FIRST ---
         const varPrimary = getCssVariable('--primary-color');
         const varWarning = getCssVariable('--warning');
+        const driverFillColor = hexToRgba(varWarning, 0.9); 
+        const orderFillColor = hexToRgba(varPrimary, 0.8);  
 
+        // --- v46.2: Define SVG Strings using calculated colors ---
         // אייקון משאית (נהג)
-        const driverIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="${hexToRgba(varWarning, 0.9)}" stroke="black" stroke-width="1"><path d="M37.5 22.5h-5.833c-1.021 0-1.906.396-2.635 1.177-.729.781-1.146 1.74-1.146 2.865v2.917H5.833V7.5h20.834v10h10.833ZM5.833 33.333h1.25v-2.083h1.667v2.083h10.833v-2.083h1.667v2.083h1.25a2.083 2.083 0 0 0 2.083-2.083v-5.417h4.167a2.083 2.083 0 0 0 2.083-2.083V20c0-1.146-.938-2.083-2.083-2.083H32.5V7.5a2.083 2.083 0 0 0-2.083-2.083H5.833A2.083 2.083 0 0 0 3.75 7.5v23.75a2.083 2.083 0 0 0 2.083 2.083Zm5-8.333a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Zm10.833 0a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>`;
+        const driverIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="${driverFillColor}" stroke="black" stroke-width="1"><path d="M37.5 22.5h-5.833c-1.021 0-1.906.396-2.635 1.177-.729.781-1.146 1.74-1.146 2.865v2.917H5.833V7.5h20.834v10h10.833ZM5.833 33.333h1.25v-2.083h1.667v2.083h10.833v-2.083h1.667v2.083h1.25a2.083 2.083 0 0 0 2.083-2.083v-5.417h4.167a2.083 2.083 0 0 0 2.083-2.083V20c0-1.146-.938-2.083-2.083-2.083H32.5V7.5a2.083 2.083 0 0 0-2.083-2.083H5.833A2.083 2.083 0 0 0 3.75 7.5v23.75a2.083 2.083 0 0 0 2.083 2.083Zm5-8.333a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Zm10.833 0a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"/></svg>`;
 
         // אייקון סיכה (הזמנה)
-        const orderIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${hexToRgba(varPrimary, 0.8)}" stroke="#000" stroke-width="1"><path fill-rule="evenodd" d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 005.16-4.053 16.975 16.975 0 005.16-4.053c0-4.03-3.27-7.3-7.3-7.3S4.5 10.267 4.5 14.25c0 1.512.464 2.98.986 4.226l.044.105.02.046a16.975 16.975 0 005.16 4.053zM12 15.75a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" clip-rule="evenodd" /></svg>`;
+        const orderIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${orderFillColor}" stroke="#000" stroke-width="1"><path fill-rule="evenodd" d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 005.16-4.053 16.975 16.975 0 005.16-4.053c0-4.03-3.27-7.3-7.3-7.3S4.5 10.267 4.5 14.25c0 1.512.464 2.98.986 4.226l.044.105.02.046a16.975 16.975 0 005.16 4.053zM12 15.75a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" clip-rule="evenodd" /></svg>`;
 
+        // --- v46.1: Define Icons AFTER variables and helpers ---
         const driverIcon = L.divIcon({
             html: driverIconSvg,
             className: 'custom-svg-icon',
@@ -997,5 +1001,4 @@
     </script>
 </body>
 </html>
-
 
