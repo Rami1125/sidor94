@@ -1,61 +1,76 @@
-// SmartLog.js (v49.1) - Await Auth Before Firestore Write
+// SmartLog.js (v49.2) - Ensure page context for better filtering
 // מודול לוגים חכם הכותב ל-Firestore, עם תמיכה בקטגוריה והצעה לפתרון
 
 // v49.1: Import authReady promise
-import { db, auth, authReady as authReadyPromise } from './config.js';
-import { collection, addDoc, serverTimestamp } from "[https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js](https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js)";
+import { db, auth, authReady as authReadyPromise } from './config.js'; // Assuming config.js is v47.7+
+import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
 const LOG_COLLECTION = 'system_logs_v3';
 const sessionId = (Date.now() + Math.random()).toString(36);
 let isDbAvailable = !!db;
-let authChecked = false; // v49.1: Flag to avoid awaiting multiple times unnecessarily
+let authChecked = false;
 
 // פונקציה פנימית לכתיבת הלוג
-const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => { // v49.1: Made async
+const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => {
     // Log to console immediately
     const consoleArgs = [`[${origin}] ${level}:`, message];
-    if (Object.keys(context).length > 0) consoleArgs.push(context);
-    if (category) consoleArgs.push(`[Category: ${category}]`);
-    if (solution) consoleArgs.push(`[Solution: ${solution}]`);
+    // v49.2: Clean context before logging to console to avoid potential circular references or large objects
+    const safeContext = {};
+    for (const key in context) {
+        if (Object.hasOwnProperty.call(context, key)) {
+            const value = context[key];
+            // Avoid logging overly complex objects to console by default, stringify small parts if needed
+            if (typeof value === 'object' && value !== null) {
+                try {
+                    // Try to stringify, limit length
+                    const strValue = JSON.stringify(value);
+                    safeContext[key] = strValue.length > 100 ? strValue.substring(0, 100) + '...' : strValue;
+                } catch (e) {
+                    safeContext[key] = '[Unserializable Object]';
+                }
+            } else {
+                safeContext[key] = value;
+            }
+        }
+    }
+    if (Object.keys(safeContext).length > 0) consoleArgs.push(safeContext);
+    if (category) consoleArgs.push(`[Cat: ${category}]`);
+    if (solution) consoleArgs.push(`[Sol: ${solution}]`);
     switch (level) { case 'INFO': console.log(...consoleArgs); break; case 'WARN': console.warn(...consoleArgs); break; case 'ERROR': console.error(...consoleArgs); break; default: console.log(...consoleArgs); }
 
-    // Attempt to write to Firestore only if db is available AND auth is ready
-    if (!isDbAvailable) { console.warn("SmartLog: Firestore DB instance unavailable.", { level, message, origin }); return; }
+    if (!isDbAvailable) { /* console.warn("SmartLog: DB unavailable."); */ return; }
 
     try {
-        // v49.1: Wait for authentication ONLY if not checked before or if auth object is missing initially
-        if (!authChecked || !auth?.currentUser) {
-            console.log("SmartLog: Waiting for authReadyPromise before writing to Firestore...");
-            await authReadyPromise; // Wait for the auth process (including retries) to complete
-            authChecked = true; // Mark as checked for this session
-            console.log("SmartLog: Auth is ready. Proceeding with Firestore write.");
-        }
-
-        const user = auth?.currentUser; // Use optional chaining again after await
-        if (!user) {
-             // This should ideally not happen if authReadyPromise resolved, but as a safeguard
-             console.warn("SmartLog: User object not available even after authReady. Log not sent to Firestore.", { level, message, origin });
-             return;
-        }
+        if (!authChecked || !auth?.currentUser) { await authReadyPromise; authChecked = true; }
+        const user = auth?.currentUser; if (!user) { return; } // Don't log to DB if auth failed
         const userContext = { uid: user.uid, isAnonymous: user.isAnonymous };
+
+        // v49.2: Ensure page context is always included and cleaned
+        const pagePath = typeof window !== 'undefined' ? window.location.pathname : 'N/A';
+        // Simple cleaning: remove leading/trailing slashes and potentially hash/query params
+        const cleanPageName = pagePath.replace(/^\/+|\/+$/g, '').split(/[?#]/)[0] || 'unknown';
+
+        const finalContext = {
+             // Stringify context again for Firestore to handle potential non-serializable values gracefully
+             ...JSON.parse(JSON.stringify(context || {})),
+             sessionId,
+             userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+             page: pagePath, // Send full path
+             // pageName: cleanPageName // Or send cleaned name if preferred
+        };
+
 
         const logEntry = {
             timestamp: serverTimestamp(), level, message: String(message), origin,
-            context: { ...JSON.parse(JSON.stringify(context || {})), sessionId, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A', page: typeof window !== 'undefined' ? window.location.pathname : 'N/A' },
+            context: finalContext, // Use the final cleaned context
             user: userContext, category: category || null, solution: solution || null
         };
 
         await addDoc(collection(db, LOG_COLLECTION), logEntry);
-        // console.log("SmartLog: Log entry written to Firestore."); // Optional: log success
 
     } catch (error) {
-        // Log the failure to write the log itself
-        console.error("SmartLog FATAL ERROR: Failed to write log entry to Firestore.", error, { originalMessage: message });
-        // Set flag to prevent future Firestore write attempts if permission error occurs?
-        if (error.code === 'permission-denied' || error.message.includes('permissions')) {
-             console.warn("SmartLog: Disabling further Firestore logging due to permission error.");
-             isDbAvailable = false; // Prevent further attempts if permissions are wrong
-        }
+        console.error("SmartLog FATAL ERROR writing to Firestore.", error, { originalMessage: message });
+        if (error.code === 'permission-denied' || error.message.includes('permissions')) { console.warn("SmartLog: Disabling Firestore logging."); isDbAvailable = false; }
     }
 };
 
