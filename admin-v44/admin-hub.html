@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v47.9 - מרכז בקרה (חקירה)</title>
+    <title>DeliveryMaster v48.0 - מרכז בקרה (חקירה מתקדמת)</title>
 
     <!-- Leaflet (Map) CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -94,6 +94,10 @@
         .form-input, .form-select, .form-textarea { width: 100%; padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--outline); background: var(--surface); box-sizing: border-box; font-size: 1rem; }
         .form-textarea { min-height: 80px; resize: vertical; }
         .modal-footer { margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem; }
+
+        /* v48.0: Styling for debug logs in table */
+        .debug-log-row td { background-color: #fff3cd; color: #664d03; font-style: italic; font-size: 0.8rem; }
+
     </style>
 </head>
 <body>
@@ -104,7 +108,7 @@
         <div class="header-with-ticker">
             <div class="ticker-wrap" aria-hidden="true"><div class="ticker" id="ticker-messages"><span class="ticker-item">טוען הודעות...</span></div></div>
             <header class="card">
-                 <div id="app-title"><span id="app-version">v47.9</span>DeliveryMaster</div>
+                 <div id="app-title"><span id="app-version">v48.0</span>DeliveryMaster</div>
                  <div id="connection-status" class="status-connecting"><div class="dot"></div><span>מאתחל חיבור...</span></div>
             </header>
         </div>
@@ -133,7 +137,7 @@
                     </button>
                  </div>
                  <div class="table-container">
-                    <table><thead><tr><th>מזהה</th><th>לקוח</th><th>טלפון</th><th>כתובת</th><th>נהג</th><th>סטטוס</th><th>פעולות</th></tr></thead><tbody id="orders-table-body"></tbody></table>
+                    <table><thead><tr><th>מזהה</th><th>לקוח</th><th>טלפון</th><th>כתובת</th><th>נהג</th><th>סטטוס</th><th>פעולות</th></tr></thead><tbody id="orders-table-body"><tr class="initial-loading"><td colspan="7" class="text-center p-4">טוען הזמנות...</td></tr></tbody></table>
                  </div>
             </div>
             <div id="view-drivers" class="app-view view-table card">
@@ -145,7 +149,7 @@
                     </div>
                  </div>
                  <div class="table-container">
-                    <table><thead><tr><th>שם</th><th>טלפון</th><th>סטטוס</th><th>מיקום אחרון</th></tr></thead><tbody id="drivers-table-body"></tbody></table>
+                    <table><thead><tr><th>שם</th><th>טלפון</th><th>סטטוס</th><th>מיקום אחרון</th></tr></thead><tbody id="drivers-table-body"><tr class="initial-loading"><td colspan="4" class="text-center p-4">טוען נהגים...</td></tr></tbody></table>
                  </div>
             </div>
         </main>
@@ -227,7 +231,7 @@
 
     <!-- Firebase & App Logic (Modular) -->
     <script type="module">
-        console.log('Module script started (v47.9)');
+        console.log('Module script started (v48.0)');
 
         // --- Import Modules ---
         let db, auth, authReady, SmartLog;
@@ -238,13 +242,13 @@
             const firebaseImports = await import("./config.js");
             db = firebaseImports.db;
             auth = firebaseImports.auth;
-            authReady = firebaseImports.authReady; // Get the promise from config (v47.7 no timeout)
+            authReady = firebaseImports.authReady;
 
             const smartLogImport = await import("./SmartLog.js");
             SmartLog = smartLogImport.SmartLog;
             console.log('Core modules (config, SmartLog) imported successfully.');
 
-             // Fallback for SmartLog if needed
+             // Fallback for SmartLog
             if (!SmartLog) {
                  console.error("SmartLog module failed to load. Using console.log as fallback.");
                  SmartLog = { info: (msg, origin, context) => console.log(`[INFO][${origin}] ${msg}`, context || ''), warn: (msg, origin, context) => console.warn(`[WARN][${origin}] ${msg}`, context || ''), error: (err, origin, context) => console.error(`[ERROR][${origin}] ${err.message}`, context || '', err.stack) };
@@ -252,15 +256,7 @@
 
             // Import Firestore functions
             const firestoreFunctions = await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js");
-            collection = firestoreFunctions.collection;
-            doc = firestoreFunctions.doc;
-            onSnapshot = firestoreFunctions.onSnapshot;
-            query = firestoreFunctions.query;
-            orderBy = firestoreFunctions.orderBy;
-            addDoc = firestoreFunctions.addDoc;
-            updateDoc = firestoreFunctions.updateDoc;
-            serverTimestamp = firestoreFunctions.serverTimestamp;
-            deleteDoc = firestoreFunctions.deleteDoc;
+            collection = firestoreFunctions.collection; doc = firestoreFunctions.doc; onSnapshot = firestoreFunctions.onSnapshot; query = firestoreFunctions.query; orderBy = firestoreFunctions.orderBy; addDoc = firestoreFunctions.addDoc; updateDoc = firestoreFunctions.updateDoc; serverTimestamp = firestoreFunctions.serverTimestamp; deleteDoc = firestoreFunctions.deleteDoc;
             console.log('Firestore functions imported successfully.');
 
         } catch (error) {
@@ -271,140 +267,91 @@
         }
 
         // --- Helper Functions, Icons, Constants, Globals ---
-        // (These sections remain largely unchanged)
         function getCssVariable(varName) { try { return getComputedStyle(document.documentElement).getPropertyValue(varName).trim(); } catch (e) { console.warn(`Could not get CSS variable ${varName}.`); return null; } }
         function hexToRgba(hex, opacity) { let c; if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){ c= hex.substring(1).split(''); if(c.length== 3){ c= [c[0], c[0], c[1], c[1], c[2], c[2]]; } c= '0x'+c.join(''); return `rgba(${[(c>>16)&255, (c>>8)&255, c&255].join(',')},${opacity})`; } if (hex && hex.startsWith('rgb')) return hex; console.warn(`Invalid hex color: ${hex}.`); return `rgba(255, 255, 255, ${opacity})`; }
         const orderIconUrl = 'https://i.ibb.co/3zdFhR7/order-pin.png';
         const driverIcons = { 'חכמת': 'https://i.ibb.co/6wY3pD7/hikmet-truck.png', 'עלי': 'https://i.ibb.co/Yc5q0kP/ali-truck.png', 'default': 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png' };
-        const defaultIconSize = [50, 50];
-        const defaultIconAnchor = [25, 50];
+        const defaultIconSize = [50, 50]; const defaultIconAnchor = [25, 50];
         const orderIcon = L.icon({ iconUrl: orderIconUrl, iconSize: defaultIconSize, iconAnchor: defaultIconAnchor, popupAnchor: [0, -50] });
         function createDriverIcon(driverName) { const iconUrl = driverIcons[driverName] || driverIcons['default']; return L.icon({ iconUrl: iconUrl, iconSize: defaultIconSize, iconAnchor: defaultIconAnchor, popupAnchor: [0, -50] }); }
         const WAREHOUSE_LOCATIONS = { "החרש": L.latLng(32.0573, 34.7963), "התלמיד": L.latLng(32.0853, 34.7818) };
         let map;
         const state = { drivers: {}, orders: {}, locations: {}, markers: { drivers: {}, orders: {} } };
-        let assignmentLine = null;
-        let selectedOrderMarker = null;
-        let currentEditOrderId = null;
-        let DOM = {};
+        let assignmentLine = null; let selectedOrderMarker = null; let currentEditOrderId = null;
+        let DOM = {}; // Defined in init
 
 
         // --- Initialization ---
         function init() {
-            // Define DOM object *after* DOM is likely ready
+            // Define DOM object
             DOM = {
-                status: document.getElementById('connection-status'),
-                navLinks: document.querySelectorAll('.nav-link[data-view]'),
-                views: document.querySelectorAll('.app-view'),
-                ordersTable: document.getElementById('orders-table-body'),
-                driversTable: document.getElementById('drivers-table-body'),
-                tickerMessages: document.getElementById('ticker-messages'),
-                addOrderBtn: document.getElementById('add-order-btn'),
-                orderModal: document.getElementById('orderModal'),
-                orderForm: document.getElementById('orderForm'),
-                modalTitle: document.getElementById('modalTitle'),
-                closeModalBtn: document.getElementById('closeModalBtn'),
-                cancelModalBtn: document.getElementById('cancelModalBtn'),
-                orderIdInput: document.getElementById('orderId'),
-                editOnlyFields: document.querySelectorAll('.edit-only'),
-                ordersSearch: document.getElementById('orders-search'),
-                driversSearch: document.getElementById('drivers-search'),
+                status: document.getElementById('connection-status'), navLinks: document.querySelectorAll('.nav-link[data-view]'), views: document.querySelectorAll('.app-view'),
+                ordersTable: document.getElementById('orders-table-body'), driversTable: document.getElementById('drivers-table-body'), tickerMessages: document.getElementById('ticker-messages'),
+                addOrderBtn: document.getElementById('add-order-btn'), orderModal: document.getElementById('orderModal'), orderForm: document.getElementById('orderForm'), modalTitle: document.getElementById('modalTitle'),
+                closeModalBtn: document.getElementById('closeModalBtn'), cancelModalBtn: document.getElementById('cancelModalBtn'), orderIdInput: document.getElementById('orderId'), editOnlyFields: document.querySelectorAll('.edit-only'),
+                ordersSearch: document.getElementById('orders-search'), driversSearch: document.getElementById('drivers-search'),
             };
 
-             // Safety check AFTER defining DOM
-             if (!DOM.status || !DOM.navLinks || !DOM.views || !DOM.ordersTable || !DOM.driversTable) {
-                 console.error("CRITICAL: One or more essential DOM elements not found!");
-                 updateConnectionStatus(false, "שגיאה בטעינת ממשק המשתמש");
-                 return;
+             // Safety check
+             if (!DOM.status || !DOM.ordersTable || !DOM.driversTable) {
+                 console.error("CRITICAL: Essential DOM elements missing!"); updateConnectionStatus(false, "שגיאה בטעינת UI"); return;
              }
-
-             if (typeof SmartLog?.info !== 'function') { return; } // Already logged error if SmartLog missing
-             SmartLog.info("Auth Ready. Admin Hub v47.9 Initializing", "Init"); // v47.9
+             if (typeof SmartLog?.info !== 'function') { console.error("SmartLog missing"); return; }
+             SmartLog.info("Auth Ready. Admin Hub v48.0 Initializing", "Init");
 
             try {
                 if (typeof collection !== 'function') { throw new Error("Firestore functions not loaded."); }
 
-                // Wrap individual init steps in try-catch
                 try { initNavigation(); } catch(e) { SmartLog.error(e, "Init.Navigation"); }
                 try { initMap(); } catch(e) { SmartLog.error(e, "Init.Map"); }
                 try { initTicker(); } catch(e) { SmartLog.error(e, "Init.Ticker"); }
                 try { initModals(); } catch(e) { SmartLog.error(e, "Init.Modals"); }
                 try { initSearch(); } catch(e) { SmartLog.error(e, "Init.Search"); }
 
-                // Wrap listener setup in try-catch
                 try {
-                    SmartLog.info("Attempting to attach Firestore listeners...", "Init.Listeners");
-                    listenToDrivers();
-                    listenToOrders();
-                    listenToLocations();
+                    SmartLog.info("Attaching Firestore listeners...", "Init.Listeners");
+                    listenToDrivers(); listenToOrders(); listenToLocations();
                     SmartLog.info("Firestore listeners attached.", "Init.Listeners");
                 } catch (e) {
-                     SmartLog.error(e, "Init.Listeners", { message: "Critical failure attaching listeners." });
-                     updateConnectionStatus(false, "שגיאה בהפעלת מאזינים");
-                     return; // Stop if listeners fail critically
+                     SmartLog.error(e, "Init.Listeners", { message: "Critical failure attaching listeners." }); updateConnectionStatus(false, "שגיאה בהפעלת מאזינים"); return;
                 }
 
-                // Only update status if NO critical errors occurred before this point
                 updateConnectionStatus(true, "מחובר ומאזין");
-                SmartLog.info("Initialization complete.", "Init"); // Simplified message
+                SmartLog.info("Initialization complete.", "Init");
 
-            } catch (e) {
-                // This catch block handles errors from the main try block (e.g., Firestore check)
-                SmartLog.error(e, "Init.Critical");
-                updateConnectionStatus(false, "שגיאת אתחול קריטית");
-            }
+            } catch (e) { SmartLog.error(e, "Init.Critical"); updateConnectionStatus(false, "שגיאת אתחול קריטית"); }
         }
 
-        // v47.9: Added detailed logging and trace to updateConnectionStatus
+        // --- Connection Status Update ---
         function updateConnectionStatus(isConnected, message) {
-            const statusEl = DOM.status;
-            if (!statusEl) {
-                 console.error("updateConnectionStatus called but status element not found in DOM object.");
-                 return;
-            }
-            // Log the update attempt WITH stack trace
-            console.trace(`updateConnectionStatus called: isConnected=${isConnected}, message="${message}"`); // v47.9: Use trace
-            SmartLog.info(`Updating connection status`, "UI.Status", { isConnected, message, callStack: new Error().stack }); // v47.9: Add stack
+             const statusEl = DOM.status; if (!statusEl) { console.error("updateConnectionStatus: status element not found."); return; }
+             console.trace(`updateConnectionStatus called: isConnected=${isConnected}, message="${message}"`);
+             SmartLog.info(`Updating connection status`, "UI.Status", { isConnected, message }); // Removed stack trace for brevity
 
-            const dot = statusEl.querySelector('.dot');
-            const span = statusEl.querySelector('span');
-
-            if (span) span.textContent = message;
-
-            // Apply classes AFTER logging
-            if (isConnected) {
-                statusEl.className = 'status-connected';
-                if(dot) dot.style.backgroundColor = 'var(--success)';
-            } else {
-                statusEl.className = 'status-error';
-                 if(dot) dot.style.backgroundColor = 'var(--error)';
-            }
-         }
-
+             const dot = statusEl.querySelector('.dot'); const span = statusEl.querySelector('span');
+             if (span) span.textContent = message;
+             if (isConnected) { statusEl.className = 'status-connected'; if(dot) dot.style.backgroundColor = 'var(--success)'; }
+             else { statusEl.className = 'status-error'; if(dot) dot.style.backgroundColor = 'var(--error)'; }
+        }
 
         // --- UI Modules ---
-        function initNavigation() { /* ... implementation unchanged ... */ }
-        function initTicker() { /* ... implementation unchanged ... */ }
-        function initModals() { /* ... implementation unchanged ... */ }
-        function openAddOrderModal() { /* ... implementation unchanged ... */ }
-        function openEditOrderModal(orderId) { /* ... implementation unchanged ... */ }
-        function closeModal() { /* ... implementation unchanged ... */ }
-        function initSearch() { /* ... implementation unchanged ... */ }
+        function initNavigation() { /* ... */ } function initTicker() { /* ... */ } function initModals() { /* ... */ } function openAddOrderModal() { /* ... */ } function openEditOrderModal(orderId) { /* ... */ } function closeModal() { /* ... */ } function initSearch() { /* ... */ }
 
         // --- Map Logic ---
-        function initMap() { /* ... implementation unchanged ... */ }
+        function initMap() { /* ... */ }
 
-        // --- Firestore Listeners (v47.9: Added logging and error handling) ---
+        // --- Firestore Listeners (v48.0: More detailed logging) ---
         function listenToDrivers() {
-            SmartLog.info("listenToDrivers: Attaching listener...", "Firestore.Drivers");
+            SmartLog.info("Attaching listener...", "Firestore.Drivers");
             const q = query(collection(db, "drivers"), orderBy("name"));
             onSnapshot(q, (snapshot) => {
-                SmartLog.info(`listenToDrivers: Received snapshot with ${snapshot.docChanges().length} changes.`, "Firestore.Drivers");
-                try { // v47.9: Wrap processing
+                SmartLog.info(`Received snapshot with ${snapshot.docChanges().length} changes.`, "Firestore.Drivers");
+                let processedCount = 0; // v48.0: Count processed items
+                try {
                     snapshot.docChanges().forEach((change) => {
                         const driverId = change.doc.id;
                         const driverData = { id: driverId, ...change.doc.data() };
-                        SmartLog.info(`Processing driver change`, "Firestore.Drivers", { id: driverId, type: change.type, data: driverData }); // v47.9: Log data sample
+                        SmartLog.info(`Processing driver change`, "Firestore.Drivers", { id: driverId, type: change.type });
 
                         if (change.type === "added" || change.type === "modified") {
                             state.drivers[driverId] = driverData;
@@ -413,28 +360,36 @@
                             delete state.drivers[driverId];
                             removeDriverMarker(driverId);
                         }
+                        processedCount++; // v48.0
                     });
-                    renderDriversTable(); // Call render after processing changes
+                     SmartLog.info(`Finished processing ${processedCount} driver changes. Calling renderDriversTable.`, "Firestore.Drivers"); // v48.0
+                    renderDriversTable(); // Call render AFTER processing all changes
                 } catch (e) {
-                    SmartLog.error(e, "Firestore.Drivers.Processing", { message: "Error processing driver snapshot changes."});
-                    updateConnectionStatus(false, "שגיאה בעיבוד נתוני נהגים"); // v47.9: Update status on error
+                    SmartLog.error(e, "Firestore.Drivers.Processing"); updateConnectionStatus(false, "שגיאה בעיבוד נהגים");
                 }
-            }, e => { // Error callback for the listener itself
-                 SmartLog.error(e, "Firestore.Drivers.Listener", { message: "Listener failed." });
-                 updateConnectionStatus(false, "שגיאת מאזין נהגים");
-            });
+            }, e => { SmartLog.error(e, "Firestore.Drivers.Listener"); updateConnectionStatus(false, "שגיאת מאזין נהגים"); });
         }
 
         function listenToOrders() {
-            SmartLog.info("listenToOrders: Attaching listener...", "Firestore.Orders");
+            SmartLog.info("Attaching listener...", "Firestore.Orders");
             const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
             onSnapshot(q, (snapshot) => {
-                 SmartLog.info(`listenToOrders: Received snapshot with ${snapshot.docChanges().length} changes.`, "Firestore.Orders");
-                 try { // v47.9: Wrap processing
+                 SmartLog.info(`Received snapshot with ${snapshot.docChanges().length} changes.`, "Firestore.Orders");
+                 let processedCount = 0; // v48.0
+                 try {
                     snapshot.docChanges().forEach((change) => {
                         const orderId = change.doc.id;
-                        const orderData = { id: orderId, ...change.doc.data() };
-                        SmartLog.info(`Processing order change`, "Firestore.Orders", { id: orderId, type: change.type, data: orderData }); // v47.9: Log data sample
+                        // v48.0: Log raw data BEFORE processing
+                        const rawData = change.doc.data();
+                        SmartLog.info(`Processing order change`, "Firestore.Orders", { id: orderId, type: change.type, rawData: JSON.stringify(rawData).substring(0, 100) + '...' }); // Log raw data sample
+
+                        // v48.0: Add basic data validation
+                        if (!rawData || typeof rawData !== 'object') {
+                             SmartLog.warn(`Invalid data structure for order ${orderId}`, "Firestore.Orders.Processing", { rawData });
+                             return; // Skip processing this invalid document
+                        }
+
+                        const orderData = { id: orderId, ...rawData }; // Proceed if data is an object
 
                         if (change.type === "added" || change.type === "modified") {
                             state.orders[orderId] = orderData;
@@ -443,177 +398,126 @@
                             delete state.orders[orderId];
                             removeOrderMarker(orderId);
                         }
+                         processedCount++; // v48.0
                     });
-                    renderOrdersTable(); // Call render after processing changes
+                     SmartLog.info(`Finished processing ${processedCount} order changes. Calling renderOrdersTable.`, "Firestore.Orders"); // v48.0
+                    renderOrdersTable();
                 } catch (e) {
-                    SmartLog.error(e, "Firestore.Orders.Processing", { message: "Error processing order snapshot changes."});
-                    updateConnectionStatus(false, "שגיאה בעיבוד נתוני הזמנות"); // v47.9: Update status on error
+                    SmartLog.error(e, "Firestore.Orders.Processing"); updateConnectionStatus(false, "שגיאה בעיבוד הזמנות");
                 }
-            }, e => { // Error callback
-                 SmartLog.error(e, "Firestore.Orders.Listener", { message: "Listener failed." });
-                 updateConnectionStatus(false, "שגיאת מאזין הזמנות");
-            });
+            }, e => { SmartLog.error(e, "Firestore.Orders.Listener"); updateConnectionStatus(false, "שגיאת מאזין הזמנות"); });
         }
 
         function listenToLocations() {
-            SmartLog.info("listenToLocations: Attaching listener...", "Firestore.Locations");
-            const q = query(collection(db, "driverLocations"));
-            onSnapshot(q, (snapshot) => {
-                SmartLog.info(`listenToLocations: Received snapshot with ${snapshot.docChanges().length} changes.`, "Firestore.Locations");
-                 try { // v47.9: Wrap processing
-                    snapshot.docChanges().forEach((change) => {
-                        const driverId = change.doc.id;
-                        const locData = change.doc.data();
-                        SmartLog.info(`Processing location change`, "Firestore.Locations", { id: driverId, type: change.type, data: locData }); // v47.9: Log data sample
+             SmartLog.info("Attaching listener...", "Firestore.Locations");
+             const q = query(collection(db, "driverLocations"));
+             onSnapshot(q, (snapshot) => {
+                 SmartLog.info(`Received snapshot with ${snapshot.docChanges().length} changes.`, "Firestore.Locations");
+                 let processedCount = 0; // v48.0
+                 try {
+                     snapshot.docChanges().forEach((change) => {
+                         const driverId = change.doc.id;
+                         const locData = change.doc.data();
+                         SmartLog.info(`Processing location change`, "Firestore.Locations", { id: driverId, type: change.type });
 
-                        if (change.type === "modified" || change.type === "added") {
-                            state.locations[driverId] = { id: driverId, ...locData };
-                            updateDriverMarkerLocation(driverId, locData);
-                        }
-                        // No specific action needed for 'removed' locations currently
-                    });
-                    renderDriversTable(); // Refresh driver table to show updated times
-                } catch (e) {
-                    SmartLog.error(e, "Firestore.Locations.Processing", { message: "Error processing location snapshot changes."});
-                    updateConnectionStatus(false, "שגיאה בעיבוד נתוני מיקום"); // v47.9: Update status on error
-                }
-            }, e => { // Error callback
-                SmartLog.error(e, "Firestore.Locations.Listener", { message: "Listener failed." });
-                updateConnectionStatus(false, "שגיאת מאזין מיקומים");
-            });
+                         // v48.0: Validate location data
+                         if (!locData || typeof locData.latitude !== 'number' || typeof locData.longitude !== 'number') {
+                              SmartLog.warn(`Invalid location data for driver ${driverId}`, "Firestore.Locations.Processing", { locData });
+                              return; // Skip invalid location
+                         }
+
+                         if (change.type === "modified" || change.type === "added") {
+                             state.locations[driverId] = { id: driverId, ...locData };
+                             updateDriverMarkerLocation(driverId, locData);
+                         }
+                         processedCount++; // v48.0
+                     });
+                     SmartLog.info(`Finished processing ${processedCount} location changes. Calling renderDriversTable.`, "Firestore.Locations"); // v48.0
+                     renderDriversTable();
+                 } catch (e) {
+                     SmartLog.error(e, "Firestore.Locations.Processing"); updateConnectionStatus(false, "שגיאה בעיבוד מיקומים");
+                 }
+             }, e => { SmartLog.error(e, "Firestore.Locations.Listener"); updateConnectionStatus(false, "שגיאת מאזין מיקומים"); });
         }
 
-        // --- Map Marker & Assignment (v47.9: Added logging and error handling) ---
+
+        // --- Map Marker & Assignment (v48.0: Added more logging) ---
         function updateDriverMarker(driverId, driverData) {
-            SmartLog.info(`updateDriverMarker called for ${driverId}`, "Map.Marker.Driver");
-            try { // v47.9: Wrap function logic
+            SmartLog.info(`Attempting to update/add marker for driver ${driverId}`, "Map.Marker.Driver"); // v48.0
+            try {
                 const location = state.locations[driverId];
-                const latLng = location ? [location.latitude, location.longitude] : null; // v47.9: Don't show marker without location
+                const latLng = location ? [location.latitude, location.longitude] : null;
                 if (!latLng) {
-                     SmartLog.warn(`No location found for driver ${driverId}. Marker not updated/added.`, "Map.Marker.Driver");
-                     removeDriverMarker(driverId); // v47.9: Remove if location is lost
-                     return;
+                     SmartLog.warn(`No valid location for driver ${driverId}. Removing marker if exists.`, "Map.Marker.Driver");
+                     removeDriverMarker(driverId); return;
                 }
                 const driverName = driverData.name || 'לא ידוע';
                 const iconToUse = createDriverIcon(driverName);
-
                 const marker = state.markers.drivers[driverId];
 
                 if (marker) {
-                    marker.setLatLng(latLng);
-                    marker.setIcon(iconToUse);
-                    marker.getPopup().setContent(`<b>${driverName}</b><br>${driverData.phone}`);
-                    marker.driverData = driverData;
+                    marker.setLatLng(latLng); marker.setIcon(iconToUse); marker.getPopup().setContent(`<b>${driverName}</b><br>${driverData.phone}`); marker.driverData = driverData;
                     SmartLog.info(`Driver marker updated: ${driverId}`, "Map.Marker.Driver");
                 } else {
                     const newMarker = L.marker(latLng, { icon: iconToUse, draggable: false }).addTo(map);
-                    newMarker.bindPopup(`<b>${driverName}</b><br>${driverData.phone}`);
-                    newMarker.driverData = driverData;
+                    newMarker.bindPopup(`<b>${driverName}</b><br>${driverData.phone}`); newMarker.driverData = driverData;
                     newMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); if (selectedOrderMarker) { assignOrder(selectedOrderMarker.orderData, driverData); } else { zoomToMarker(newMarker, 17); } });
                     state.markers.drivers[driverId] = newMarker;
                     SmartLog.info(`Driver marker added: ${driverId}`, "Map.Marker.Driver");
                 }
-            } catch (e) {
-                 SmartLog.error(e, "Map.Marker.Driver.Update", { driverId: driverId });
-                 updateConnectionStatus(false, "שגיאה בעדכון סמן נהג");
-            }
+            } catch (e) { SmartLog.error(e, "Map.Marker.Driver.Update", { driverId }); updateConnectionStatus(false, "שגיאה בעדכון סמן נהג"); }
         }
 
-        function removeDriverMarker(driverId) {
-            SmartLog.info(`removeDriverMarker called for ${driverId}`, "Map.Marker.Driver");
-             try { // v47.9: Wrap function logic
-                const marker = state.markers.drivers[driverId];
-                if (marker) {
-                    map.removeLayer(marker);
-                    delete state.markers.drivers[driverId];
-                    SmartLog.info(`Driver marker removed: ${driverId}`, "Map.Marker.Driver");
-                }
-            } catch (e) {
-                 SmartLog.error(e, "Map.Marker.Driver.Remove", { driverId: driverId });
-            }
-        }
+        function removeDriverMarker(driverId) { /* ... */ }
 
         function updateOrderMarker(orderId, orderData) {
-            SmartLog.info(`updateOrderMarker called for ${orderId}`, "Map.Marker.Order");
-            try { // v47.9: Wrap function logic
-                if (orderData.status === 'הושלם') {
-                    removeOrderMarker(orderId);
-                    return;
-                }
-                const latLng = (orderData.latitude && orderData.longitude) ? [orderData.latitude, orderData.longitude] : null;
+            SmartLog.info(`Attempting to update/add marker for order ${orderId}`, "Map.Marker.Order"); // v48.0
+            try {
+                if (orderData.status === 'הושלם') { removeOrderMarker(orderId); return; }
+                // v48.0: Validate coordinates more strictly
+                const lat = parseFloat(orderData.latitude);
+                const lng = parseFloat(orderData.longitude);
+                const latLng = (typeof lat === 'number' && !isNaN(lat) && typeof lng === 'number' && !isNaN(lng)) ? [lat, lng] : null;
+
                 if (!latLng) {
-                     SmartLog.warn(`No location found for order ${orderId}. Marker not updated/added.`, "Map.Marker.Order");
-                     removeOrderMarker(orderId); // v47.9: Remove if location is missing
-                     return;
+                     SmartLog.warn(`Invalid or missing location for order ${orderId}. Removing marker if exists.`, "Map.Marker.Order", { lat: orderData.latitude, lng: orderData.longitude });
+                     removeOrderMarker(orderId); return;
                 }
 
                 const distances = calculateDistances(latLng);
-                const popupContent = `<b>${orderData.customer?.name}</b><br>${orderData.address}<br><b>סטטוס:</b> ${orderData.status || 'חדש'}<br><small>${distances}</small>`;
+                const popupContent = `<b>${orderData.customer?.name || '?'}</b><br>${orderData.address}<br><b>סטטוס:</b> ${orderData.status || 'חדש'}<br><small>${distances}</small>`;
                 const marker = state.markers.orders[orderId];
 
                 if (marker) {
-                    marker.setLatLng(latLng);
-                    marker.getPopup().setContent(popupContent);
-                    marker.orderData = orderData;
-                     SmartLog.info(`Order marker updated: ${orderId}`, "Map.Marker.Order");
+                    marker.setLatLng(latLng); marker.getPopup().setContent(popupContent); marker.orderData = orderData;
+                    SmartLog.info(`Order marker updated: ${orderId}`, "Map.Marker.Order");
                 } else {
                     const newMarker = L.marker(latLng, { icon: orderIcon, draggable: true }).addTo(map);
-                    newMarker.bindPopup(popupContent);
-                    newMarker.orderData = orderData;
+                    newMarker.bindPopup(popupContent); newMarker.orderData = orderData;
                     newMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); handleOrderClick(newMarker); if (!selectedOrderMarker) { zoomToMarker(newMarker, 17); } });
                     newMarker.on('dragend', (e) => handleOrderDrop(e.target, orderData));
                     state.markers.orders[orderId] = newMarker;
-                     SmartLog.info(`Order marker added: ${orderId}`, "Map.Marker.Order");
+                    SmartLog.info(`Order marker added: ${orderId}`, "Map.Marker.Order");
                 }
-            } catch (e) {
-                 SmartLog.error(e, "Map.Marker.Order.Update", { orderId: orderId });
-                 updateConnectionStatus(false, "שגיאה בעדכון סמן הזמנה");
-            }
+            } catch (e) { SmartLog.error(e, "Map.Marker.Order.Update", { orderId }); updateConnectionStatus(false, "שגיאה בעדכון סמן הזמנה"); }
         }
 
-        function removeOrderMarker(orderId) {
-            SmartLog.info(`removeOrderMarker called for ${orderId}`, "Map.Marker.Order");
-             try { // v47.9: Wrap function logic
-                const marker = state.markers.orders[orderId];
-                if (marker) {
-                    map.removeLayer(marker);
-                    delete state.markers.orders[orderId];
-                     SmartLog.info(`Order marker removed: ${orderId}`, "Map.Marker.Order");
-                }
-             } catch (e) {
-                 SmartLog.error(e, "Map.Marker.Order.Remove", { orderId: orderId });
-             }
-        }
+        function removeOrderMarker(orderId) { /* ... */ }
+        function updateDriverMarkerLocation(driverId, locData) { /* ... */ }
+        function calculateDistances(orderLatLng) { /* ... */ }
+        function handleOrderClick(marker) { /* ... */ }
+        function handleOrderDrop(orderMarker, orderData) { /* ... */ }
+        async function assignOrder(orderData, driverData) { /* ... */ }
+        function zoomToMarker(marker, zoomLevel) { /* ... */ }
 
-        function updateDriverMarkerLocation(driverId, locData) {
-            SmartLog.info(`updateDriverMarkerLocation called for ${driverId}`, "Map.Marker.DriverLoc");
-             try { // v47.9: Wrap function logic
-                const marker = state.markers.drivers[driverId];
-                if (marker && locData.latitude && locData.longitude) {
-                    marker.setLatLng([locData.latitude, locData.longitude]);
-                    SmartLog.info(`Driver marker location updated: ${driverId}`, "Map.Marker.DriverLoc");
-                } else if (marker) {
-                     SmartLog.warn(`Invalid location data for driver ${driverId}`, "Map.Marker.DriverLoc", { locData });
-                }
-             } catch (e) {
-                 SmartLog.error(e, "Map.Marker.DriverLoc.Update", { driverId: driverId });
-             }
-        }
-
-        function calculateDistances(orderLatLng) { /* ... implementation unchanged ... */ }
-        function handleOrderClick(marker) { /* ... implementation unchanged ... */ }
-        function handleOrderDrop(orderMarker, orderData) { /* ... implementation unchanged ... */ }
-        async function assignOrder(orderData, driverData) { /* ... implementation unchanged ... */ }
-        function zoomToMarker(marker, zoomLevel) { /* ... implementation unchanged ... */ }
-
-        // --- CRUD & Render (v47.9: Added logging and error handling) ---
-        async function handleSaveOrder(e) { /* ... (try-catch already exists) ... */ }
+        // --- CRUD & Render (v48.0: Added more logging) ---
+        async function handleSaveOrder(e) { /* ... */ }
 
         function renderOrdersTable(filter = '') {
-            SmartLog.info("renderOrdersTable called", "UI.Render.Orders", { filter });
-            if (!DOM.ordersTable) { SmartLog.warn("Order table body not found in DOM.", "UI.Render.Orders"); return; } // v47.9: Check existence
+            SmartLog.info(`renderOrdersTable called. Items in state: ${Object.keys(state.orders).length}`, "UI.Render.Orders", { filter }); // v48.0
+            if (!DOM.ordersTable) { SmartLog.warn("Order table body not found.", "UI.Render.Orders"); return; }
 
-            try { // v47.9: Wrap function logic
+            try {
                 const lcFilter = filter.toLowerCase();
                 const orders = Object.values(state.orders).filter(o =>
                     !lcFilter ||
@@ -622,11 +526,13 @@
                     (o.driver?.name && o.driver.name.toLowerCase().includes(lcFilter)) ||
                     (o.id && o.id.includes(lcFilter))
                 );
+                 SmartLog.info(`Rendering ${orders.length} orders after filter.`, "UI.Render.Orders"); // v48.0
 
+                let tableHTML = ''; // v48.0: Build HTML string
                 if (orders.length === 0) {
-                    DOM.ordersTable.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem;">אין הזמנות${filter ? ' תואמות לחיפוש' : ''}</td></tr>`; // v47.9: Improved message
+                    tableHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem;">אין הזמנות${filter ? ' תואמות לחיפוש' : ''}</td></tr>`;
                 } else {
-                    DOM.ordersTable.innerHTML = orders.map(order => `
+                    tableHTML = orders.map(order => `
                         <tr>
                             <td>${order.id.slice(-6)}</td>
                             <td>${order.customer?.name || '---'}</td>
@@ -641,31 +547,37 @@
                         </tr>
                     `).join('');
                 }
-                 SmartLog.info(`Order table rendered with ${orders.length} items.`, "UI.Render.Orders");
+                 // v48.0: Log generated HTML (first 100 chars) before inserting
+                 SmartLog.info(`Generated orders table HTML (sample): ${tableHTML.substring(0,100)}...`, "UI.Render.Orders");
+                 DOM.ordersTable.innerHTML = tableHTML; // Update DOM
+                 SmartLog.info(`Order table DOM updated.`, "UI.Render.Orders");
             } catch (e) {
                  SmartLog.error(e, "UI.Render.Orders", { message: "Error rendering orders table." });
-                 if (DOM.ordersTable) DOM.ordersTable.innerHTML = `<tr><td colspan="7" class="text-error p-4">שגיאה בטעינת טבלת הזמנות!</td></tr>`;
+                 if (DOM.ordersTable) DOM.ordersTable.innerHTML = `<tr><td colspan="7" class="text-error p-4">שגיאה בטעינת טבלת הזמנות! בדוק לוגים.</td></tr>`; // v48.0: More specific error
                  updateConnectionStatus(false, "שגיאה ברינדור הזמנות");
             }
         }
 
-        async function handleDeleteOrder(orderId) { /* ... (try-catch already exists) ... */ }
-        function getStatusColor(status) { /* ... implementation unchanged ... */ }
+
+        async function handleDeleteOrder(orderId) { /* ... */ }
+        function getStatusColor(status) { /* ... */ }
 
         function renderDriversTable(filter = '') {
-            SmartLog.info("renderDriversTable called", "UI.Render.Drivers", { filter });
-            if (!DOM.driversTable) { SmartLog.warn("Driver table body not found in DOM.", "UI.Render.Drivers"); return; } // v47.9: Check existence
+            SmartLog.info(`renderDriversTable called. Items in state: ${Object.keys(state.drivers).length}`, "UI.Render.Drivers", { filter }); // v48.0
+            if (!DOM.driversTable) { SmartLog.warn("Driver table body not found.", "UI.Render.Drivers"); return; }
 
-            try { // v47.9: Wrap function logic
+            try {
                 const lcFilter = filter.toLowerCase();
                 const drivers = Object.values(state.drivers).filter(d =>
                     !lcFilter || (d.name && d.name.toLowerCase().includes(lcFilter))
                 );
+                 SmartLog.info(`Rendering ${drivers.length} drivers after filter.`, "UI.Render.Drivers"); // v48.0
 
+                let tableHTML = ''; // v48.0
                 if (drivers.length === 0) {
-                    DOM.driversTable.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 2rem;">אין נהגים רשומים${filter ? ' תואמים לחיפוש' : ''}</td></tr>`; // v47.9: Improved message
+                    tableHTML = `<tr><td colspan="4" style="text-align: center; padding: 2rem;">אין נהגים רשומים${filter ? ' תואמים לחיפוש' : ''}</td></tr>`;
                 } else {
-                    DOM.driversTable.innerHTML = drivers.map(driver => {
+                    tableHTML = drivers.map(driver => {
                         const location = state.locations[driver.id];
                         const lastUpdate = location?.lastUpdate ?
                             new Date(location.lastUpdate.toDate()).toLocaleTimeString('he-IL') : 'אין נתונים';
@@ -679,13 +591,16 @@
                         `;
                     }).join('');
                 }
-                 SmartLog.info(`Driver table rendered with ${drivers.length} items.`, "UI.Render.Drivers");
+                 SmartLog.info(`Generated drivers table HTML (sample): ${tableHTML.substring(0,100)}...`, "UI.Render.Drivers"); // v48.0
+                 DOM.driversTable.innerHTML = tableHTML; // Update DOM
+                 SmartLog.info(`Driver table DOM updated.`, "UI.Render.Drivers");
             } catch (e) {
                  SmartLog.error(e, "UI.Render.Drivers", { message: "Error rendering drivers table." });
-                  if (DOM.driversTable) DOM.driversTable.innerHTML = `<tr><td colspan="4" class="text-error p-4">שגיאה בטעינת טבלת נהגים!</td></tr>`;
+                 if (DOM.driversTable) DOM.driversTable.innerHTML = `<tr><td colspan="4" class="text-error p-4">שגיאה בטעינת טבלת נהגים! בדוק לוגים.</td></tr>`; // v48.0
                  updateConnectionStatus(false, "שגיאה ברינדור נהגים");
             }
         }
+
 
         // --- Global Functions ---
         window.openEditOrderModal = openEditOrderModal;
@@ -693,7 +608,7 @@
 
 
         // --- Start App ---
-        console.log('Waiting for authReady (v47.9)...');
+        console.log('Waiting for authReady (v48.0)...');
         if (authReady) {
             authReady
                 .then((user) => {
@@ -702,7 +617,7 @@
                 })
                 .catch(err => {
                     console.error('authReady Promise failed!', err);
-                    (typeof SmartLog?.error === 'function' ? SmartLog.error : console.error)(err, "Auth.Fatal", { message: "Firebase Authentication failed."}); // Simplified message
+                    (typeof SmartLog?.error === 'function' ? SmartLog.error : console.error)(err, "Auth.Fatal", { message: "Firebase Authentication failed."});
                     updateConnectionStatus(false, `שגיאת אימות: ${err.message}`);
                 });
         } else {
