@@ -3,438 +3,458 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v43.0 - קוקפיט (תבנית חדשה)</title>
-    
-    <!-- Leaflet CSS & JS -->
+    <title>DeliveryMaster v44.0 - מרכז בקרה</title>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Leaflet Plugins -->
-    <script src="https://unpkg.com/leaflet-geometryutil"></script> 
-    <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
     <style>
-        /* v43: New Design System - Clean & Modern Admin Template */
-        
-        /* 1. Base & Reset */
         :root {
-            --primary-color: #0ea5e9; /* sky-500 */
-            --primary-hover-color: #0284c7; /* sky-600 */
-            --primary-light-color: #f0f9ff; /* sky-50 */
-            --secondary-color: #64748b; /* slate-500 */
-            --light-bg: #f8fafc; /* slate-50 */
-            --white-bg: #ffffff;
-            --border-color: #e2e8f0; /* slate-200 */
-            --border-light-color: #f1f5f9; /* slate-100 */
-            --text-primary: #1e293b; /* slate-800 */
-            --text-secondary: #475569; /* slate-600 */
-            --text-muted: #94a3b8; /* slate-400 */
-            --danger-color: #ef4444; /* red-500 */
-            --warning-color: #f59e0b; /* amber-500 */
-            --success-color: #22c55e; /* green-500 */
-            --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+            --m3-primary: #0ea5e9; /* sky-500 */
+            --m3-on-primary: #ffffff;
+            --m3-surface: #1f2937; /* gray-800 */
+            --m3-on-surface: #e5e7eb; /* gray-200 */
+            --m3-surface-container: #374151; /* gray-700 */
+            --m3-on-surface-variant: #9ca3af; /* gray-400 */
+            --m3-outline: #4b5563; /* gray-600 */
+            --m3-success: #22c55e; /* green-500 */
+            --m3-warning: #f59e0b; /* amber-500 */
+            --m3-error: #ef4444; /* red-500 */
+            
+            --glass-bg: rgba(55, 65, 81, 0.6); /* gray-700 60% */
+            --glass-blur: blur(12px);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: var(--border-color); }
-        html { line-height: 1.5; font-family: var(--font-family); direction: rtl; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; font-size: 16px; }
-        body { margin: 0; background-color: var(--light-bg); color: var(--text-primary); overflow: hidden; }
-        a { color: inherit; text-decoration: inherit; }
-        button, input, select { font: inherit; margin: 0; padding: 0; }
-        button { cursor: pointer; background-color: transparent; border: none; }
-        svg { display: block; vertical-align: middle; }
-        .hidden { display: none !important; }
-
-        /* 2. Layout Structure */
-        .app-layout { display: flex; height: 100vh; }
-        .sidebar { width: 250px; background-color: var(--white-bg); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.03); z-index: 20; }
-        .main-container { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .content-wrapper { flex-grow: 1; padding: 1.5rem; overflow-y: auto; background-color: var(--light-bg); position: relative; }
-
-        /* 3. Sidebar Styling */
-        .sidebar-header { padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
-        .sidebar-title { font-size: 1.15rem; font-weight: 600; color: var(--text-primary); }
-        .sidebar-version { font-size: 0.75rem; color: var(--primary-color); font-weight: 500; margin-right: 0.5rem; }
-        .sidebar-nav { padding: 1rem; flex-grow: 1; overflow-y: auto; }
-        .nav-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 1rem; margin-bottom: 0.25rem; border-radius: 0.375rem; font-weight: 500; color: var(--text-secondary); transition: background-color 0.15s, color 0.15s; }
-        .nav-link:hover { background-color: var(--primary-light-color); color: var(--primary-hover-color); }
-        .nav-link.active { background-color: var(--primary-color); color: var(--white-bg); }
-        .nav-link svg { width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
-        .nav-link span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem; }
-        .sidebar-footer { padding: 1rem; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted); text-align: center; }
-
-        /* 4. Connection Status (in footer) */
-        .connection-status { font-size: 0.8rem; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 500; display: inline-block; }
-        .status-connected { background-color: #dcfce7; color: #15803d; }
-        .status-connecting { background-color: #fef3c7; color: #b45309; }
-        .status-error { background-color: #fee2e2; color: #b91c1c; }
-
-        /* 5. Content Area & Views */
-        .app-view { 
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0; /* Cover the wrapper */
-            padding: 1.5rem; 
-            transition: opacity 0.3s ease-out; /* Simple fade */
-            opacity: 0; 
-            pointer-events: none;
-            display: flex; flex-direction: column; 
-            overflow: hidden; 
-            background-color: var(--light-bg); 
-        }
-        .app-view:not(.hidden) { 
-            opacity: 1; 
-            pointer-events: auto; 
-            position: relative; /* Take space */
-            z-index: 1; 
-        }
-        #view-map { padding: 0; } 
-        #leaflet-map-container { flex-grow: 1; border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--border-color); }
-        #leaflet-map { height: 100%; width: 100%; z-index: 1; } 
-        .leaflet-container { background: #e2e8f0; }
-
-        /* 6. Table & Card Styling */
-        .content-card { background-color: var(--white-bg); border-radius: 0.75rem; border: 1px solid var(--border-color); box-shadow: 0 1px 2px 0 rgba(0,0,0,0.03); overflow: hidden; flex-grow: 1; display: flex; flex-direction: column; height: 100%; }
-        .card-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        .card-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
-        .card-body { flex-grow: 1; overflow-y: auto; }
-        table { border-collapse: collapse; width: 100%; } 
-        thead { background-color: var(--light-bg); position: sticky; top: 0; z-index: 5; } 
-        th { color: var(--text-secondary); padding: 0.75rem 1.5rem; font-weight: 500; text-align: right; white-space: nowrap; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-color); } 
-        tbody { background-color: var(--white-bg); } 
-        td { padding: 0.75rem 1.5rem; text-align: right; border-bottom: 1px solid var(--border-light-color); font-size: 0.9rem; color: var(--text-primary); }
-        tr:last-child td { border-bottom: none; }
-        td:last-child { white-space: nowrap; width: auto; }
-        tbody tr:hover { background-color: var(--light-bg); }
-
-        /* 7. Buttons - Refined v43 */
-        .btn { padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; cursor: pointer; transition: all 0.15s ease-out; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; white-space: nowrap; line-height: 1.25rem; font-size: 0.875rem; }
-        .btn:hover { filter: brightness(1.05); }
-        .btn:active { transform: scale(0.98); box-shadow: inset 0 1px 1px 0 rgba(0, 0, 0, 0.05); }
-        .btn-primary { background-color: var(--primary-color); color: white; border-color: var(--primary-color); } .btn-primary:hover { background-color: var(--primary-hover-color); border-color: var(--primary-hover-color); }
-        .btn-secondary { background-color: var(--white-bg); color: var(--text-secondary); border-color: #cbd5e1; } .btn-secondary:hover { background-color: var(--light-bg); border-color: #94a3b8; color: var(--text-primary); }
-        .btn-success { background-color: var(--success-color); color: white; border-color: var(--success-color); } .btn-success:hover { background-color: #16a34a; border-color: #15803d; }
-        .btn-warning { background-color: var(--warning-color); color: white; border-color: var(--warning-color); } .btn-warning:hover { background-color: #d97706; border-color: #b45309; }
-        .btn-danger { background-color: var(--danger-color); color: white; border-color: var(--danger-color); } .btn-danger:hover { background-color: #dc2626; border-color: #b91c1c; }
-        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 0.25rem; }
-        .btn svg { width: 1rem; height: 1rem; }
-
-        /* 8. Forms & Filters v43 - Enhanced */
-        .form-input { width: 100%; background-color: var(--white-bg); border: 1px solid #cbd5e1; color: var(--text-primary); padding: 0.6rem 0.75rem; border-radius: 0.375rem; transition: border-color 0.2s, box-shadow 0.2s; font-size: 0.9rem; }
-        .form-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); outline: none; }
-        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-secondary); font-size: 0.8rem; }
-        .filter-input-wrapper { position: relative; flex-shrink: 0; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background-color: var(--white-bg); }
-        .filter-input { padding-left: 2.5rem; height: 38px; font-size: 0.9rem; background-color: var(--light-bg); border-radius: 0.375rem; border: 1px solid var(--border-color); }
-        .filter-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); outline: none; background-color: var(--white-bg); }
-        .filter-input-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; width: 1rem; height: 1rem; }
-
-        /* 9. Modals v43 */
-        .modal-backdrop { /* ... same backdrop ... */ }
-        .modal-content { /* ... same shape ... */ }
-        .modal-header { border-bottom: 1px solid var(--border-color); padding: 1rem 1.5rem; }
-        .modal-body { padding: 1.5rem; max-height: 70vh; overflow-y: auto; }
-        .modal-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
-        .modal-footer { display: flex; gap: 0.75rem; justify-content: flex-end; border-top: 1px solid var(--border-color); padding: 1rem 1.5rem; background-color: var(--light-bg); border-bottom-left-radius: 0.75rem; border-bottom-right-radius: 0.75rem;}
-
-        /* 10. Notification Ticker v43 */
-        #notification-ticker { height: 36px; overflow: hidden; background-color: var(--primary-light-color); border-bottom: 1px solid #e0f2fe; position: relative; flex-shrink: 0; cursor: default; }
-        #notification-ticker ul { list-style: none; padding: 0; margin: 0; position: absolute; width: 100%; animation: ticker-scroll-v41 40s linear infinite; }
-        #notification-ticker li { height: 36px; padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #075985; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #notification-ticker .time { font-size: 0.7rem; color: #38bdf8; margin-left: 1rem; flex-shrink: 0; }
-        #notification-ticker .level-WARN { color: #b45309; } #notification-ticker .level-ERROR { color: #b91c1c; font-weight: 500; }
-        @keyframes ticker-scroll-v41 { 0% { transform: translateY(0); } 100% { transform: translateY(-100%); } }
-        #notification-ticker:hover ul { animation-play-state: paused; }
-
-        /* Status Badges */
-        .status-badge { padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
-        .status-חדש { background-color: #e0f2fe; color: #0ea5e9; } .status-שויך { background-color: #fef3c7; color: #d97706; } .status-הושלם { background-color: #dcfce7; color: #16a34a; } .status-default { background-color: #e5e7eb; color: #4b5563; }
-        .level-INFO { color: var(--primary-color); } .level-WARN { color: var(--warning-color); } .level-ERROR { color: var(--danger-color); font-weight: 600; }
         
-        /* Map Popups & Icons */
-        .leaflet-popup-content { font-size: 0.8rem; } .map-popup-button { /* ... same ... */ }
-        .leaflet-div-icon { font-size: 2.2rem; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
-
-        /* Select Driver Modal List */
-        #driver-select-list button { display: block; width: 100%; text-align: right; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; border-radius: 0.375rem; }
-        #driver-select-list button:hover { background-color: var(--light-bg); }
+        body, html {
+            height: 100vh; width: 100vw; margin: 0;
+            font-family: 'Rubik', sans-serif;
+            background-color: var(--m3-surface);
+            color: var(--m3-on-surface);
+            overflow: hidden;
+        }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 1.25rem;
+        }
+        
+        /* Glass UI Component */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: var(--glass-border);
+            border-radius: 1.5rem; /* 24px */
+        }
+        
+        /* Layout */
+        .app-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            gap: 1rem;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        
+        header {
+            grid-column: 1 / -1; /* Full width */
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        nav {
+            grid-row: 2 / 3;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        main {
+            grid-row: 2 / 3;
+            grid-column: 2 / 3;
+            overflow: hidden;
+            border-radius: 1.5rem; /* For map */
+            position: relative;
+        }
+        
+        /* Header */
+        #app-title { font-size: 1.5rem; font-weight: 500; }
+        #app-version { font-size: 0.8rem; color: var(--m3-primary); margin-right: 8px; }
+        #connection-status { 
+            font-size: 0.85rem; font-weight: 500; 
+            display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 99px;
+            transition: all 0.3s ease;
+        }
+        #connection-status .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-connecting { background-color: rgba(245, 158, 11, 0.1); color: var(--m3-warning); }
+        .status-connecting .dot { background-color: var(--m3-warning); }
+        .status-connected { background-color: rgba(34, 197, 94, 0.1); color: var(--m3-success); }
+        .status-connected .dot { background-color: var(--m3-success); }
+        .status-error { background-color: rgba(239, 68, 68, 0.1); color: var(--m3-error); }
+        .status-error .dot { background-color: var(--m3-error); }
+        
+        /* Navigation (M3 Style) */
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.8rem 1.25rem;
+            border-radius: 99px;
+            text-decoration: none;
+            color: var(--m3-on-surface-variant);
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .nav-link:hover {
+            background-color: rgba(255,255,255, 0.05);
+            color: var(--m3-on-surface);
+        }
+        .nav-link.active {
+            background-color: var(--m3-primary);
+            color: var(--m3-on-primary);
+            font-weight: 700;
+        }
+        
+        /* Views */
+        .app-view {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            box-sizing: border-box;
+        }
+        .app-view.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Map View */
+        #view-map { padding: 0; }
+        #leaflet-map { width: 100%; height: 100%; z-index: 1; }
+        .leaflet-container { background: #000; }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: var(--m3-surface-container);
+            color: var(--m3-on-surface);
+            border: 1px solid var(--m3-outline);
+        }
+        
+        /* Table View (Orders/Drivers) */
+        .view-table { padding: 1.5rem; }
+        .table-container { 
+            flex-grow: 1; 
+            overflow-y: auto; 
+            border: 1px solid var(--m3-outline);
+            border-radius: 1rem;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { 
+            padding: 1rem; text-align: right; 
+            border-bottom: 1px solid var(--m3-outline);
+        }
+        thead {
+            position: sticky; top: 0;
+            background: var(--m3-surface-container);
+        }
+        th { font-size: 0.8rem; color: var(--m3-on-surface-variant); }
+        
     </style>
-
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { 
-            getFirestore, collection, query, orderBy, onSnapshot, 
-            doc, setDoc, updateDoc, deleteDoc, serverTimestamp, where
-        } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
-
-        // --- Config ---
-        const firebaseConfig = { /* ... same ... */ apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949", storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB" };
-
-        // --- Globals ---
-        let db; let currentEditDoc = null; let mapInstance = null; let allDrivers = {}; 
-        let driverMarkers = {}; let orderMarkers = {}; let currentlyDraggedOrder = null;
-        let assignmentLines = {}; let notificationQueue = []; const MAX_NOTIFICATIONS = 15;
-
-        // --- Warehouse Coordinates ---
-        const WAREHOUSES = { /* ... same ... */ hatalmid: { name: "התלמיד 6", lat: 32.1860, lng: 34.9080 }, haharash: { name: "החרש 10", lat: 32.1840, lng: 34.9095 } };
-        
-        // --- Icons v43 ---
-        // הדבק כאן לינקים לאייקונים שלך אם תרצה (השאר null כדי להשתמש ב-SVG)
-        const driverIconUrl = null; 
-        const orderIconUrl = null; 
-        // SVG icons ( truck yellow, pin blue )
-        const driverSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f59e0b" width="36px" height="36px"><path d="M0 0h24v24H0z" fill="none"/><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`; 
-        const orderSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%230ea5e9" width="36px" height="36px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
-        const driverIcon = driverIconUrl ? L.icon({ iconUrl: driverIconUrl, iconSize: [42, 42], iconAnchor: [21, 42] }) : L.divIcon({ html: driverSvg, className: 'leaflet-div-icon', iconSize: [36, 36], iconAnchor: [18, 18] }); 
-        const orderIcon = orderIconUrl ? L.icon({ iconUrl: orderIconUrl, iconSize: [36, 46], iconAnchor: [18, 46] }) : L.divIcon({ html: orderSvg, className: 'leaflet-div-icon', iconSize: [36, 36], iconAnchor: [18, 36] }); 
-
-        // --- Init App ---
-        document.addEventListener('DOMContentLoaded', async () => { /* ... same init logic ... */ try{const a=initializeApp(firebaseConfig);const o=getAuth(a);db=getFirestore(a);setStatus('מתחבר...','status-connecting');await signInAnonymously(o);setStatus('מחובר','status-connected');initNavigation();/* Removed map init from here */;listenToDrivers();listenToDriverLocations();listenToOrders();listenToCustomers();listenToSystemLogs();initFilters();renderNotifications()}catch(e){console.error("Init Error",e);setStatus(`שגיאה: ${e.message}`,'status-error')} });
-        
-        // --- Navigation & View Transitions ---
-        function initNavigation() { 
-            const navLinks = document.querySelectorAll('.nav-link');
-            navLinks.forEach(link => { 
-                link.addEventListener('click', (e) => { 
-                    e.preventDefault(); 
-                    const viewId = e.currentTarget.getAttribute('href').substring(1); 
-                    showView(viewId); 
-                    navLinks.forEach(l => l.classList.remove('active')); 
-                    e.currentTarget.classList.add('active'); 
-                }); 
-            });
-            const initialLink = document.querySelector('.nav-link[href="#view-map"]');
-            if (initialLink) { 
-                initialLink.classList.add('active'); 
-                // Don't call showView here, let the initial state handle it
-                window.currentViewId = 'view-map'; // Set initial view
-                 // Delay map init slightly to ensure container is rendered
-                 setTimeout(initMap, 50); 
-            } else { 
-                console.error("Initial map link not found!"); 
-                const ol = document.querySelector('.nav-link[href="#view-orders"]'); 
-                if (ol) ol.classList.add('active');
-                window.currentViewId = 'view-orders'; // Set fallback view
-            }
-             // Ensure initial view is visible
-             const initialView = document.getElementById(window.currentViewId);
-             if(initialView) {
-                 initialView.classList.remove('hidden');
-                 initialView.style.opacity = '1';
-                 initialView.style.transform = 'translateY(0)';
-                 initialView.style.pointerEvents = 'auto';
-                 initialView.style.position = 'relative';
-             }
-        }
-        
-        window.showView = (viewId) => { 
-             if (viewId === window.currentViewId) return; 
-             const currentView = window.currentViewId ? document.getElementById(window.currentViewId) : null;
-             const targetView = document.getElementById(viewId); 
-             console.log(`Switching view from ${window.currentViewId} to ${viewId}`); 
-             
-             if (currentView) { 
-                 // Start fade out / move out
-                 currentView.style.opacity = '0';
-                 currentView.style.transform = 'translateY(10px)';
-                 currentView.style.pointerEvents = 'none';
-                 // Hide after transition
-                 setTimeout(() => {
-                    if(window.currentViewId !== currentView.id) { // Check if view hasn't changed again quickly
-                        currentView.classList.add('hidden');
-                        currentView.style.position = 'absolute'; 
-                    }
-                 }, 300); // Match transition duration
-             } 
-             
-             if (targetView) {
-                 // Prepare target view (remove hidden, set initial state for transition)
-                 targetView.style.position = 'relative'; // Put back in flow for layout calculation
-                 targetView.classList.remove('hidden'); 
-                 targetView.offsetHeight; // Force reflow
-                 
-                 // Start transition in
-                 targetView.style.opacity = '1';
-                 targetView.style.transform = 'translateY(0)';
-                 targetView.style.pointerEvents = 'auto';
-
-                 window.currentViewId = viewId; 
-
-                 if (viewId === 'view-map' && mapInstance) { 
-                     setTimeout(() => { 
-                         console.log("Invalidating map size");
-                         mapInstance.invalidateSize({ animate: false }); 
-                     }, 350); 
-                 }
-             } else { 
-                 console.error(`Target view ${viewId} not found!`); 
-                 window.currentViewId = null; 
-             } 
-        }
-
-
-        // --- Real-time Listeners (READ) ---
-        // (Listeners remain the same)
-        function listenToDrivers(){/*...*/} function listenToDriverLocations(){/*...*/} function listenToOrders(){/*...*/} function listenToCustomers(){/*...*/} function listenToSystemLogs(){/*...*/}
-
-        // --- Render Functions (v43 Filters & Styling) ---
-        function initFilters() { /* ... same ... */ }
-        function renderOrdersTable() { /* ... same ... */ }
-        function renderDriversTable() { /* ... same ... */ }
-        function renderCustomersTable() { /* ... same ... */ }
-        function renderLogsTable() { /* ... same ... */ }
-        function setStatus(message, cssClass) { /* ... same ... */ }
-
-        // --- Map Functions ---
-        window.initMap = () => { /* ... same init with zoom 9 ... */ const e=document.getElementById('leaflet-map');if(!e){console.error("Map container #leaflet-map not found!");return}try{if(typeof L==='undefined'){console.error("Leaflet (L) not defined.");setStatus('שגיאת מפה','status-error');return}if(!mapInstance){mapInstance=L.map(e,{zoomControl:true}).setView([31.7683,35.2137],9);L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:19}).addTo(mapInstance);mapInstance.whenReady(()=>{console.log("Map initialized.");setStatus('מחובר','status-connected')});mapInstance.on('tileerror',(e)=>{console.error('Tile error:',e);setStatus('שגיאת מפה','status-error')})}else{console.log("Map already initialized, invalidating size.");mapInstance.invalidateSize()}}catch(e){console.error("Map init failed:",e);e.innerHTML=`<div class="p-4 text-center text-red-500">Map Error: ${e.message}</div>`;setStatus('שגיאת מפה','status-error')} }
-        
-        function updateDriverMarker(driverId, locationData) { /* ... same logic ... */ }
-        function updateOrderMarkers(orders) { /* ... same logic ... */ }
-        
-        // --- Drag & Drop ---
-        function handleOrderDrop(event) { /* ... same ... */ }
-        
-        // --- CRUD ---
-        window.openAddOrderModal = () => { /* ... */ }
-        window.openEditOrderModal = (orderJsonString) => { /* ... */ }
-        window.openAssignDriverModal = (orderId) => { /* ... */ }
-        window.openConfirmAssignModal = (orderId, driverId, customerName, driverName) => { /* ... */ }
-        window.openSelectDriverModal = (orderId) => { /* ... */ }
-        window.closeModal = (modalId) => { /* ... */ }
-        window.handleSaveOrder = async () => { /* ... same logic ... */ };
-        window.handleAssignDriver = async (orderId, driverId, driverName) => { /* ... same logic + notification ... */ }
-        window.handleConfirmAssign = (orderId, driverId, driverName) => { handleAssignDriver(orderId, driverId, driverName); }
-        window.handleMarkAsCompleted = async (orderId) => { /* ... same logic + notification ... */ }
-        window.handleDelete = async (collectionName, docId) => { /* ... same logic + notification ... */ }
-        
-        // --- Assignment Line ---
-        function drawAssignmentLine(orderId, driverId) { /* ... same ... */ }
-        function removeAssignmentLine(orderId) { /* ... same ... */ }
-
-         // --- Notification Ticker ---
-         function addNotification(message, level = 'INFO') { /* ... same queue logic ... */ }
-         function renderNotifications() { /* ... same rendering + animation restart ... */ }
-         // Initial render moved inside DOMContentLoaded
-
-        // --- Attach handlers ---
-        window.handleMarkAsCompleted = handleMarkAsCompleted;
-        window.handleDelete = handleDelete; 
-
-    </script>
 </head>
-<body class="h-screen overflow-hidden bg-gray-50"> 
+<body>
 
     <div class="app-layout">
         
-        <!-- Sidebar -->
-        <aside class="sidebar flex flex-col justify-between">
-             <!-- Sidebar content -->
-             <div> 
-                 <div class="sidebar-header">
-                     <span class="sidebar-title">ח. סבן <span class="sidebar-version">v43.0</span></span>
-                 </div>
-                 <nav class="sidebar-nav space-y-1"> 
-                    {/* SVG Icons for better clarity */}
-                    <a href="#view-map" class="nav-link"> <svg>...</svg> <span>חדר מצב</span> </a>
-                    <a href="#view-orders" class="nav-link"> <svg>...</svg> <span>הזמנות</span> </a>
-                    <a href="#view-drivers" class="nav-link"> <svg>...</svg> <span>נהגים</span> </a>
-                    <a href="#view-customers" class="nav-link"> <svg>...</svg> <span>לקוחות</span> </a>
-                    <a href="#view-logs" class="nav-link"> <svg>...</svg> <span>לוגים</span> </a> 
-                 </nav> 
-             </div> 
-             <div class="sidebar-footer"> <span id="connection-status" class="connection-status status-connecting"> טוען... </span> </div>
-        </aside>
+        <header class="glass-card">
+            <div id="app-title">
+                <span id="app-version">v44.0</span>DeliveryMaster
+            </div>
+            <div id="connection-status" class="status-connecting">
+                <div class="dot"></div>
+                <span>מאתחל חיבור...</span>
+            </div>
+        </header>
 
-        <!-- Main Content -->
-        <main class="main-container">
+        <nav class="glass-card">
+            <a href="#map" class="nav-link active" data-view="view-map">
+                <span class="material-symbols-outlined">map</span>
+                חדר מצב (מפה)
+            </a>
+            <a href="#orders" class="nav-link" data-view="view-orders">
+                <span class="material-symbols-outlined">list_alt</span>
+                ניהול הזמנות
+            </a>
+            <a href="#drivers" class="nav-link" data-view="view-drivers">
+                <span class="material-symbols-outlined">local_shipping</span>
+                ניהול נהגים
+            </a>
+            <a href="log.html" target="_blank" class="nav-link">
+                <span class="material-symbols-outlined">terminal</span>
+                צג לוגים (בחלון חדש)
+            </a>
+        </nav>
+
+        <main>
+            <div id="view-map" class="app-view active">
+                <div id="leaflet-map"></div>
+            </div>
+
+            <div id="view-orders" class="app-view view-table glass-card">
+                <h2>ניהול הזמנות</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>מזהה</th>
+                                <th>לקוח</th>
+                                <th>כתובת</th>
+                                <th>נהג</th>
+                                <th>סטטוס</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
             
-            <!-- Notification Ticker -->
-            <div id="notification-ticker" class="flex-shrink-0">
-                 <ul id="notification-ticker-list">
-                      <li><span class="time">--:--</span><span>מערכת v43.0 טוענת...</span></li>
-                 </ul>
-            </div>
-
-            <!-- Main Content Area (Views container) -->
-            <div class="content-wrapper">
-                <!-- View 1: Map (Default) -->
-                <div id="view-map" class="app-view hidden h-full"> 
-                    <div id="leaflet-map-container" class="h-full"> <div id="leaflet-map"></div> </div>
-                </div>
-
-                <!-- View 2: Orders Table -->
-                <div id="view-orders" class="app-view hidden h-full flex flex-col"> 
-                    <div class="content-card flex-grow overflow-hidden"> 
-                          <div class="card-header">
-                             <h2 class="card-title">ניהול הזמנות</h2> 
-                             <button class="btn btn-primary btn-sm" onclick="openAddOrderModal()"> + הוסף הזמנה </button> 
-                          </div>
-                           <div class="filter-input-wrapper flex-shrink-0"> 
-                                <span class="filter-input-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></span> 
-                                <input type="text" id="filter-orders" class="filter-input" placeholder="חיפוש הזמנה..."> 
-                            </div>
-                         <div class="card-body overflow-y-auto">
-                            <table class="w-full min-w-full text-right"> 
-                                <thead class="sticky top-0 bg-gray-50 z-10">...</thead> 
-                                <tbody id="orders-table-body" class="divide-y divide-gray-200"></tbody> 
-                            </table> 
-                         </div>
-                     </div>
-                </div>
-
-                 <!-- View 3: Drivers Table -->
-                <div id="view-drivers" class="app-view hidden h-full flex flex-col">
-                     <div class="content-card flex-grow overflow-hidden">
-                          <div class="card-header"> <h2 class="card-title">ניהול נהגים</h2> </div>
-                           <div class="filter-input-wrapper flex-shrink-0"> 
-                             <span class="filter-input-icon"><svg>...</svg></span> 
-                             <input type="text" id="filter-drivers" class="filter-input" placeholder="חיפוש נהג..."> 
-                         </div>
-                         <div class="card-body overflow-y-auto"> 
-                            <table class="w-full min-w-full text-right"> 
-                                <thead class="sticky top-0 bg-gray-50 z-10">...</thead> 
-                                <tbody id="drivers-table-body" class="divide-y divide-gray-200"></tbody> 
-                            </table> 
-                         </div> 
-                     </div>
-                </div>
-                
-                <!-- View 4: Customers Table -->
-                 <div id="view-customers" class="app-view hidden h-full flex flex-col">
-                     <div class="content-card flex-grow overflow-hidden">
-                          <div class="card-header"> <h2 class="card-title">ניהול לקוחות</h2> </div>
-                           <div class="filter-input-wrapper flex-shrink-0"> 
-                            <span class="filter-input-icon"><svg>...</svg></span> 
-                            <input type="text" id="filter-customers" class="filter-input" placeholder="חיפוש לקוח..."> 
-                        </div>
-                         <div class="card-body overflow-y-auto"> 
-                             <table class="w-full min-w-full text-right"> 
-                                <thead class="sticky top-0 bg-gray-50 z-10">...</thead> 
-                                <tbody id="customers-table-body" class="divide-y divide-gray-200"></tbody> 
-                             </table> 
-                         </div> 
-                    </div>
-                </div>
-                
-                <!-- View 5: Logs Table -->
-                 <div id="view-logs" class="app-view hidden h-full flex flex-col">
-                    <div class="content-card flex-grow overflow-hidden">
-                        <div class="card-header"> <h2 class="card-title">צג לוגים</h2> </div>
-                        <div class="card-body overflow-y-auto"> 
-                             <table class="w-full min-w-full text-right"> 
-                                <thead class="sticky top-0 bg-gray-50 z-10">...</thead> 
-                                <tbody id="logs-table-body" class="divide-y divide-gray-200"></tbody> 
-                             </table> 
-                         </div> 
-                     </div>
+            <div id="view-drivers" class="app-view view-table glass-card">
+                <h2>ניהול נהגים</h2>
+                 <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>שם</th>
+                                <th>טלפון</th>
+                                <th>סטטוס</th>
+                                <th>מיקום אחרון</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drivers-table-body">
+                            </tbody>
+                    </table>
                 </div>
             </div>
-
         </main>
-    </div>
-    
-    <!-- Modals (Structure refined) -->
-    <div id="addOrderModal" class="modal-backdrop"> <div class="modal-content"> <div class="modal-header p-4"><h2 id="addOrderModalTitle" class="modal-title">...</h2></div> <div class="modal-body"><form id="addOrderForm">...</form></div> </div> </div>
-    <div id="assignDriverModal" class="modal-backdrop"> <div class="modal-content"> <div class="modal-header p-4"><h2 class="modal-title">שיבוץ נהג</h2></div> <div class="modal-body"><form>...</form></div> </div> </div>
-    <div id="confirmAssignModal" class="modal-backdrop"> <div class="modal-content"> <div class="modal-header p-4"><h2 class="modal-title">אישור שיבוץ</h2></div> <div class="modal-body"><p id="confirmAssignText">...</p></div> <div class="modal-footer">...</div> </div> </div>
-    <div id="selectDriverModal" class="modal-backdrop"> <div class="modal-content"> <div class="modal-header p-4"><h2 class="modal-title">בחר נהג לשיבוץ</h2></div> <div class="modal-body"><div id="driver-select-list" class="max-h-60 overflow-y-auto">...</div></div> <div class="modal-footer">...</div> </div> </div>
 
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script type="module">
+        // ייבוא רכיבי Firebase והלוגר
+        import { db, auth } from './config.js';
+        import { SmartLog } from './SmartLog.js';
+        import { 
+            collection, 
+            doc, 
+            onSnapshot, 
+            query, 
+            orderBy,
+            updateDoc // (נצטרך בהמשך לפעולות)
+        } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+        // --- Globals ---
+        let map;
+        const state = {
+            drivers: {},
+            orders: {},
+            locations: {},
+            markers: {
+                drivers: {},
+                orders: {}
+            }
+        };
+
+        const DOM = {
+            status: document.getElementById('connection-status'),
+            navLinks: document.querySelectorAll('.nav-link[data-view]'),
+            views: document.querySelectorAll('.app-view'),
+            ordersTable: document.getElementById('orders-table-body'),
+            driversTable: document.getElementById('drivers-table-body')
+        };
+        
+        // --- 1. Initialization ---
+        function init() {
+            try {
+                initNavigation();
+                initMap();
+                SmartLog.info("Admin Hub v44.0 Initializing", "Init");
+                
+                // התחל האזנה לכל הנתונים
+                listenToDrivers();
+                listenToOrders();
+                listenToLocations();
+                
+                updateConnectionStatus(true, "מחובר ומאזין");
+            } catch (e) {
+                SmartLog.error(e, "Init");
+                updateConnectionStatus(false, "שגיאת אתחול קריטית");
+            }
+        }
+        
+        function updateConnectionStatus(isConnected, message) {
+            const statusEl = DOM.status;
+            statusEl.querySelector('span').textContent = message;
+            if (isConnected) {
+                statusEl.className = 'status-connected';
+            } else {
+                statusEl.className = 'status-error';
+            }
+        }
+
+        // --- 2. Navigation ---
+        function initNavigation() {
+            DOM.navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (link.hasAttribute('target')) return; // Ignore external links
+
+                    const viewId = link.getAttribute('data-view');
+                    
+                    DOM.views.forEach(v => v.classList.remove('active'));
+                    document.getElementById(viewId).classList.add('active');
+                    
+                    DOM.navLinks.forEach(l => l.classList.remove('active'));
+                    link.classList.add('active');
+                    
+                    if (viewId === 'view-map') {
+                        // חובה לרענן את המפה
+                        map.invalidateSize();
+                    }
+                    SmartLog.info(`Mapsd to ${viewId}`, "Navigation");
+                });
+            });
+        }
+        
+        // --- 3. Map Logic (Leaflet) ---
+        function initMap() {
+            try {
+                map = L.map('leaflet-map').setView([32.109333, 34.855499], 10); // מרכז ישראל
+                
+                // שכבת רקע כהה (Material 3 Dark)
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; OpenStreetMap &copy; CARTO',
+                    subdomains: 'abcd',
+                    maxZoom: 19
+                }).addTo(map);
+                SmartLog.info("Map Initialized", "MapModule");
+            } catch(e) {
+                SmartLog.error(e, "MapModule.initMap");
+                document.getElementById('leaflet-map').innerHTML = "<h1>שגיאה בטעינת המפה</h1>";
+            }
+        }
+
+        // --- 4. Firestore Real-time Listeners ---
+        function listenToDrivers() {
+            const q = query(collection(db, "drivers"), orderBy("name"));
+            onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const driverId = change.doc.id;
+                    const driverData = change.doc.data();
+                    if (change.type === "removed") {
+                        delete state.drivers[driverId];
+                    } else {
+                        state.drivers[driverId] = { id: driverId, ...driverData };
+                    }
+                });
+                renderDriversTable();
+                SmartLog.info(`Drivers snapshot updated. Total: ${Object.keys(state.drivers).length}`, "Firestore.Drivers");
+            }, e => SmartLog.error(e, "Firestore.Drivers"));
+        }
+
+        function listenToOrders() {
+            // (במערכת אמיתית, נסנן רק הזמנות פעילות)
+            const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (snapshot) => {
+                 snapshot.docChanges().forEach((change) => {
+                    const orderId = change.doc.id;
+                    const orderData = change.doc.data();
+                    if (change.type === "removed") {
+                        delete state.orders[orderId];
+                    } else {
+                        state.orders[orderId] = { id: orderId, ...orderData };
+                    }
+                });
+                renderOrdersTable();
+            }, e => SmartLog.error(e, "Firestore.Orders"));
+        }
+        
+        function listenToLocations() {
+            const q = query(collection(db, "driverLocations"));
+            onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const driverId = change.doc.id;
+                    const locData = change.doc.data();
+                    if (change.type === "removed") {
+                        delete state.locations[driverId];
+                        // (כאן נסיר סמן מהמפה)
+                    } else {
+                        state.locations[driverId] = { id: driverId, ...locData };
+                        // (כאן נעדכן סמן על המפה)
+                    }
+                });
+                renderDriversTable(); // רענון הטבלה כדי להציג מיקום
+            }, e => SmartLog.error(e, "Firestore.Locations"));
+        }
+
+        // --- 5. Render Functions ---
+        function renderOrdersTable() {
+            const orders = Object.values(state.orders);
+            if (orders.length === 0) {
+                DOM.ordersTable.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem;">אין הזמנות פעילות</td></tr>`;
+                return;
+            }
+            DOM.ordersTable.innerHTML = orders.map(order => `
+                <tr>
+                    <td>${order.id.slice(-6)}</td>
+                    <td>${order.customer?.name || 'ללא שם'}</td>
+                    <td>${order.address || 'לא צוינה כתובת'}</td>
+                    <td>${order.driver?.name || '<i>טרם שויך</i>'}</td>
+                    <td><span style="color: var(--m3-primary); font-weight: 500;">${order.status || 'חדש'}</span></td>
+                    <td>
+                        </td>
+                </tr>
+            `).join('');
+        }
+        
+        function renderDriversTable() {
+            const drivers = Object.values(state.drivers);
+            if (drivers.length === 0) {
+                DOM.driversTable.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 2rem;">אין נהגים רשומים</td></tr>`;
+                return;
+            }
+            DOM.driversTable.innerHTML = drivers.map(driver => {
+                const location = state.locations[driver.id];
+                const lastUpdate = location?.lastUpdate ? 
+                    new Date(location.lastUpdate.toDate()).toLocaleTimeString('he-IL') : 'אין נתונים';
+                
+                return `
+                <tr>
+                    <td>${driver.name}</td>
+                    <td>${driver.phone || '---'}</td>
+                    <td><span style="color: var(--m3-success);">${driver.status || 'פעיל'}</span></td>
+                    <td>${lastUpdate}</td>
+                </tr>
+            `}).join('');
+        }
+        
+        // --- Start App ---
+        init();
+        
+    </script>
 </body>
 </html>
-
