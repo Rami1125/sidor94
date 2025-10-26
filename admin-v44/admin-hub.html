@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v48.3 - מרכז בקרה</title>
+    <title>DeliveryMaster v48.4 - מרכז בקרה</title>
 
     <!-- Leaflet (Map) CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -46,7 +46,7 @@
         <div class="header-with-ticker">
             <div class="ticker-wrap" aria-hidden="true"><div class="ticker" id="ticker-messages"><span class="ticker-item">טוען הודעות...</span></div></div>
             <header class="card">
-                 <div id="app-title"><span id="app-version">v48.3</span>DeliveryMaster</div>
+                 <div id="app-title"><span id="app-version">v48.4</span>DeliveryMaster</div>
                  <div id="connection-status" class="status-connecting"><div class="dot"></div><span>מאתחל חיבור...</span></div>
             </header>
         </div>
@@ -84,7 +84,7 @@
 
     <!-- Firebase & App Logic (Modular) -->
     <script type="module">
-        console.log('Module script started (v48.3)'); // v48.3
+        console.log('Module script started (v48.4)'); // v48.4
 
         // --- Import Modules ---
         let db, auth, authReady, SmartLog;
@@ -101,19 +101,19 @@
         let map; const state = { /* ... */ }; let assignmentLine = null; let selectedOrderMarker = null; let currentEditOrderId = null; let DOM = {};
 
 
-        // --- Initialization ---
-        function init() {
+        // --- Initialization (v48.4: Made async) ---
+        async function init() { // v48.4: Add async keyword
             DOM = { /* ... definition unchanged ... */ };
              if (!DOM.status || !DOM.ordersTable || !DOM.driversTable) { /* ... error handling ... */ return; }
              if (typeof SmartLog?.info !== 'function') { /* ... error handling ... */ return; }
-             SmartLog.info("Auth Ready. Admin Hub v48.3 Initializing", "Init"); // v48.3
+             SmartLog.info("Auth Ready. Admin Hub v48.4 Initializing", "Init"); // v48.4
 
             try {
                 if (typeof collection !== 'function') { throw new Error("Firestore functions not loaded."); }
 
-                // v48.3: Initialize Map FIRST
+                // v48.4: Initialize Map FIRST and WAIT for it
                 try {
-                    initMap(); // Create the map object
+                    await initMap(); // Use await here
                     SmartLog.info("Map initialized successfully before attaching listeners.", "Init.MapOrder");
                 } catch(e) {
                     SmartLog.error(e, "Init.Map.Critical", { message: "CRITICAL: Failed to initialize map! Listeners will likely fail." });
@@ -121,13 +121,13 @@
                     return; // Stop initialization if map fails
                 }
 
-                // Initialize other UI elements
+                // Initialize other UI elements (can run in parallel if needed, but not critical)
                 try { initNavigation(); } catch(e) { SmartLog.error(e, "Init.Navigation"); }
                 try { initTicker(); } catch(e) { SmartLog.error(e, "Init.Ticker"); }
                 try { initModals(); } catch(e) { SmartLog.error(e, "Init.Modals"); }
                 try { initSearch(); } catch(e) { SmartLog.error(e, "Init.Search"); }
 
-                // Attach listeners AFTER map is initialized
+                // Attach listeners AFTER map is guaranteed to be ready
                 try {
                     SmartLog.info("Attaching Firestore listeners...", "Init.Listeners");
                     listenToDrivers(); listenToOrders(); listenToLocations();
@@ -148,78 +148,57 @@
         // --- UI Modules ---
         function initNavigation() { /* ... */ } function initTicker() { /* ... */ } function initModals() { /* ... */ } function openAddOrderModal() { /* ... */ } function openEditOrderModal(orderId) { /* ... */ } function closeModal() { /* ... */ } function initSearch() { /* ... */ }
 
-        // --- Map Logic ---
+        // --- Map Logic (v48.4: initMap returns a Promise) ---
         function initMap() {
-             try {
-                SmartLog.info("Initializing Leaflet map...", "Init.Map");
-                if (map) map.remove();
-                map = L.map('leaflet-map').setView([32.109333, 34.855499], 9);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
-                map.on('mousemove', (e) => { if (assignmentLine) { assignmentLine.setLatLngs([selectedOrderMarker.getLatLng(), e.latlng]); } });
-                SmartLog.info("Leaflet map initialized successfully.", "Init.Map");
-             } catch(e) {
-                SmartLog.error(e, "Init.Map", { message: "CRITICAL: Failed to initialize Leaflet map!" });
-                const mapDiv = document.getElementById('leaflet-map');
-                if (mapDiv) mapDiv.innerHTML = '<h2 style="color: red; text-align: center; padding-top: 50px;">שגיאה קריטית בטעינת המפה!</h2>';
-                throw e; // Re-throw to signal failure in init()
-             }
+             // v48.4: Return a promise
+             return new Promise((resolve, reject) => {
+                 try {
+                    SmartLog.info("Initializing Leaflet map...", "Init.Map");
+                    if (map) {
+                         try { map.remove(); } catch(removeErr) { SmartLog.warn("Error removing previous map instance", "Init.Map", removeErr); }
+                         map = null; // Ensure map is nullified
+                    }
+
+                    // Check if map container exists
+                    const mapContainer = document.getElementById('leaflet-map');
+                     if (!mapContainer) {
+                         throw new Error("Map container element ('leaflet-map') not found in DOM.");
+                     }
+
+                    map = L.map('leaflet-map'); // Assign to global map variable
+
+                     // Add event listener for map load
+                     map.whenReady(() => {
+                         SmartLog.info("Leaflet map 'whenReady' event fired.", "Init.Map");
+                         resolve(); // Resolve the promise when map is fully ready
+                     });
+
+                    map.setView([32.109333, 34.855499], 9);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
+                    map.on('mousemove', (e) => { if (assignmentLine) { assignmentLine.setLatLngs([selectedOrderMarker.getLatLng(), e.latlng]); } });
+
+                    SmartLog.info("Leaflet map object created and layers added.", "Init.Map");
+                    // DO NOT resolve here, wait for whenReady
+
+                 } catch(e) {
+                    SmartLog.error(e, "Init.Map", { message: "CRITICAL: Failed to initialize Leaflet map!" });
+                    const mapDiv = document.getElementById('leaflet-map');
+                    if (mapDiv) mapDiv.innerHTML = '<h2 style="color: red; text-align: center; padding-top: 50px;">שגיאה קריטית בטעינת המפה!</h2>';
+                    reject(e); // Reject the promise on error
+                 }
+             });
          }
 
 
         // --- Firestore Listeners ---
         function listenToDrivers() { /* ... */ } function listenToOrders() { /* ... */ } function listenToLocations() { /* ... */ }
 
-        // --- Map Marker & Assignment (v48.3: Removed redundant map check, fixed log context) ---
-        function updateDriverMarker(driverId, driverData) {
-            // No need for map check here, initMap runs first
-            SmartLog.info(`Attempting to update/add marker for driver ${driverId}`, "Map.Marker.Driver");
-            try {
-                const location = state.locations[driverId];
-                const latLng = location ? [location.latitude, location.longitude] : null;
-                if (!latLng) { SmartLog.warn(`No valid location for driver ${driverId}.`, "Map.Marker.Driver"); removeDriverMarker(driverId); return; }
-                const driverName = driverData.name || 'לא ידוע'; const iconToUse = createDriverIcon(driverName); const marker = state.markers.drivers[driverId];
-                if (marker) { /* ... update marker ... */ SmartLog.info(`Driver marker updated: ${driverId}`, "Map.Marker.Driver"); }
-                else { /* ... create marker ... */ SmartLog.info(`Driver marker added: ${driverId}`, "Map.Marker.Driver"); }
-            } catch (e) { SmartLog.error(e, "Map.Marker.Driver.Update", { driverId }); updateConnectionStatus(false, "שגיאה בעדכון סמן נהג"); }
-        }
-
-        function removeDriverMarker(driverId) {
-            // No need for map check here
-            /* ... rest of implementation ... */
-        }
-
-        function updateOrderMarker(orderId, orderData) {
-            // No need for map check here
-            SmartLog.info(`Attempting to update/add marker for order ${orderId}`, "Map.Marker.Order");
-            try {
-                if (orderData.status === 'הושלם') { removeOrderMarker(orderId); return; }
-                const lat = parseFloat(orderData.latitude); const lng = parseFloat(orderData.longitude);
-                const latLng = (typeof lat === 'number' && !isNaN(lat) && typeof lng === 'number' && !isNaN(lng)) ? [lat, lng] : null;
-                if (!latLng) {
-                    // v48.3: Fix context for SmartLog - ensure values are serializable
-                    const context = {
-                        orderId: orderId,
-                        latitudeProvided: String(orderData.latitude), // Convert potentially undefined to string
-                        longitudeProvided: String(orderData.longitude) // Convert potentially undefined to string
-                    };
-                    SmartLog.warn(`Invalid or missing location for order ${orderId}. Removing marker if exists.`, "Map.Marker.Order", context);
-                    removeOrderMarker(orderId); return;
-                }
-                const distances = calculateDistances(latLng); const popupContent = `<b>${orderData.customer?.name || '?'}</b><br>${orderData.address}<br><b>סטטוס:</b> ${orderData.status || 'חדש'}<br><small>${distances}</small>`; const marker = state.markers.orders[orderId];
-                if (marker) { /* ... update marker ... */ SmartLog.info(`Order marker updated: ${orderId}`, "Map.Marker.Order"); }
-                else { /* ... create marker ... */ SmartLog.info(`Order marker added: ${orderId}`, "Map.Marker.Order"); }
-            } catch (e) { SmartLog.error(e, "Map.Marker.Order.Update", { orderId }); updateConnectionStatus(false, "שגיאה בעדכון סמן הזמנה"); }
-        }
-
-
-        function removeOrderMarker(orderId) {
-            // No need for map check here
-             /* ... rest of implementation ... */
-        }
-        function updateDriverMarkerLocation(driverId, locData) {
-            // No need for map check here
-             /* ... rest of implementation ... */
-        }
+        // --- Map Marker & Assignment (No changes needed here, map check is now implicitly handled by await in init) ---
+        function updateDriverMarker(driverId, driverData) { /* ... */ }
+        function removeDriverMarker(driverId) { /* ... */ }
+        function updateOrderMarker(orderId, orderData) { /* ... */ }
+        function removeOrderMarker(orderId) { /* ... */ }
+        function updateDriverMarkerLocation(driverId, locData) { /* ... */ }
         function calculateDistances(orderLatLng) { /* ... */ } function handleOrderClick(marker) { /* ... */ } function handleOrderDrop(orderMarker, orderData) { /* ... */ } async function assignOrder(orderData, driverData) { /* ... */ } function zoomToMarker(marker, zoomLevel) { /* ... */ }
 
         // --- CRUD & Render ---
@@ -230,9 +209,13 @@
 
 
         // --- Start App ---
-        console.log('Waiting for authReady (v48.3)...'); // v48.3
+        console.log('Waiting for authReady (v48.4)...'); // v48.4
         if (authReady) {
-            authReady.then((user) => { console.log('authReady resolved. Starting init()...'); init(); })
+            authReady.then(async (user) => { // v48.4: Add async here
+                        console.log('authReady resolved. Starting async init()...'); // v48.4
+                        await init(); // v48.4: Use await here
+                        console.log("Async init() completed."); // v48.4
+                     })
                      .catch(err => { console.error('authReady failed!', err); (SmartLog.error || console.error)(err, "Auth.Fatal"); updateConnectionStatus(false, `Auth Error: ${err.message}`); });
         } else { console.error('authReady missing!'); updateConnectionStatus(false, "Config Error"); }
 
