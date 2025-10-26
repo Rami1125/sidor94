@@ -1,5 +1,5 @@
-// config.js (v47.4)
-// הגדלת timeout להתחברות
+// config.js (v47.5)
+// תיקון שגיאת ייצוא (export) בבלוק catch
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
@@ -19,31 +19,36 @@ const firebaseConfig = {
 
 // אתחול רכיבים
 let app, auth, db, functions;
-let authReadyReject; // v47.4 Store reject function for external access if needed
+let initializationError = null; // v47.5: Store potential initialization error
 
 try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
     functions = getFunctions(app, 'europe-west1');
-    console.log("Firebase app initialized successfully in config.js");
+    console.log("Firebase app initialized successfully in config.js (v47.5)");
 } catch (error) {
      console.error("CRITICAL ERROR: Firebase initialization failed in config.js!", error);
-     authReadyReject = () => Promise.reject(error); // Function to return rejected promise
-     // Continue exporting essentials, but authReady will be rejected
-     const authReady = authReadyReject();
-     export { app, auth, db, functions, authReady };
-     // No need to throw here, let the authReady rejection handle it
+     initializationError = error; // v47.5: Save the error
+     // Do not export from here!
 }
 
-// --- v47.4: Authentication Promise with increased timeout and clearer logging ---
+// --- v47.5: Authentication Promise - Handles initialization errors ---
 const authReady = new Promise((resolve, reject) => {
-    // Save reject function in case initialization failed earlier
-    if (authReadyReject) {
-        reject(new Error("Firebase initialization failed before sign-in attempt."));
+    // v47.5: Check if initialization failed earlier
+    if (initializationError) {
+        console.error("authReady: Failing early due to initialization error.");
+        reject(new Error(`Firebase initialization failed: ${initializationError.message}`));
         return;
     }
-    console.log("authReady (v47.4): Attempting anonymous sign-in (30s timeout)...");
+    // Ensure auth object exists before proceeding
+    if (!auth) {
+         console.error("authReady: Firebase auth object is not available.");
+         reject(new Error("Firebase auth object failed to initialize."));
+         return;
+    }
+
+    console.log("authReady (v47.5): Attempting anonymous sign-in (30s timeout)...");
     const authTimeout = setTimeout(() => {
         console.error("authReady: Anonymous sign-in timed out after 30 seconds.");
         reject(new Error("Firebase anonymous sign-in timed out (30s). Check network/config."));
@@ -53,15 +58,15 @@ const authReady = new Promise((resolve, reject) => {
         .then((userCredential) => {
             clearTimeout(authTimeout);
             console.log("authReady: Anonymous sign-in successful.", userCredential.user.uid);
-            resolve(userCredential.user);
+            resolve(userCredential.user); // Resolve with the user object
         })
         .catch((error) => {
             clearTimeout(authTimeout);
-            console.error("authReady: Anonymous sign-in failed!", error.code, error.message); // Log code and message
+            console.error("authReady: Anonymous sign-in failed!", error.code, error.message);
             reject(error); // Reject the promise on failure
         });
 });
 
-// ייצוא הרכיבים וה-Promise
+// v47.5: Single export statement at the top level
 export { app, auth, db, functions, authReady };
 
