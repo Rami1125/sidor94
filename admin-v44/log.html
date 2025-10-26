@@ -3,37 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v45.1 - צג לוגים</title>
+    <title>DeliveryMaster v45.2 - צג לוגים</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
     <style>
-        /* v45.0: עיצוב בהיר (ברירת מחדל) */
+        /* v45.2: עיצוב בהיר קבוע */
         :root {
             --m3-primary: #0066cc; /* כחול בהיר */
             --m3-surface: #ffffff;
             --m3-on-surface: #1a1a1a;
             --m3-surface-container: #f0f4f8; /* רקע בהיר מאוד */
-            --m3-on-surface-variant: #5c5c5c;
+            --m3-on-surface-variant: #5f6368;
             --m3-outline: #d0d0d0;
             --m3-success: #1e8e3e;
             --m3-warning: #f9a825;
             --m3-error: #d93025;
-            --m3-info: var(--m3-primary);
-        }
-        
-        /* v45.0: עיצוב כהה (כאשר body.dark) */
-        body.dark {
-            --m3-primary: #0ea5e9;
-            --m3-surface: #1f2937;
-            --m3-on-surface: #e5e7eb;
-            --m3-surface-container: #374151;
-            --m3-on-surface-variant: #9ca3af;
-            --m3-outline: #4b5563;
-            --m3-success: #22c55e;
-            --m3-warning: #f59e0b;
-            --m3-error: #ef4444;
             --m3-info: var(--m3-primary);
         }
 
@@ -55,19 +41,6 @@
         h1 { font-weight: 500; color: var(--m3-on-surface); }
         h1 span { color: var(--m3-primary); }
         
-        #theme-toggle {
-            background: var(--m3-surface-container);
-            border: 1px solid var(--m3-outline);
-            color: var(--m3-on-surface-variant);
-            padding: 0.5rem;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        #theme-toggle .material-symbols-outlined { font-size: 1.25rem; }
-
         .filters {
             display: flex;
             gap: 1rem;
@@ -93,11 +66,7 @@
             overflow-y: auto;
             border: 1px solid var(--m3-outline);
             border-radius: 1rem;
-            background-color: var(--m3-surface-container); /* רקע בהיר יותר בכהה, לבן בבהיר */
-        }
-        
-        body.dark .log-container {
-             background-color: #111827; /* Darker for contrast */
+            background-color: var(--m3-surface-container);
         }
         
         table {
@@ -121,13 +90,11 @@
         th { font-family: 'Rubik'; color: var(--m3-on-surface-variant); }
         
         tr:hover { background-color: rgba(0,0,0,0.03); }
-        body.dark tr:hover { background-color: rgba(255,255,255,0.03); }
         
         /* Log Levels */
         .level-INFO { color: var(--m3-info); font-weight: 500; }
         .level-WARN { color: var(--m3-warning); font-weight: 500; }
         .level-ERROR { color: var(--m3-error); font-weight: 700; }
-        body.dark .level-ERROR { background-color: rgba(239, 68, 68, 0.05); }
         
         .col-time { color: var(--m3-on-surface-variant); width: 150px; }
         .col-level { width: 80px; }
@@ -139,12 +106,10 @@
 
     <div class="header-container">
         <h1>
-            <span>[v45.1]</span> צג לוגים בזמן אמת
+            <span>[v45.2]</span> צג לוגים בזמן אמת
             <span id="status" style="font-size: 0.9rem; color: var(--m3-warning); margin-right: 10px;">(מתחבר...)</span>
         </h1>
-        <button id="theme-toggle" title="שנה מצב תצוגה">
-            <span class="material-symbols-outlined" id="theme-icon">light_mode</span>
-        </button>
+        <!-- v45.2: הסרת כפתור החלפת עיצוב לפשטות -->
     </div>
     
     <div class="filters">
@@ -175,10 +140,9 @@
     </div>
 
     <script type="module">
-        // v45.1: הגדרת נתיב אבסולוטי בראש הקובץ
-        const APP_ROOT = "/admin-v44"; // ודא שנתיב זה תואם לשרת שלך
+        // v45.2: נתיב אבסולוטי קבוע
+        const APP_ROOT = "/admin-v44"; 
 
-        // v45.1: ייבוא כל המודולים המקומיים עם הנתיב האבסולוטי
         import { db, authReady } from `${APP_ROOT}/config.js`; 
         import { SmartLog } from `${APP_ROOT}/SmartLog.js`;
         import { 
@@ -191,58 +155,29 @@
 
 
         const LOG_COLLECTION = 'system_logs_v3';
-        const LOG_LIMIT = 200; // הצג 200 לוגים אחרונים
+        const LOG_LIMIT = 200; 
         
         const DOM = {
             tableBody: document.getElementById('logs-table-body'),
             filterText: document.getElementById('filter-text'),
             filterLevel: document.getElementById('filter-level'),
             status: document.getElementById('status'),
-            themeToggle: document.getElementById('theme-toggle'),
-            themeIcon: document.getElementById('theme-icon')
         };
         
-        let allLogs = []; // Cache
-        let unsubscribe = null; // שומר את פונקציית ביטול ההאזנה
+        let allLogs = []; 
+        let unsubscribe = null; 
 
         function init() {
-            // v45.0: הפונקציה רצה רק אחרי אימות
-            console.log("Auth Ready. Log Viewer v45.1 Initializing.");
+            console.log("Auth Ready. Log Viewer v45.2 Initializing.");
             
-            // האזנה לפילטרים
             DOM.filterText.addEventListener('input', renderLogs);
             DOM.filterLevel.addEventListener('input', renderLogs);
             
-            // אתחול מצב תצוגה
-            initTheme();
+            // v45.2: עיצוב בהיר הוא קבוע, אין צורך ב-initTheme()
             
-            // התחלת האזנה ל-Firestore
             listenToLogs();
         }
         
-        // --- v45.0: Theme Toggle Logic ---
-        function initTheme() {
-            const savedTheme = localStorage.getItem('logTheme') || 'light';
-            setTheme(savedTheme);
-
-            DOM.themeToggle.addEventListener('click', () => {
-                const newTheme = document.body.classList.contains('dark') ? 'light' : 'dark';
-                setTheme(newTheme);
-            });
-        }
-
-        function setTheme(theme) {
-            if (theme === 'dark') {
-                document.body.classList.add('dark');
-                DOM.themeIcon.textContent = 'dark_mode';
-            } else {
-                document.body.classList.remove('dark');
-                DOM.themeIcon.textContent = 'light_mode';
-            }
-            localStorage.setItem('logTheme', theme);
-        }
-        
-        // --- Firestore Logic ---
         function listenToLogs() {
             if (unsubscribe) unsubscribe(); 
 
@@ -313,11 +248,9 @@
             }).join('');
         }
 
-        // --- v45.0: Start App ---
-        // המתן לאימות לפני אתחול האפליקציה
+        // --- Start App ---
         authReady.then(() => {
-            // v45.1: כעת שהלוגר מיובא למעלה, אפשר להשתמש בו ישר
-            SmartLog.info("Log Viewer Page Loaded (v45.1)", "LogViewer");
+            SmartLog.info("Log Viewer Page Loaded (v45.2)", "LogViewer");
             init();
         }).catch(err => {
             console.error("Fatal Auth Error", err);
