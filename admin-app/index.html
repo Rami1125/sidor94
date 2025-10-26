@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v41.0 - קוקפיט אולטימטיבי</title>
+    <title>DeliveryMaster v41.1 - קוקפיט אולטימטיבי</title>
     
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -47,9 +47,9 @@
         /* Layout */
         .main-layout { display: grid; grid-template-columns: 240px 1fr; height: 100vh; padding: 1rem; gap: 1rem; background-color: #f3f4f6; }
         main { display: flex; flex-direction: column; height: calc(100vh - 2rem); overflow: hidden; }
-        .main-content-area { flex-grow: 1; overflow: hidden; position: relative; /* Needed for absolute positioning of hidden views */ }
-        .view-content { height: 100%; overflow-y: auto; padding: 1rem; /* Add padding for scrollable content */ }
-        .view-content-table { padding: 0; /* Remove padding for table views */ }
+        .main-content-area { flex-grow: 1; overflow: hidden; position: relative; }
+        .view-content { height: 100%; overflow-y: auto; padding: 1rem; }
+        .view-content-table { padding: 0; }
 
         /* Sidebar */
         .sidebar { background-color: #fff; }
@@ -64,7 +64,7 @@
         #leaflet-map { height: 100%; width: 100%; z-index: 10; }
         .leaflet-container { background: #e5e7eb; }
         .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #fff; color: #1f2937; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.8rem; }
-        .leaflet-popup-content { margin: 10px 15px; max-width: 250px; /* Limit popup width */ }
+        .leaflet-popup-content { margin: 10px 15px; max-width: 250px; }
         .leaflet-popup-close-button { color: #374151 !important; }
         .map-popup-button { margin-top: 6px; padding: 3px 6px; font-size: 11px; background-color: #0ea5e9; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .leaflet-marker-draggable.leaflet-drag-target { cursor: grabbing !important; }
@@ -72,7 +72,7 @@
 
         /* Buttons v41 - Final Polish */
         .btn { padding: 0.6rem 1.2rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease-out; border: 1px solid transparent; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; white-space: nowrap; }
-        .btn:hover { filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.06); } /* Add subtle hover shadow */
+        .btn:hover { filter: brightness(1.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.06); }
         .btn:active { transform: scale(0.98); box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); filter: brightness(1); }
         .btn-primary { background-color: #0ea5e9; color: white; border-color: #0ea5e9; } .btn-primary:hover { background-color: #0284c7; border-color: #0284c7; }
         .btn-secondary { background-color: #fff; color: #374151; border-color: #d1d5db; } .btn-secondary:hover { background-color: #f9fafb; border-color: #adb5bd;}
@@ -96,9 +96,9 @@
         .form-input { width: 100%; background-color: #f9fafb; border: 1px solid #d1d5db; color: #1f2937; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: border-color 0.2s, box-shadow 0.2s; }
         .form-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2); outline: none; }
         .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #374151; }
-        .filter-input-wrapper { position: relative; margin-bottom: 1rem; flex-shrink: 0; /* Prevent shrinking */ }
-        .filter-input { padding-left: 2.5rem; /* Space for icon */ }
-        .filter-input-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; pointer-events: none; }
+        .filter-input-wrapper { position: relative; margin-bottom: 1rem; flex-shrink: 0; }
+        .filter-input { padding-left: 2.5rem; }
+        .filter-input-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; pointer-events: none; width: 1.25rem; height: 1.25rem; } /* Adjusted size */
 
         /* Table */
         table { border-collapse: collapse; } thead { background-color: #f9fafb; } th { color: #4b5563; padding: 0.75rem; font-weight: 600; text-align: right; } tbody { background-color: #fff; } td { padding: 0.75rem; text-align: right; }
@@ -118,12 +118,32 @@
         #notification-ticker:hover ul { animation-play-state: paused; }
 
         /* v41: View Transitions */
-        .app-view { transition: opacity 0.25s ease-in-out, transform 0.25s ease-in-out; will-change: transform, opacity; }
-        .app-view.hidden { opacity: 0; transform: translateY(15px); pointer-events: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        #view-map.app-view.hidden { opacity: 0; pointer-events: none; position: absolute; width: 100%; height: 100%; }
-        #view-map.app-view { position: relative; width: 100%; height: 100%; opacity: 1; transform: translateY(0); }
-        /* Ensure non-map views take full height when active */
-         .app-view:not(.hidden):not(#view-map) { position: relative; width: 100%; height: 100%; opacity: 1; transform: translateY(0); }
+        .app-view { 
+            position: absolute; /* Take views out of flow initially */
+            top: 0; left: 0; width: 100%; height: 100%;
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; 
+            will-change: transform, opacity;
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none; /* Prevent interaction when hidden */
+        }
+        .app-view:not(.hidden) { /* Styles for the active view */
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+            position: relative; /* Put back into flow */
+        }
+        /* Special handling for map view to ensure it fills space */
+        #view-map {
+             position: relative; /* Ensure map stays in flow when active */
+        }
+         /* Ensure hidden map doesn't interfere */
+        #view-map.hidden {
+            position: absolute; 
+            opacity: 0; 
+            pointer-events: none;
+        }
+
     </style>
 
     <!-- Firebase SDKs -->
@@ -148,57 +168,102 @@
         let currentlyDraggedOrder = null;
         let assignmentLines = {}; 
         let notificationQueue = []; 
-        const MAX_NOTIFICATIONS = 15; // Increased slightly
+        const MAX_NOTIFICATIONS = 15;
 
         // --- Warehouse Coordinates ---
         const WAREHOUSES = { /* ... same ... */ hatalmid: { name: "התלמיד 6", lat: 32.1860, lng: 34.9080 }, haharash: { name: "החרש 10", lat: 32.1840, lng: 34.9095 } };
         
         // --- Icons v41 ---
-        // הדבק כאן לינקים לאייקונים שלך אם תרצה (השאר null כדי להשתמש ב-SVG/Emoji)
-        const driverIconUrl = null; // למשל: 'https://img.icons8.com/ios-filled/50/f59e0b/truck.png'
-        const orderIconUrl = null; // למשל: 'https://img.icons8.com/ios-filled/50/0ea5e9/map-pin.png'
-        
-        // Use SVG for better control and scaling
+        const driverIconUrl = null; 
+        const orderIconUrl = null; 
         const driverSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f59e0b" width="32px" height="32px"><path d="M0 0h24v24H0z" fill="none"/><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`;
-        const orderSvg = `<svg xmlns="https://img.icons8.com/?size=100&id=9uHKZ60VvWW2&format=png&color=000000`;
-
+        const orderSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%230ea5e9" width="32px" height="32px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
         const driverIcon = driverIconUrl ? L.icon({ iconUrl: driverIconUrl, iconSize: [38, 38], iconAnchor: [19, 38] }) : L.divIcon({ html: driverSvg, className: 'leaflet-div-icon', iconSize: [32, 32], iconAnchor: [16, 16] }); 
         const orderIcon = orderIconUrl ? L.icon({ iconUrl: orderIconUrl, iconSize: [32, 42], iconAnchor: [16, 42] }) : L.divIcon({ html: orderSvg, className: 'leaflet-div-icon', iconSize: [32, 32], iconAnchor: [16, 32] }); 
 
         // --- Init App ---
-        document.addEventListener('DOMContentLoaded', async () => { /* ... same init logic ... */ try{const a=initializeApp(firebaseConfig);const o=getAuth(a);db=getFirestore(a);setStatus('מתחבר...','text-yellow-500');await signInAnonymously(o);setStatus('מחובר (מאזין...)','text-green-500');initNavigation();initMap();listenToDrivers();listenToDriverLocations();listenToOrders();listenToCustomers();listenToSystemLogs();initFilters()}catch(e){console.error("Init Error",e);setStatus(`שגיאת התחברות: ${e.message}`,'text-red-500')} });
+        document.addEventListener('DOMContentLoaded', async () => { 
+            try { 
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                db = getFirestore(app);
+                setStatus('מתחבר...', 'text-yellow-500'); 
+                await signInAnonymously(auth);
+                setStatus('מחובר (מאזין...)', 'text-green-500'); 
+                initNavigation(); // Init nav first
+                initMap(); // Then map
+                // Then listeners
+                listenToDrivers();
+                listenToDriverLocations();
+                listenToOrders();
+                listenToCustomers();
+                listenToSystemLogs();
+                initFilters();
+                renderNotifications(); // Initial render for ticker
+            } catch (error) { 
+                console.error("Init Error", error); 
+                setStatus(`שגיאת התחברות: ${error.message}`, 'text-red-500'); 
+            } 
+        });
         
         // --- Navigation & View Transitions ---
-        function initNavigation() { /* ... same event listeners ... */ const l=document.querySelectorAll('.sidebar-nav a');l.forEach(k=>{k.addEventListener('click',(e)=>{e.preventDefault();const v=e.currentTarget.getAttribute('href').substring(1);showView(v);l.forEach(j=>j.classList.remove('active'));e.currentTarget.classList.add('active');});});showView('view-map');document.querySelector('.sidebar-nav a[href="#view-map"]').classList.add('active'); }
+        function initNavigation() { 
+            const navLinks = document.querySelectorAll('.sidebar-nav a');
+            navLinks.forEach(link => { 
+                link.addEventListener('click', (e) => { 
+                    e.preventDefault(); 
+                    const viewId = e.currentTarget.getAttribute('href').substring(1); 
+                    showView(viewId); 
+                    navLinks.forEach(l => l.classList.remove('active')); 
+                    e.currentTarget.classList.add('active'); 
+                }); 
+            });
+            // v41.1: Add null check for the initial active link
+            const initialLink = document.querySelector('.sidebar-nav a[href="#view-map"]');
+            if (initialLink) {
+                 initialLink.classList.add('active');
+                 showView('view-map'); // Show map initially AFTER setting active class
+            } else {
+                 console.error("Initial navigation link for map not found!");
+                 showView('view-orders'); // Fallback to orders view
+                 const ordersLink = document.querySelector('.sidebar-nav a[href="#view-orders"]');
+                 if (ordersLink) ordersLink.classList.add('active');
+            }
+        }
         
-        // v41: Improved view switching with transitions
-        window.currentViewId = 'view-map'; // Track current view
+        window.currentViewId = null; // Initialize null
         window.showView = (viewId) => { 
-            if (viewId === window.currentViewId) return; // Don't switch if already active
+            if (viewId === window.currentViewId) return; 
 
-            const currentView = document.getElementById(window.currentViewId);
+            const currentView = window.currentViewId ? document.getElementById(window.currentViewId) : null;
             const targetView = document.getElementById(viewId); 
 
-            if (currentView) currentView.classList.add('hidden'); // Start hiding current
+            console.log(`Switching view from ${window.currentViewId} to ${viewId}`);
+
+            if (currentView) {
+                currentView.classList.add('hidden'); 
+                currentView.style.position = 'absolute'; // Ensure it's out of flow
+            }
             
             if (targetView) {
-                // Ensure target is ready for transition
-                targetView.style.position = 'absolute'; // Keep it positioned while hidden
-                targetView.classList.remove('hidden'); // Make it visible but transparent/translated
-                
-                // Force reflow to apply initial hidden styles before transition
-                targetView.offsetHeight; 
-
-                // Start transition
-                targetView.style.position = 'relative'; // Put back in flow
+                targetView.classList.remove('hidden'); // Make it potentially visible
+                targetView.style.position = 'relative'; // Put back in flow for layout calculation
+                targetView.offsetHeight; // Force reflow
                 targetView.style.opacity = '1';
                 targetView.style.transform = 'translateY(0)';
-            }
-             window.currentViewId = viewId; // Update tracked view
+                 
+                window.currentViewId = viewId; // Update tracked view AFTER transition starts
 
-            // Handle map invalidate after transition
-            if (viewId === 'view-map' && mapInstance) { 
-                setTimeout(() => mapInstance.invalidateSize({ animate: true }), 300); // Animate resize
+                // Handle map invalidate after transition
+                if (viewId === 'view-map' && mapInstance) { 
+                    setTimeout(() => {
+                        console.log("Invalidating map size");
+                        mapInstance.invalidateSize({ animate: false }); // Try without animation first
+                    }, 300); // Increased delay
+                }
+            } else {
+                 console.error(`Target view ${viewId} not found!`);
+                 window.currentViewId = null; // Reset current view if target not found
             }
         }
 
@@ -219,7 +284,7 @@
         
         function updateDriverMarker(driverId, locationData) { /* ... same logic ... */ if(!mapInstance||!locationData.latitude||!locationData.longitude)return;const l=[locationData.latitude,locationData.longitude];const n=allDrivers[driverId]?.name||driverId;const p=`<b>נהג: ${n}</b><br>עודכן: ${locationData.lastUpdate?.toDate().toLocaleTimeString('he-IL')||'N/A'}`;if(driverMarkers[driverId])driverMarkers[driverId].setLatLng(l).setPopupContent(p);else{driverMarkers[driverId]=L.marker(l,{icon:driverIcon,draggable:!1}).addTo(mapInstance).bindPopup(p);driverMarkers[driverId]._driverInfo={id:driverId,name:n}}}
         
-        function updateOrderMarkers(orders) { /* ... same logic including distance ... */ if(!mapInstance)return;const c=orders.map(o=>o.id);Object.keys(orderMarkers).forEach(m=>{if(!c.includes(m)){mapInstance.removeLayer(orderMarkers[m]);delete orderMarkers[m]}});let w=0;orders.forEach(o=>{if(!o.latitude||!o.longitude){if(o.status!=='הושלם')w++;if(orderMarkers[o.id]){mapInstance.removeLayer(orderMarkers[o.id]);delete orderMarkers[o.id]}return}if(o.status!=='הושלם'){const l=[o.latitude,o.longitude];const t=L.GeometryUtil.distance(mapInstance,l,[WAREHOUSES.hatalmid.lat,WAREHOUSES.hatalmid.lng]);const h=L.GeometryUtil.distance(mapInstance,l,[WAREHOUSES.haharash.lat,WAREHOUSES.haharash.lng]);const k=(t/1e3).toFixed(1);const r=(h/1e3).toFixed(1);const p=`<b>${o.customer?.name||'לקוח'}</b> (${o.id})<br>${o.address}<br>סטטוס: ${o.status}<hr class="my-1 border-gray-200">מרחק מהתלמיד: ${k} ק"מ<br>מרחק מהחרש: ${r} ק"מ`+(o.status==='חדש'?`<br><button class="map-popup-button" onclick="openSelectDriverModal('${o.id}')">שבץ מרשימה</button>`:'');const i=o.id;const d=o.status==='חדש';if(orderMarkers[i]){orderMarkers[i].setLatLng(l).setPopupContent(p);if(d&&!orderMarkers[i].dragging.enabled())orderMarkers[i].dragging.enable();else if(!d&&orderMarkers[i].dragging.enabled())orderMarkers[i].dragging.disable()}else{orderMarkers[i]=L.marker(l,{icon:orderIcon,draggable:d}).addTo(mapInstance).bindPopup(p,{minWidth:200});orderMarkers[i]._orderData=o;orderMarkers[i].on('dragstart',()=>{currentlyDraggedOrder=o});orderMarkers[i].on('dragend',handleOrderDrop)}}else if(orderMarkers[o.id]){mapInstance.removeLayer(orderMarkers[o.id]);delete orderMarkers[o.id]}});if(w>0){console.warn(`${w} active orders missing coords.`);addNotification(`${w} הזמנות ללא מיקום במפה`,'WARN')}}
+        function updateOrderMarkers(orders) { /* ... same logic including distance ... */ if(!mapInstance)return;const c=orders.map(o=>o.id);Object.keys(orderMarkers).forEach(m=>{if(!c.includes(m)){mapInstance.removeLayer(orderMarkers[m]);delete orderMarkers[m]}});let w=0;orders.forEach(o=>{if(!o.latitude||!o.longitude){if(o.status!=='הושלם')w++;if(orderMarkers[o.id]){mapInstance.removeLayer(orderMarkers[o.id]);delete orderMarkers[o.id]}return}if(o.status!=='הושלם'){const l=[o.latitude,o.longitude];const t=L.GeometryUtil.distance(mapInstance,l,[WAREHOUSES.hatalmid.lat,WAREHOUSES.hatalmid.lng]);const h=L.GeometryUtil.distance(mapInstance,l,[WAREHOUSES.haharash.lat,WAREHOUSES.haharash.lng]);const k=(t/1e3).toFixed(1);const r=(h/1e3).toFixed(1);const p=`<b>${o.customer?.name||'לקוח'}</b> (${o.id.slice(-4)})<br>${o.address}<br>סטטוס: ${o.status}<hr class="my-1 border-gray-200">מרחק מהתלמיד: ${k} ק"מ<br>מרחק מהחרש: ${r} ק"מ`+(o.status==='חדש'?`<br><button class="map-popup-button" onclick="openSelectDriverModal('${o.id}')">שבץ מרשימה</button>`:'');const i=o.id;const d=o.status==='חדש';if(orderMarkers[i]){orderMarkers[i].setLatLng(l).setPopupContent(p);if(d&&!orderMarkers[i].dragging.enabled())orderMarkers[i].dragging.enable();else if(!d&&orderMarkers[i].dragging.enabled())orderMarkers[i].dragging.disable()}else{orderMarkers[i]=L.marker(l,{icon:orderIcon,draggable:d}).addTo(mapInstance).bindPopup(p,{minWidth:200});orderMarkers[i]._orderData=o;orderMarkers[i].on('dragstart',()=>{currentlyDraggedOrder=o});orderMarkers[i].on('dragend',handleOrderDrop)}}else if(orderMarkers[o.id]){mapInstance.removeLayer(orderMarkers[o.id]);delete orderMarkers[o.id]}});if(w>0){console.warn(`${w} active orders missing coords.`);addNotification(`${w} הזמנות ללא מיקום במפה`,'WARN')}}
         
         // --- Drag & Drop ---
         function handleOrderDrop(event) { /* ... same ... */ if (!currentlyDraggedOrder) return; const m = event.target; const l = m.getLatLng(); const THRESHOLD = 50; let closest = null; let minDist = Infinity; Object.keys(driverMarkers).forEach(dId => { const dM = driverMarkers[dId]; const dist = l.distanceTo(dM.getLatLng()); if (dist < minDist) { minDist = dist; closest = { id: dId, name: allDrivers[dId]?.name || dId, marker: dM }; } }); if (closest && minDist <= THRESHOLD) { openConfirmAssignModal(currentlyDraggedOrder.id, closest.id, currentlyDraggedOrder.customer?.name || '?', closest.name); } else { m.setLatLng([currentlyDraggedOrder.latitude, currentlyDraggedOrder.longitude]); alert("לא נמצא נהג קרוב מספיק."); } currentlyDraggedOrder = null; }
@@ -234,11 +299,11 @@
         
         window.handleSaveOrder = async () => { /* ... same logic ... */ };
         
-        window.handleAssignDriver = async (orderId, driverId, driverName) => { /* ... same logic + notification ... */ const ref = doc(db, "orders", orderId); try { if (!driverName) { driverName = document.getElementById('driverNameInput').value; driverId = Object.keys(allDrivers).find(id => allDrivers[id].name === driverName) || driverName; } const dData = { id: driverId, name: driverName }; await updateDoc(ref, { driver: dData, status: "שויך" }); drawAssignmentLine(orderId, driverId); closeModal('assignDriverModal'); closeModal('confirmAssignModal'); closeModal('selectDriverModal'); const input = document.getElementById('driverNameInput'); if(input) input.value = ''; currentEditDoc = null; addNotification(`הזמנה ${orderId.slice(-4)} שויכה לנהג ${driverName}`, 'INFO'); } catch (e) { console.error("Assign Error:", e); alert("שגיאה בשיבוץ: " + e.message); } }
+        window.handleAssignDriver = async (orderId, driverId, driverName) => { /* ... same logic + notification ... */ const ref = doc(db, "orders", orderId); try { if (!driverName) { driverName = document.getElementById('driverNameInput').value; driverId = Object.keys(allDrivers).find(id => allDrivers[id].name === driverName) || driverName; } const dData = { id: driverId, name: driverName }; await updateDoc(ref, { driver: dData, status: "שויך" }); drawAssignmentLine(orderId, driverId); closeModal('assignDriverModal'); closeModal('confirmAssignModal'); closeModal('selectDriverModal'); const input = document.getElementById('driverNameInput'); if(input) input.value = ''; currentEditDoc = null; addNotification(`שיוך: הזמנה ${orderId.slice(-4)} (${window.allOrders[orderId]?.customer?.name || 'לקוח'}) שויכה לנהג ${driverName}`, 'INFO'); } catch (e) { console.error("Assign Error:", e); alert("שגיאה בשיבוץ: " + e.message); } }
         
         window.handleConfirmAssign = (orderId, driverId, driverName) => { handleAssignDriver(orderId, driverId, driverName); }
-        window.handleMarkAsCompleted = async (orderId) => { /* ... same logic + notification ... */ if (!confirm(`...`)) return; const ref = doc(db, "orders", orderId); try { await updateDoc(ref, { status: "הושלם" }); removeAssignmentLine(orderId); addNotification(`הזמנה ${orderId.slice(-4)} הושלמה`, 'INFO'); } catch (e) { console.error("Complete Error:", e); alert("שגיאה בסיום: " + e.message); } }
-        window.handleDelete = async (collectionName, docId) => { /* ... same logic + notification ... */ if (!confirm(`...`)) return; const ref = doc(db, collectionName, docId); try { await deleteDoc(ref); if(collectionName === 'orders') removeAssignmentLine(docId); addNotification(`פריט ${docId.slice(-4)} נמחק מ-${collectionName}`, 'WARN'); } catch (e) { console.error("Delete Error:", e); alert("שגיאה במחיקה: " + e.message); } }
+        window.handleMarkAsCompleted = async (orderId) => { /* ... same logic + notification ... */ if (!confirm(`...`)) return; const ref = doc(db, "orders", orderId); try { await updateDoc(ref, { status: "הושלם" }); removeAssignmentLine(orderId); addNotification(`הושלם: הזמנה ${orderId.slice(-4)} (${window.allOrders[orderId]?.customer?.name || 'לקוח'}) הושלמה`, 'INFO'); } catch (e) { console.error("Complete Error:", e); alert("שגיאה בסיום: " + e.message); } }
+        window.handleDelete = async (collectionName, docId) => { /* ... same logic + notification ... */ if (!confirm(`...`)) return; const ref = doc(db, collectionName, docId); try { await deleteDoc(ref); if(collectionName === 'orders') removeAssignmentLine(docId); addNotification(`נמחק: ${collectionName.slice(0,-1)} ${docId.slice(-4)} נמחק.`, 'WARN'); } catch (e) { console.error("Delete Error:", e); alert("שגיאה במחיקה: " + e.message); } }
         
         // --- Assignment Line ---
         function drawAssignmentLine(orderId, driverId) { /* ... same ... */ if (!mapInstance || !orderMarkers[orderId] || !driverMarkers[driverId]) return; removeAssignmentLine(orderId); const oLatLng = orderMarkers[orderId].getLatLng(); const dLatLng = driverMarkers[driverId].getLatLng(); const line = L.polyline([oLatLng, dLatLng], { color: '#f59e0b', weight: 3, opacity: 0.7 }); const decorator = L.polylineDecorator(line, { patterns: [{ offset: '0%', repeat: 10, symbol: L.Symbol.dash({ pixelSize: 5, pathOptions: { color: '#f59e0b', weight: 3, opacity: 0.7 } }) }] }).addTo(mapInstance); assignmentLines[orderId] = { line, decorator }; setTimeout(() => removeAssignmentLine(orderId), 5000); }
@@ -249,9 +314,9 @@
          function renderNotifications() { /* ... same rendering + animation restart ... */ 
              const tickerList = document.getElementById('notification-ticker-list'); if (!tickerList) return;
              tickerList.innerHTML = notificationQueue.map(n => `<li class="level-${n.level}"><span>${n.message}</span><span class="time">${n.timestamp.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</span></li>`).join('');
-             const ticker = document.getElementById('notification-ticker'); if (ticker) { const ul = ticker.querySelector('ul'); if (ul) { ul.style.animation = 'none'; ul.offsetHeight; if (ul.scrollHeight > ticker.offsetHeight) { const duration = (ul.scrollHeight / 40) * 5; /* Approx 5s per item */ ul.style.animation = `ticker-scroll-v41 ${duration}s linear infinite`; } else { ul.style.animation = ''; ul.style.transform = 'translateY(0)'; } } }
+             const ticker = document.getElementById('notification-ticker'); if (ticker) { const ul = ticker.querySelector('ul'); if (ul) { ul.style.animation = 'none'; ul.offsetHeight; if (ul.scrollHeight > ticker.offsetHeight) { const duration = (ul.scrollHeight / 40) * 5; ul.style.animation = `ticker-scroll-v41 ${duration}s linear infinite`; } else { ul.style.animation = ''; ul.style.transform = 'translateY(0)'; } } }
          }
-         document.addEventListener('DOMContentLoaded', renderNotifications); // Initial render
+         // Removed initial render from DOMContentLoaded, relying on first addNotification or empty state
 
         // --- Attach handlers ---
         window.handleMarkAsCompleted = handleMarkAsCompleted;
@@ -265,15 +330,15 @@
         
         <!-- Sidebar -->
         <aside class="light-card sidebar p-4 flex flex-col justify-between">
-             <!-- Sidebar content (nav links - SVG icons added for visual clarity) -->
+             <!-- Sidebar content -->
              <div> 
                  <h1 class="text-2xl font-bold text-gray-800 p-2 mb-6">ח. סבן (v41)</h1> 
                  <nav class="sidebar-nav space-y-2"> 
-                    <a href="#view-map"> <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m0 0v2.25m0-2.25h1.5M9 15H7.5m1.5-6.75V4.5m0 2.25H7.5M15 12m-3 0a3 3 0 116 0 3 3 0 01-6 0z" /></svg> <span>חדר מצב (מפה)</span> </a>
-                    <a href="#view-orders"> <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg> <span>ניהול הזמנות</span> </a>
-                    <a href="#view-drivers"> <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg> <span>ניהול נהגים</span> </a>
-                    <a href="#view-customers"> <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg> <span>ניהול לקוחות</span> </a>
-                    <a href="#view-logs"> <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5M3.75 6.75h16.5M3.75 17.25h16.5" /></svg> <span>צג לוגים</span> </a> 
+                    <a href="#view-map"> <svg>...</svg> <span>חדר מצב (מפה)</span> </a>
+                    <a href="#view-orders"> <svg>...</svg> <span>ניהול הזמנות</span> </a>
+                    <a href="#view-drivers"> <svg>...</svg> <span>ניהול נהגים</span> </a>
+                    <a href="#view-customers"> <svg>...</svg> <span>ניהול לקוחות</span> </a>
+                    <a href="#view-logs"> <svg>...</svg> <span>צג לוגים</span> </a> 
                  </nav> 
              </div> 
              <div id="connection-status" class="text-sm text-yellow-500 p-2 text-center"> טוען... </div>
@@ -285,7 +350,7 @@
             <!-- Notification Ticker -->
             <div id="notification-ticker" class="flex-shrink-0">
                  <ul id="notification-ticker-list">
-                      <li><span class="time">--:--</span><span>מערכת v41.0 טעונה. ממתין לאירועים...</span></li>
+                      <li><span class="time">--:--</span><span>מערכת v41.1 טעונה. ממתין לאירועים...</span></li>
                  </ul>
             </div>
 
@@ -299,21 +364,30 @@
                 <!-- View 2: Orders Table -->
                 <div id="view-orders" class="app-view hidden h-full flex flex-col gap-4">
                      <header class="flex-shrink-0 flex justify-between items-center p-4 border-b border-gray-200"> <h2 class="text-xl font-semibold text-gray-800">ניהול הזמנות</h2> <button class="btn btn-primary" onclick="openAddOrderModal()"> + הוסף הזמנה </button> </header>
-                     <div class="filter-input-wrapper px-4 pt-4"> <span class="filter-input-icon"><svg>...</svg></span> <input type="text" id="filter-orders" class="filter-input" placeholder="חפש הזמנה..."> </div>
+                     <div class="filter-input-wrapper px-4 pt-4"> 
+                        <span class="filter-input-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></span> 
+                        <input type="text" id="filter-orders" class="filter-input" placeholder="חפש הזמנה..."> 
+                    </div>
                      <div class="overflow-hidden flex-grow view-content view-content-table"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="orders-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
                 </div>
 
                 <!-- View 3: Drivers Table -->
                 <div id="view-drivers" class="app-view hidden h-full flex flex-col gap-4 p-4">
                      <header class="flex-shrink-0 flex justify-between items-center"> <h2 class="text-xl font-semibold text-gray-800">ניהול נהגים</h2> </header>
-                      <div class="filter-input-wrapper"> <span class="filter-input-icon"><svg>...</svg></span> <input type="text" id="filter-drivers" class="filter-input" placeholder="חפש נהג..."> </div>
+                      <div class="filter-input-wrapper"> 
+                         <span class="filter-input-icon"><svg>...</svg></span> 
+                         <input type="text" id="filter-drivers" class="filter-input" placeholder="חפש נהג..."> 
+                     </div>
                      <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content view-content-table"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="drivers-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
                 </div>
                 
                 <!-- View 4: Customers Table -->
                  <div id="view-customers" class="app-view hidden h-full flex flex-col gap-4 p-4">
                      <header class="flex-shrink-0 flex justify-between items-center"> <h2 class="text-xl font-semibold text-gray-800">ניהול לקוחות</h2> </header>
-                     <div class="filter-input-wrapper"> <span class="filter-input-icon"><svg>...</svg></span> <input type="text" id="filter-customers" class="filter-input" placeholder="חפש לקוח..."> </div>
+                     <div class="filter-input-wrapper"> 
+                        <span class="filter-input-icon"><svg>...</svg></span> 
+                        <input type="text" id="filter-customers" class="filter-input" placeholder="חפש לקוח..."> 
+                    </div>
                      <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content view-content-table"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="customers-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
                 </div>
                 
