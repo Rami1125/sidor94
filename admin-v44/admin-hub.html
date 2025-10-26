@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v48.4 - מרכז בקרה</title>
+    <title>DeliveryMaster v49.0 - מרכז בקרה</title>
 
     <!-- Leaflet (Map) CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -36,6 +36,22 @@
         .btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 500; color: var(--on-primary); background-color: var(--primary-color); border: none; cursor: pointer; transition: background-color 0.2s; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.5rem; } .btn:hover { background-color: #0b98d9; } .btn-icon { padding: 0.5rem; min-width: auto; } .btn-secondary { background-color: var(--surface); color: var(--on-surface-variant); border: 1px solid var(--outline); } .btn-secondary:hover { background-color: var(--hover-bg); } .btn-danger { background-color: var(--error); } .btn-danger:hover { background-color: #c5221f; }
         .table-container { flex-grow: 1; overflow-y: auto; border: 1px solid var(--outline); border-radius: 1rem; } table { width: 100%; border-collapse: collapse; } th, td { padding: 0.75rem 1rem; text-align: right; border-bottom: 1px solid var(--outline); white-space: nowrap; } td { max-width: 200px; overflow: hidden; text-overflow: ellipsis; } td.actions { max-width: none; white-space: normal; } thead { position: sticky; top: 0; background: var(--surface-container); z-index: 10; } th { font-size: 0.8rem; color: var(--on-surface-variant); font-weight: 500; } tbody tr:hover { background-color: var(--hover-bg); }
         .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 1000; display: none; opacity: 0; transition: opacity 0.3s ease; align-items: center; justify-content: center; } .modal-backdrop.visible { display: flex; opacity: 1; } .modal-content { background: var(--surface-container); border-radius: 1rem; padding: 2rem; width: 90%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); transform: scale(0.95); transition: transform 0.3s ease; max-height: 90vh; overflow-y: auto; } .modal-backdrop.visible .modal-content { transform: scale(1); } .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; } .modal-title { font-size: 1.25rem; font-weight: 700; } .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; } .form-group { margin-bottom: 1rem; } .form-group.full-width { grid-column: 1 / -1; } .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.9rem; } .form-input, .form-select, .form-textarea { width: 100%; padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--outline); background: var(--surface); box-sizing: border-box; font-size: 1rem; } .form-textarea { min-height: 80px; resize: vertical; } .modal-footer { margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem; }
+
+         /* v49.0: Style for Auth Error Message */
+        #auth-error-message {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--error);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 2000;
+            display: none; /* Hidden by default */
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -46,8 +62,8 @@
         <div class="header-with-ticker">
             <div class="ticker-wrap" aria-hidden="true"><div class="ticker" id="ticker-messages"><span class="ticker-item">טוען הודעות...</span></div></div>
             <header class="card">
-                 <div id="app-title"><span id="app-version">v48.4</span>DeliveryMaster</div>
-                 <div id="connection-status" class="status-connecting"><div class="dot"></div><span>מאתחל חיבור...</span></div>
+                 <div id="app-title"><span id="app-version">v49.0</span>DeliveryMaster</div>
+                 <div id="connection-status" class="status-connecting"><div class="dot"></div><span>מנסה להתחבר... (1/3)</span></div> <!-- v49.0: Initial message -->
             </header>
         </div>
 
@@ -59,38 +75,51 @@
             <a class="nav-link" data-view="view-log"><span class="material-symbols-outlined">terminal</span>צג לוגים (בחלון חדש)</a>
         </nav>
 
-        <!-- Main Content (Structure only, implementation in script) -->
+        <!-- Main Content -->
         <main>
             <div id="view-map" class="app-view active"><div id="leaflet-map" class="card" style="padding: 0;"></div></div>
-            <div id="view-orders" class="app-view view-table card">
-                 <h2>ניהול הזמנות</h2>
-                 <div class="table-controls"> /* ... */ </div>
-                 <div class="table-container"><table><thead><tr><th>מזהה</th><th>לקוח</th><th>טלפון</th><th>כתובת</th><th>נהג</th><th>סטטוס</th><th>פעולות</th></tr></thead><tbody id="orders-table-body"></tbody></table></div>
-            </div>
-            <div id="view-drivers" class="app-view view-table card">
-                 <h2>ניהול נהגים</h2>
-                 <div class="table-controls"> /* ... */ </div>
-                 <div class="table-container"><table><thead><tr><th>שם</th><th>טלפון</th><th>סטטוס</th><th>מיקום אחרון</th></tr></thead><tbody id="drivers-table-body"></tbody></table></div>
-            </div>
+            <div id="view-orders" class="app-view view-table card"> /* ... */ </div>
+            <div id="view-drivers" class="app-view view-table card"> /* ... */ </div>
         </main>
 
     </div>
 
-    <!-- Order Modal (Structure only) -->
+    <!-- Order Modal -->
     <div id="orderModal" class="modal-backdrop"> /* ... */ </div>
+
+     <!-- v49.0: Auth Error Message Area -->
+     <div id="auth-error-message">
+         ⚠️ שגיאת תקשורת: לא ניתן להתחבר ל-Firebase כרגע. אנא בדוק חיבור רשת או נסה שוב בעוד רגע.
+     </div>
+
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <!-- Firebase & App Logic (Modular) -->
     <script type="module">
-        console.log('Module script started (v48.4)'); // v48.4
+        console.log('Module script started (v49.0)'); // v49.0
 
         // --- Import Modules ---
-        let db, auth, authReady, SmartLog;
+        let db, auth, authReadyPromise, SmartLog; // v49.0: Rename authReady to authReadyPromise
         let collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc;
-        try { /* ... module imports unchanged ... */ }
-        catch (error) { /* ... error handling unchanged ... */ }
+        let mapReadyPromise = null; // v49.0: Promise for map readiness
+        let mapResolve, mapReject; // v49.0: Functions to resolve/reject map promise
+
+        try {
+            // Import config (which now handles auth retries) and logger
+            const firebaseImports = await import("./config.js");
+            db = firebaseImports.db; auth = firebaseImports.auth; authReadyPromise = firebaseImports.authReady; // v49.0
+            const smartLogImport = await import("./SmartLog.js");
+            SmartLog = smartLogImport.SmartLog;
+            console.log('Core modules imported successfully.');
+            if (!SmartLog) { console.error("SmartLog fallback."); SmartLog = { info: console.log, warn: console.warn, error: console.error }; }
+
+            // Import Firestore functions
+            const firestoreFunctions = await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js");
+            collection = firestoreFunctions.collection; doc = firestoreFunctions.doc; onSnapshot = firestoreFunctions.onSnapshot; query = firestoreFunctions.query; orderBy = firestoreFunctions.orderBy; addDoc = firestoreFunctions.addDoc; updateDoc = firestoreFunctions.updateDoc; serverTimestamp = firestoreFunctions.serverTimestamp; deleteDoc = firestoreFunctions.deleteDoc;
+            console.log('Firestore functions imported successfully.');
+        } catch (error) { console.error('CRITICAL ERROR importing modules!', error); throw new Error("Module import failed."); }
 
         // --- Helper Functions, Icons, Constants, Globals ---
         function getCssVariable(varName) { /* ... */ } function hexToRgba(hex, opacity) { /* ... */ }
@@ -98,49 +127,56 @@
         const driverIcons = { /* ... */ }; const defaultIconSize = [50, 50]; const defaultIconAnchor = [25, 50];
         const orderIcon = L.icon({ /* ... */ }); function createDriverIcon(driverName) { /* ... */ }
         const WAREHOUSE_LOCATIONS = { /* ... */ };
-        let map; const state = { /* ... */ }; let assignmentLine = null; let selectedOrderMarker = null; let currentEditOrderId = null; let DOM = {};
+        let map; let layerGroup; // v49.0: Add layerGroup global
+        const state = { /* ... */ }; let assignmentLine = null; let selectedOrderMarker = null; let currentEditOrderId = null; let DOM = {};
 
 
-        // --- Initialization (v48.4: Made async) ---
-        async function init() { // v48.4: Add async keyword
-            DOM = { /* ... definition unchanged ... */ };
-             if (!DOM.status || !DOM.ordersTable || !DOM.driversTable) { /* ... error handling ... */ return; }
-             if (typeof SmartLog?.info !== 'function') { /* ... error handling ... */ return; }
-             SmartLog.info("Auth Ready. Admin Hub v48.4 Initializing", "Init"); // v48.4
-
+        // --- Initialization (v49.0: Reworked structure) ---
+        async function initializeApplication() {
+            SmartLog.info("initializeApplication: Starting...", "Init");
             try {
-                if (typeof collection !== 'function') { throw new Error("Firestore functions not loaded."); }
+                // 1. Initialize DOM references
+                DOM = { /* ... definition unchanged ... */ };
+                if (!DOM.status || !DOM.ordersTable || !DOM.driversTable) { throw new Error("Essential DOM elements missing!"); }
 
-                // v48.4: Initialize Map FIRST and WAIT for it
-                try {
-                    await initMap(); // Use await here
-                    SmartLog.info("Map initialized successfully before attaching listeners.", "Init.MapOrder");
-                } catch(e) {
-                    SmartLog.error(e, "Init.Map.Critical", { message: "CRITICAL: Failed to initialize map! Listeners will likely fail." });
-                    updateConnectionStatus(false, "שגיאה קריטית באתחול המפה");
-                    return; // Stop initialization if map fails
-                }
-
-                // Initialize other UI elements (can run in parallel if needed, but not critical)
+                // 2. Initialize UI Components (can run early)
                 try { initNavigation(); } catch(e) { SmartLog.error(e, "Init.Navigation"); }
                 try { initTicker(); } catch(e) { SmartLog.error(e, "Init.Ticker"); }
                 try { initModals(); } catch(e) { SmartLog.error(e, "Init.Modals"); }
                 try { initSearch(); } catch(e) { SmartLog.error(e, "Init.Search"); }
 
-                // Attach listeners AFTER map is guaranteed to be ready
-                try {
-                    SmartLog.info("Attaching Firestore listeners...", "Init.Listeners");
-                    listenToDrivers(); listenToOrders(); listenToLocations();
-                    SmartLog.info("Firestore listeners attached.", "Init.Listeners");
-                } catch (e) {
-                     SmartLog.error(e, "Init.Listeners", { message: "Critical failure attaching listeners." }); updateConnectionStatus(false, "שגיאה בהפעלת מאזינים"); return;
-                }
+                // 3. Wait for Firebase Authentication (using the promise from config.js)
+                SmartLog.info("Waiting for Firebase Authentication (authReadyPromise)...", "Init.Auth");
+                const user = await authReadyPromise; // This now includes retries
+                SmartLog.info(`Firebase Authentication successful. User: ${user.uid}`, "Init.Auth");
 
-                updateConnectionStatus(true, "מחובר ומאזין");
-                SmartLog.info("Initialization complete.", "Init");
+                // 4. Initialize Map (returns a promise now)
+                 SmartLog.info("Initializing Map...", "Init.Map");
+                 mapReadyPromise = initMap(); // Store the promise
+                 await mapReadyPromise; // Wait for the map to be fully ready
+                 SmartLog.info("Map initialization complete.", "Init.Map");
 
-            } catch (e) { SmartLog.error(e, "Init.Critical"); updateConnectionStatus(false, "שגיאת אתחול"); }
+                 // 5. Attach Firestore listeners (only after auth AND map are ready)
+                 SmartLog.info("Attaching Firestore listeners...", "Init.Listeners");
+                 listenToDrivers(); listenToOrders(); listenToLocations();
+                 SmartLog.info("Firestore listeners attached.", "Init.Listeners");
+
+                 // 6. Update final status
+                 updateConnectionStatus(true, "מחובר ומאזין");
+                 SmartLog.info("Application initialization complete.", "Init");
+
+             } catch (error) {
+                 SmartLog.error(error, "Init.Critical", { message: "Application initialization failed." });
+                 updateConnectionStatus(false, `שגיאת אתחול: ${error.message}`);
+
+                 // v49.0: Display specific error for auth failure
+                 if (error.message.includes("signInAnonymously") || error.message.includes("Maximum retries")) {
+                     const authErrorMsg = document.getElementById('auth-error-message');
+                     if (authErrorMsg) authErrorMsg.style.display = 'block';
+                 }
+            }
         }
+
 
         // --- Connection Status Update ---
         function updateConnectionStatus(isConnected, message) { /* ... implementation unchanged (with logging) ... */ }
@@ -148,43 +184,44 @@
         // --- UI Modules ---
         function initNavigation() { /* ... */ } function initTicker() { /* ... */ } function initModals() { /* ... */ } function openAddOrderModal() { /* ... */ } function openEditOrderModal(orderId) { /* ... */ } function closeModal() { /* ... */ } function initSearch() { /* ... */ }
 
-        // --- Map Logic (v48.4: initMap returns a Promise) ---
+        // --- Map Logic (v49.0: initMap uses layerGroup, returns Promise) ---
         function initMap() {
-             // v48.4: Return a promise
-             return new Promise((resolve, reject) => {
+             return new Promise((resolve, reject) => { // Return promise
+                 mapResolve = resolve; // Store resolve/reject for later use
+                 mapReject = reject;
                  try {
                     SmartLog.info("Initializing Leaflet map...", "Init.Map");
-                    if (map) {
-                         try { map.remove(); } catch(removeErr) { SmartLog.warn("Error removing previous map instance", "Init.Map", removeErr); }
-                         map = null; // Ensure map is nullified
-                    }
+                    if (map) { try { map.remove(); } catch(removeErr) { /* ... */ } map = null; layerGroup = null; } // v49.0: Reset layerGroup too
 
-                    // Check if map container exists
                     const mapContainer = document.getElementById('leaflet-map');
-                     if (!mapContainer) {
-                         throw new Error("Map container element ('leaflet-map') not found in DOM.");
-                     }
+                    if (!mapContainer) throw new Error("Map container element not found.");
 
-                    map = L.map('leaflet-map'); // Assign to global map variable
+                    // v49.0: Create map instance
+                    map = L.map('leaflet-map', { zoomControl: true }).setView([32.08, 34.78], 11); // Set initial view
 
-                     // Add event listener for map load
-                     map.whenReady(() => {
-                         SmartLog.info("Leaflet map 'whenReady' event fired.", "Init.Map");
-                         resolve(); // Resolve the promise when map is fully ready
-                     });
+                    // v49.0: Create and add the layerGroup ONCE
+                    layerGroup = L.layerGroup().addTo(map);
+                    SmartLog.info("LayerGroup created and added to map.", "Init.Map");
 
-                    map.setView([32.109333, 34.855499], 9);
+                    // Add tile layer
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
+
+                    // Add mousemove listener
                     map.on('mousemove', (e) => { if (assignmentLine) { assignmentLine.setLatLngs([selectedOrderMarker.getLatLng(), e.latlng]); } });
 
-                    SmartLog.info("Leaflet map object created and layers added.", "Init.Map");
-                    // DO NOT resolve here, wait for whenReady
+                    // Resolve the promise when the map is ready
+                     map.whenReady(() => {
+                         SmartLog.info("Leaflet map 'whenReady' event fired. Resolving map promise.", "Init.Map");
+                         if (mapResolve) mapResolve(); // Resolve the promise
+                     });
+
+                    SmartLog.info("Leaflet map object created, layers/events added.", "Init.Map");
 
                  } catch(e) {
-                    SmartLog.error(e, "Init.Map", { message: "CRITICAL: Failed to initialize Leaflet map!" });
+                    SmartLog.error(e, "Init.Map", { message: "CRITICAL: Failed to initialize Leaflet map!" }, 'MapEngine', 'בדוק קונסול שגיאות או נסה לרענן.');
                     const mapDiv = document.getElementById('leaflet-map');
                     if (mapDiv) mapDiv.innerHTML = '<h2 style="color: red; text-align: center; padding-top: 50px;">שגיאה קריטית בטעינת המפה!</h2>';
-                    reject(e); // Reject the promise on error
+                    if (mapReject) mapReject(e); // Reject the promise on error
                  }
              });
          }
@@ -193,11 +230,120 @@
         // --- Firestore Listeners ---
         function listenToDrivers() { /* ... */ } function listenToOrders() { /* ... */ } function listenToLocations() { /* ... */ }
 
-        // --- Map Marker & Assignment (No changes needed here, map check is now implicitly handled by await in init) ---
-        function updateDriverMarker(driverId, driverData) { /* ... */ }
-        function removeDriverMarker(driverId) { /* ... */ }
-        function updateOrderMarker(orderId, orderData) { /* ... */ }
-        function removeOrderMarker(orderId) { /* ... */ }
+
+        // --- v49.0: safeAddMarker Function ---
+        async function safeAddMarker(marker) {
+            try {
+                // A.1: Safety check - Wait if map/layerGroup not ready
+                if (!map || !layerGroup || !map.addLayer) {
+                    SmartLog.warn('safeAddMarker: Map or layerGroup not ready, waiting...', "MapEngine");
+                    if (mapReadyPromise) {
+                        await mapReadyPromise; // Wait for the map init promise to resolve
+                        SmartLog.info('safeAddMarker: Map is now ready after waiting.', "MapEngine");
+                        // Re-check after waiting
+                        if (!map || !layerGroup || !map.addLayer) {
+                             throw new Error("Map or layerGroup still not available after waiting.");
+                        }
+                    } else {
+                         throw new Error("mapReadyPromise is not defined.");
+                    }
+                }
+                 // Add marker to the layerGroup
+                 layerGroup.addLayer(marker);
+                 SmartLog.info('Marker added successfully via layerGroup.', "MapEngine");
+
+            } catch (err) {
+                SmartLog.error(err, "Map.Marker.AddLayer", { markerDetails: marker?.options?.icon?.options?.iconUrl }, 'MapEngine', 'שגיאה בהוספת סמן למפה. בדוק אם המפה אותחלה כראוי.');
+            }
+        }
+
+        // --- Map Marker & Assignment (v49.0: Uses safeAddMarker) ---
+        function updateDriverMarker(driverId, driverData) {
+            SmartLog.info(`Attempting update/add for driver ${driverId}`, "Map.Marker.Driver");
+            try {
+                const location = state.locations[driverId];
+                const latLng = location ? [location.latitude, location.longitude] : null;
+                if (!latLng) { removeDriverMarker(driverId); return; }
+                const driverName = driverData.name || '?'; const iconToUse = createDriverIcon(driverName);
+                const marker = state.markers.drivers[driverId];
+
+                if (marker) {
+                    // Update existing marker (no need for safeAddMarker)
+                    marker.setLatLng(latLng); marker.setIcon(iconToUse); marker.getPopup().setContent(`<b>${driverName}</b><br>${driverData.phone}`); marker.driverData = driverData;
+                    SmartLog.info(`Driver marker updated: ${driverId}`, "Map.Marker.Driver");
+                } else {
+                    // Create new marker
+                    const newMarker = L.marker(latLng, { icon: iconToUse, draggable: false });
+                    newMarker.bindPopup(`<b>${driverName}</b><br>${driverData.phone}`); newMarker.driverData = driverData;
+                    newMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); if (selectedOrderMarker) { assignOrder(selectedOrderMarker.orderData, driverData); } else { zoomToMarker(newMarker, 17); } });
+                    state.markers.drivers[driverId] = newMarker;
+                    // v49.0: Use safeAddMarker to add to map
+                    safeAddMarker(newMarker);
+                    SmartLog.info(`Driver marker created: ${driverId}`, "Map.Marker.Driver");
+                }
+            } catch (e) { SmartLog.error(e, "Map.Marker.Driver.Update", { driverId }, 'MapEngine', 'שגיאה פנימית בעדכון סמן נהג.'); updateConnectionStatus(false, "שגיאה בסמן נהג"); }
+        }
+
+        function removeDriverMarker(driverId) {
+             SmartLog.info(`Attempting remove for driver ${driverId}`, "Map.Marker.Driver");
+             try {
+                const marker = state.markers.drivers[driverId];
+                if (marker) {
+                    if (layerGroup && layerGroup.hasLayer(marker)) { // v49.0: Check layerGroup
+                        layerGroup.removeLayer(marker);
+                    } else if (map && map.hasLayer(marker)) { // Fallback if somehow not in layerGroup
+                        map.removeLayer(marker);
+                    }
+                    delete state.markers.drivers[driverId];
+                    SmartLog.info(`Driver marker removed: ${driverId}`, "Map.Marker.Driver");
+                }
+             } catch (e) { SmartLog.error(e, "Map.Marker.Driver.Remove", { driverId }, 'MapEngine', 'שגיאה בהסרת סמן נהג.'); }
+        }
+
+        function updateOrderMarker(orderId, orderData) {
+             SmartLog.info(`Attempting update/add for order ${orderId}`, "Map.Marker.Order");
+            try {
+                if (orderData.status === 'הושלם') { removeOrderMarker(orderId); return; }
+                const lat = parseFloat(orderData.latitude); const lng = parseFloat(orderData.longitude);
+                const latLng = (typeof lat === 'number' && !isNaN(lat) && typeof lng === 'number' && !isNaN(lng)) ? [lat, lng] : null;
+                if (!latLng) { /* ... warning & remove ... */ return; }
+                const distances = calculateDistances(latLng); const popupContent = `<b>${orderData.customer?.name || '?'}</b><br>${orderData.address}<br><b>סטטוס:</b> ${orderData.status || 'חדש'}<br><small>${distances}</small>`;
+                const marker = state.markers.orders[orderId];
+
+                if (marker) {
+                    // Update existing marker
+                    marker.setLatLng(latLng); marker.getPopup().setContent(popupContent); marker.orderData = orderData;
+                    SmartLog.info(`Order marker updated: ${orderId}`, "Map.Marker.Order");
+                } else {
+                    // Create new marker
+                    const newMarker = L.marker(latLng, { icon: orderIcon, draggable: true });
+                    newMarker.bindPopup(popupContent); newMarker.orderData = orderData;
+                    newMarker.on('click', (e) => { L.DomEvent.stopPropagation(e); handleOrderClick(newMarker); if (!selectedOrderMarker) { zoomToMarker(newMarker, 17); } });
+                    newMarker.on('dragend', (e) => handleOrderDrop(e.target, orderData));
+                    state.markers.orders[orderId] = newMarker;
+                     // v49.0: Use safeAddMarker
+                     safeAddMarker(newMarker);
+                     SmartLog.info(`Order marker created: ${orderId}`, "Map.Marker.Order");
+                }
+            } catch (e) { SmartLog.error(e, "Map.Marker.Order.Update", { orderId }, 'MapEngine', 'שגיאה פנימית בעדכון סמן הזמנה.'); updateConnectionStatus(false, "שגיאה בסמן הזמנה"); }
+        }
+
+
+        function removeOrderMarker(orderId) {
+            SmartLog.info(`Attempting remove for order ${orderId}`, "Map.Marker.Order");
+             try {
+                const marker = state.markers.orders[orderId];
+                if (marker) {
+                    if (layerGroup && layerGroup.hasLayer(marker)) { // v49.0: Check layerGroup
+                        layerGroup.removeLayer(marker);
+                    } else if (map && map.hasLayer(marker)) {
+                        map.removeLayer(marker);
+                    }
+                    delete state.markers.orders[orderId];
+                    SmartLog.info(`Order marker removed: ${orderId}`, "Map.Marker.Order");
+                }
+             } catch (e) { SmartLog.error(e, "Map.Marker.Order.Remove", { orderId }, 'MapEngine', 'שגיאה בהסרת סמן הזמנה.'); }
+        }
         function updateDriverMarkerLocation(driverId, locData) { /* ... */ }
         function calculateDistances(orderLatLng) { /* ... */ } function handleOrderClick(marker) { /* ... */ } function handleOrderDrop(orderMarker, orderData) { /* ... */ } async function assignOrder(orderData, driverData) { /* ... */ } function zoomToMarker(marker, zoomLevel) { /* ... */ }
 
@@ -209,15 +355,7 @@
 
 
         // --- Start App ---
-        console.log('Waiting for authReady (v48.4)...'); // v48.4
-        if (authReady) {
-            authReady.then(async (user) => { // v48.4: Add async here
-                        console.log('authReady resolved. Starting async init()...'); // v48.4
-                        await init(); // v48.4: Use await here
-                        console.log("Async init() completed."); // v48.4
-                     })
-                     .catch(err => { console.error('authReady failed!', err); (SmartLog.error || console.error)(err, "Auth.Fatal"); updateConnectionStatus(false, `Auth Error: ${err.message}`); });
-        } else { console.error('authReady missing!'); updateConnectionStatus(false, "Config Error"); }
+        initializeApplication(); // v49.0: Call the main async initializer
 
     </script>
 </body>
