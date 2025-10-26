@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v44.1 - מרכז בקרה</title>
+    <title>DeliveryMaster v45.0 - מרכז בקרה</title>
 
     <!-- Leaflet (Map) CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -117,6 +117,7 @@
             color: var(--m3-on-surface-variant);
             font-weight: 500;
             transition: all 0.2s ease;
+            cursor: pointer; /* v45.0: Upewnij się, że jest klikalny */
         }
         .nav-link:hover {
             background-color: rgba(255,255,255, 0.05);
@@ -182,7 +183,7 @@
         <!-- 1. Header -->
         <header class="glass-card">
             <div id="app-title">
-                <span id="app-version">v44.1</span>DeliveryMaster
+                <span id="app-version">v45.0</span>DeliveryMaster
             </div>
             <div id="connection-status" class="status-connecting">
                 <div class="dot"></div>
@@ -192,20 +193,20 @@
 
         <!-- 2. Navigation -->
         <nav class="glass-card">
-            <a href="#map" class="nav-link active" data-view="view-map">
+            <a class="nav-link active" data-view="view-map">
                 <span class="material-symbols-outlined">map</span>
                 חדר מצב (מפה)
             </a>
-            <a href="#orders" class="nav-link" data-view="view-orders">
+            <a class="nav-link" data-view="view-orders">
                 <span class="material-symbols-outlined">list_alt</span>
                 ניהול הזמנות
             </a>
-            <a href="#drivers" class="nav-link" data-view="view-drivers">
+            <a class="nav-link" data-view="view-drivers">
                 <span class="material-symbols-outlined">local_shipping</span>
                 ניהול נהגים
             </a>
-            <!-- v44.1: תיקון נתיב פתיחה - מוודא פתיחה מהנתיב הנכון -->
-            <a href="/admin-v44/log.html" target="_blank" class="nav-link">
+            <!-- v45.0: שינוי ל-data-view כדי שהלוגיקה תטפל בזה -->
+            <a class="nav-link" data-view="view-log">
                 <span class="material-symbols-outlined">terminal</span>
                 צג לוגים (בחלון חדש)
             </a>
@@ -268,12 +269,12 @@
     
     <!-- Firebase & App Logic (Modular) -->
     <script type="module">
-        // v44.1: שינוי נתיב ייבוא לנתיב אבסולוטי מהשורש
-        // ודא שהתיקייה שלך בשרת היא אכן "admin-v44"
+        // v45.0: שינוי נתיב ייבוא
         const APP_ROOT = "/admin-v44"; 
         
         // ייבוא רכיבי Firebase והלוגר
-        import { db, auth } from `${APP_ROOT}/config.js`;
+        // v45.0: ייבוא Promise האימות
+        import { db, auth, authReady } from `${APP_ROOT}/config.js`; 
         import { SmartLog } from `${APP_ROOT}/SmartLog.js`;
         import { 
             collection, 
@@ -281,7 +282,7 @@
             onSnapshot, 
             query, 
             orderBy,
-            updateDoc // (נצטרך בהמשך לפעולות)
+            updateDoc 
         } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
         // --- Globals ---
@@ -306,10 +307,12 @@
         
         // --- 1. Initialization ---
         function init() {
+            // v45.0: הפונקציה הזו רצה רק *אחרי* אימות מוצלח
+            SmartLog.info("Auth Ready. Admin Hub v45.0 Initializing", "Init");
+            
             try {
                 initNavigation();
                 initMap();
-                SmartLog.info("Admin Hub v44.1 Initializing", "Init");
                 
                 // התחל האזנה לכל הנתונים
                 listenToDrivers();
@@ -317,6 +320,8 @@
                 listenToLocations();
                 
                 updateConnectionStatus(true, "מחובר ומאזין");
+                SmartLog.info("Initialization complete. Listeners attached.", "Init");
+
             } catch (e) {
                 SmartLog.error(e, "Init");
                 updateConnectionStatus(false, "שגיאת אתחול קריטית");
@@ -338,14 +343,15 @@
             DOM.navLinks.forEach(link => {
                 link.addEventListener('click', (e) => {
                     e.preventDefault();
-                    if (link.hasAttribute('target')) {
-                        // פותח קישורים חיצוניים (כמו הלוג)
-                        window.open(link.href, link.target);
+                    const viewId = link.getAttribute('data-view');
+
+                    // v45.0: טיפול מיוחד בקישור ללוגים
+                    if (viewId === 'view-log') {
+                        window.open(`${APP_ROOT}/log.html`, '_blank');
+                        SmartLog.info(`Opened log window`, "Navigation");
                         return;
                     }
 
-                    const viewId = link.getAttribute('data-view');
-                    
                     DOM.views.forEach(v => v.classList.remove('active'));
                     document.getElementById(viewId).classList.add('active');
                     
@@ -353,20 +359,22 @@
                     link.classList.add('active');
                     
                     if (viewId === 'view-map') {
-                        // חובה לרענן את המפה
-                        setTimeout(() => map.invalidateSize(), 10);
+                        setTimeout(() => {
+                            if (map) map.invalidateSize();
+                        }, 10); // v45.0: תן ל-CSS לסיים
                     }
                     SmartLog.info(`Mapsd to ${viewId}`, "Navigation");
                 });
             });
+            SmartLog.info("Navigation listeners attached", "Init.Navigation");
         }
         
         // --- 3. Map Logic (Leaflet) ---
         function initMap() {
             try {
+                if (map) map.remove(); // v45.0: נקה מפה קודמת אם קיימת
                 map = L.map('leaflet-map').setView([32.109333, 34.855499], 10); // מרכז ישראל
                 
-                // שכבת רקע כהה (Material 3 Dark)
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                     attribution: '&copy; OpenStreetMap &copy; CARTO',
                     subdomains: 'abcd',
@@ -398,7 +406,6 @@
         }
 
         function listenToOrders() {
-            // (במערכת אמיתית, נסנן רק הזמנות פעילות)
             const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
             onSnapshot(q, (snapshot) => {
                  snapshot.docChanges().forEach((change) => {
@@ -434,6 +441,7 @@
 
         // --- 5. Render Functions ---
         function renderOrdersTable() {
+            if (!DOM.ordersTable) return; // v45.0: בדיקת בטיחות
             const orders = Object.values(state.orders);
             if (orders.length === 0) {
                 DOM.ordersTable.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem;">אין הזמנות פעילות</td></tr>`;
@@ -454,6 +462,7 @@
         }
         
         function renderDriversTable() {
+            if (!DOM.driversTable) return; // v45.0: בדיקת בטיחות
             const drivers = Object.values(state.drivers);
             if (drivers.length === 0) {
                 DOM.driversTable.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 2rem;">אין נהגים רשומים</td></tr>`;
@@ -474,9 +483,17 @@
             `}).join('');
         }
         
-        // --- Start App ---
-        init();
+        // --- v45.0: Start App ---
+        // המתן לאימות לפני אתחול האפליקציה
+        authReady.then(() => {
+            init();
+        }).catch(err => {
+            // שגיאת אימות קריטית
+            SmartLog.error(err, "Auth.Fatal");
+            updateConnectionStatus(false, "שגיאת אימות Firebase");
+        });
         
     </script>
 </body>
 </html>
+
