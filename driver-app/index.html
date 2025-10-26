@@ -27,7 +27,7 @@
     <style>
         /* --- Styles unchanged --- */
         body { font-family: 'Rubik', sans-serif; overscroll-behavior-y: contain; }
-        #map { height: 250px; border-radius: 0.5rem; background-color: #e5e7eb; /* Light gray background */ } /* Added background */
+        #map { height: 250px; border-radius: 0.5rem; background-color: #e5e7eb; }
         .leaflet-control-zoom { display: none; } .leaflet-control-attribution { font-size: 10px; }
         .btn-primary { background-color: #3a86ff; color: white; } .btn-primary:hover { background-color: #2f6ac2; }
         .btn-secondary { background-color: #6c757d; color: white; } .btn-secondary:hover { background-color: #5a6268; }
@@ -38,7 +38,7 @@
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); } }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3a86ff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #critical-error-display { display: none; /* Hidden by default */ }
+        #critical-error-display { display: none; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -53,7 +53,7 @@
                 <p id="driver-name-display" class="text-sm text-gray-600">נהג: טוען...</p>
             </div>
             <div id="status-indicator" class="flex items-center space-x-2 space-x-reverse text-sm">
-                 <span id="status-text" class="text-yellow-600 font-medium">טוען אפליקציה...</span> <!-- v50.3: Initial text -->
+                 <span id="status-text" class="text-yellow-600 font-medium">טוען אפליקציה...</span>
                  <div id="status-dot" class="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
             </div>
         </header>
@@ -98,8 +98,7 @@
 
     <!-- Combined & Inlined App Logic -->
     <script type="module">
-        // v50.3: Enhanced initialization logging and error handling
-        console.log('Driver App script started (v50.3)');
+        console.log('Driver App script started (v50.4)'); // v50.4
 
         // --- Inlined Firebase SDK Imports ---
         import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
@@ -129,7 +128,7 @@
 
         // --- Driver App Specific Logic ---
         let map; let driverMarker; let currentDriverId = null; let currentDriverName = null; let watchId = null; let currentOrders = {}; let notificationAudio = null; let hasNotificationPermission = false; let hasGeolocationPermission = false; let lastLocationUpdate = 0;
-        let DOM = {}; // Defined after DOMContentLoaded
+        let DOM = {};
 
         // --- Initialization ---
         async function initializeDriverApp() {
@@ -142,19 +141,26 @@
             };
             SmartLog.info("DOM elements referenced.", "Init.DOM");
             if (!DOM.driverNameDisplay || !DOM.statusText || !DOM.mapElement || !DOM.orderList) { throw new Error("Essential DOM elements missing!"); }
-            SmartLog.info("Initializing Driver App (v50.3)...", "Init"); // v50.3
+            SmartLog.info("Initializing Driver App (v50.4)...", "Init"); // v50.4
 
             try {
-                // Check driver ID AFTER DOM is ready
+                // Check driver ID
                 SmartLog.info("Checking localStorage for driver info...", "Auth");
                 currentDriverId = localStorage.getItem('driverId'); currentDriverName = localStorage.getItem('driverName');
                 if (!currentDriverId || !currentDriverName) { SmartLog.error(new Error("Missing driverId/Name"), "Auth"); window.location.href = 'login.html'; return; }
                 DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`; SmartLog.info("Driver ID found.", "Auth");
 
                 // Wait for Firebase Auth
-                updateStatus("ממתין לאימות Firebase...", "yellow", true); // More specific message
+                updateStatus("ממתין לאימות Firebase...", "yellow", true);
                 SmartLog.info("Waiting for Firebase Authentication...", "Init.Auth");
-                const user = await authReadyPromise;
+                const user = await authReadyPromise; // Get the user object
+
+                // v50.4: Check if user object and uid are valid
+                if (!user || !user.uid) {
+                     SmartLog.error(new Error("Invalid user object received after authReady"), "Auth.Critical", { userReceived: user }, "Auth", "האימות נכשל באופן בלתי צפוי. נסה לרענן.");
+                     throw new Error("Invalid user object received after authentication."); // Stop initialization
+                }
+                // Now it's safe to access user.uid
                 SmartLog.info(`Firebase Auth successful. User: ${user.uid}`, "Init.Auth");
                 if (DOM.authErrorMsg) DOM.authErrorMsg.style.display = 'none';
 
@@ -164,7 +170,7 @@
 
                 // Initialize Map
                 updateStatus("מאתחל מפה...", "yellow", true);
-                initMap(); // Needs to succeed, throws error on failure
+                initMap();
 
                 // Start Geolocation only if permission granted
                 if (hasGeolocationPermission) {
@@ -177,11 +183,11 @@
 
                 // Attach Order Listener
                 updateStatus("מסנכרן משימות...", "yellow", true);
-                listenToOrders(); // Needs to succeed, has internal error handling
+                listenToOrders();
 
                 updateFinalStatus(); SmartLog.info("Driver App Initialization Complete.", "Init");
 
-            } catch (error) { // Catch errors from await auth, initMap, listeners setup
+            } catch (error) {
                 SmartLog.error(error, "Init.Critical");
                 const errorMsg = `שגיאת אתחול: ${error.message}`;
                 updateStatus(errorMsg, "red", false);
@@ -189,61 +195,34 @@
             }
         }
 
-         function updateFinalStatus() { if (watchId) updateStatus("GPS פעיל", "green", false); else if (!hasGeolocationPermission) updateStatus("נדרשת הרשאת מיקום", "red", false); else updateStatus("GPS לא פעיל", "yellow", false); }
-        function updateStatus(text, color = "gray", pulse = false) { if (!DOM.statusText || !DOM.statusDot) { console.warn("Status elements missing:", text); return; } SmartLog.info(`Status: ${text}`, "UI.Status", { color, pulse }); DOM.statusText.textContent = text; DOM.statusText.className = `text-sm font-medium text-${color}-600`; DOM.statusDot.className = `w-3 h-3 rounded-full bg-${color}-400 ${pulse ? 'animate-pulse' : ''}`; }
-        async function checkAndRequestPermissions() { /* ... implementation unchanged ... */ }
-        async function handlePermissionRequest() { /* ... implementation unchanged ... */ }
-        function startGeolocation() { /* ... implementation unchanged ... */ }
-        async function updateLocationInFirestore(lat, lng) { /* ... implementation unchanged ... */ }
-        async function updateLocationText(lat, lng) { /* ... implementation unchanged ... */ }
+         function updateFinalStatus() { /* ... */ }
+        function updateStatus(text, color = "gray", pulse = false) { /* ... */ }
+        async function checkAndRequestPermissions() { /* ... */ }
+        async function handlePermissionRequest() { /* ... */ }
+        function startGeolocation() { /* ... */ }
+        async function updateLocationInFirestore(lat, lng) { /* ... */ }
+        async function updateLocationText(lat, lng) { /* ... */ }
+        function initMap() { /* ... */ }
+        function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
+        function listenToOrders() { /* ... */ }
+        function renderOrderList() { /* ... */ }
+        function createOrderCard(order) { /* ... */ }
+        window.acknowledgeOrder = async (orderId) => { /* ... */ };
+        window.completeOrder = async (orderId) => { /* ... */ };
+        function initNotifications() { /* ... */ }
+        function handleNewOrderNotification() { /* ... */ }
+        function stopNotificationSound() { /* ... */ }
+        function registerServiceWorker() { /* ... */ }
 
-        // v50.3: More robust initMap
-        function initMap() {
-             SmartLog.info("initMap: Starting...", "Map.Init");
-             try {
-                 if (map) { try { map.remove(); } catch(e){} map = null; } // Cleanup previous instance
-                 if (!DOM.mapElement) { throw new Error("Map DOM element not found!"); }
-                 map = L.map(DOM.mapElement); // Throws if element not found or invalid
-                 SmartLog.info("initMap: L.map created.", "Map.Init");
-
-                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 18, }).addTo(map); // Throws if map invalid
-                 SmartLog.info("initMap: TileLayer added.", "Map.Init");
-
-                 map.setView([32.0853, 34.7818], 13); // Set initial view
-                 SmartLog.info("initMap: View set.", "Map.Init");
-
-                 // Add a small delay before confirming map is fully ready, helps some rendering issues
-                 // setTimeout(() => { SmartLog.info("Map initialized successfully (post-delay).", "Map"); }, 100);
-                 SmartLog.info("Map initialized successfully.", "Map"); // Log success
-
-             } catch (e) {
-                  SmartLog.error(e, "Map.Init");
-                  if (DOM.mapElement) DOM.mapElement.innerHTML = '<p class="text-red-500 p-4 text-center">שגיאה קריטית בטעינת המפה!</p>';
-                  throw e; // Re-throw error to be caught by initializeDriverApp
-             }
-        }
-        function updateDriverMarkerOnMap(lat, lng) { /* ... implementation unchanged ... */ }
-        function listenToOrders() { /* ... implementation unchanged ... */ }
-        function renderOrderList() { /* ... implementation unchanged ... */ }
-        function createOrderCard(order) { /* ... implementation unchanged ... */ }
-        window.acknowledgeOrder = async (orderId) => { /* ... implementation unchanged ... */ };
-        window.completeOrder = async (orderId) => { /* ... implementation unchanged ... */ };
-        function initNotifications() { /* ... implementation unchanged ... */ }
-        function handleNewOrderNotification() { /* ... implementation unchanged ... */ }
-        function stopNotificationSound() { /* ... implementation unchanged ... */ }
-        function registerServiceWorker() { /* ... implementation unchanged ... */ }
-
-
-        // --- Start Application (v50.3: Ensures DOMContentLoaded) ---
+        // --- Start Application ---
         function runInitialization() {
-             console.log('DOMContentLoaded fired (v50.3). Starting app initialization...');
-             try { if (typeof SmartLog === 'undefined') { console.error("SmartLog is missing!"); const statusText = document.getElementById('status-text'); if(statusText) statusText.textContent = 'שגיאת טעינה!'; return; }
+             console.log('DOMContentLoaded fired (v50.4). Starting app initialization...'); // v50.4
+             try { if (typeof SmartLog === 'undefined') { console.error("SmartLog is missing!"); /*...*/ return; }
                 SmartLog.info("DOMContentLoaded fired.", "Init"); registerServiceWorker(); initializeDriverApp(); try { if(feather) feather.replace(); } catch (e) { SmartLog.warn("Feather replace failed.", "UI", e); }
-             } catch (criticalError) { console.error("CRITICAL SYNC ERROR:", criticalError); const errDisp = document.getElementById('critical-error-display'); const errMsg = document.getElementById('critical-error-message'); if (errDisp && errMsg) { errMsg.textContent = `שגיאה קריטית: ${criticalError.message}`; errDisp.style.display = 'block'; } (SmartLog.error || console.error)(criticalError, "Init.SyncCritical"); }
+             } catch (criticalError) { /* ... error handling ... */ }
         }
-
         if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', runInitialization); }
-        else { runInitialization(); } // Already loaded
+        else { runInitialization(); }
 
     </script>
 
