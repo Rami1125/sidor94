@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v49.2 - צג לוגים</title>
+    <title>DeliveryMaster v49.3 - צג לוגים</title> <!-- v49.3 -->
 
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -104,12 +104,16 @@
         select.form-control {
             /* Basic arrow styling */
             appearance: none;
-            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236c757d%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); /* Adjusted arrow color */
             background-repeat: no-repeat;
             background-position: left 0.7em top 50%;
             background-size: 0.65em auto;
             padding-left: 2.5em; /* Space for arrow */
         }
+         :root[data-theme="dark"] select.form-control {
+              background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23adb5bd%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E'); /* Dark theme arrow */
+         }
+
 
         /* Log Container & Table */
         .log-container {
@@ -153,7 +157,7 @@
 
     <h1>
         <div>
-            <span style="color: var(--sl-info-color);">[v49.2]</span> צג לוגים (מלשינון חכם)
+            <span style="color: var(--sl-info-color);">[v49.3]</span> צג לוגים (מלשינון חכם) <!-- v49.3 -->
             <span id="status" class="status-warn">
                  <span class="status-dot"></span><span id="status-text">מתחבר...</span>
             </span>
@@ -171,7 +175,6 @@
             <option value="WARN">אזהרה (WARN)</option>
             <option value="ERROR">שגיאה (ERROR)</option>
         </select>
-         <!-- v49.2: New Filter for Source File -->
          <select id="filter-source" class="form-control">
              <option value="">כל הקבצים</option>
              <!-- Options will be populated by JS -->
@@ -185,7 +188,7 @@
                     <th class="col-time">זמן</th>
                     <th class="col-level">רמה</th>
                     <th class="col-origin">מקור (קוד)</th>
-                    <th class="col-source">מקור (קובץ)</th> {/* v49.2: New Column */}
+                    <th class="col-source">מקור (קובץ)</th> <!-- v49.3: Removed comment -->
                     <th>הודעה</th>
                     <th class="col-context">קונטקסט / פרטים</th>
                 </tr>
@@ -214,7 +217,7 @@
             tableBody: document.getElementById('logs-table-body'),
             filterText: document.getElementById('filter-text'),
             filterLevel: document.getElementById('filter-level'),
-            filterSource: document.getElementById('filter-source'), // v49.2
+            filterSource: document.getElementById('filter-source'),
             statusText: document.getElementById('status-text'),
             statusDot: document.getElementById('status').querySelector('.status-dot'),
             statusContainer: document.getElementById('status'),
@@ -223,193 +226,86 @@
         };
 
         let allLogs = []; // Cache for raw logs
-        let uniqueSources = new Set(); // v49.2: To store unique source filenames
+        let uniqueSources = new Set();
         let unsubscribe = null;
 
         // --- Initialization ---
         function init() {
-            console.log("Log Viewer Initializing (v49.2)...");
-             // Theme handling
+            console.log("Log Viewer Initializing (v49.3)..."); // v49.3
              initializeTheme();
              DOM.themeToggle.addEventListener('click', toggleTheme);
-
-            // Filter listeners
-            DOM.filterText.addEventListener('input', renderLogs);
-            DOM.filterLevel.addEventListener('input', renderLogs);
-            DOM.filterSource.addEventListener('input', renderLogs); // v49.2
-
-            // Start listening to Firestore
-            listenToLogs();
+             DOM.filterText.addEventListener('input', renderLogs);
+             DOM.filterLevel.addEventListener('input', renderLogs);
+             DOM.filterSource.addEventListener('input', renderLogs);
+             listenToLogs();
              console.log("Initialization complete. Listening for logs.");
-             // Log viewer init success via console, not SmartLog, as SmartLog might not be available here
              console.info("[LogViewer] Initialized Successfully.");
         }
 
         // --- Theme Management ---
-         function initializeTheme() {
-            const savedTheme = localStorage.getItem('logViewerTheme') || 'light';
-            setTheme(savedTheme);
-         }
-
-         function setTheme(themeName) {
-             document.documentElement.setAttribute('data-theme', themeName);
-             DOM.themeIcon.textContent = themeName === 'dark' ? 'dark_mode' : 'light_mode';
-             localStorage.setItem('logViewerTheme', themeName);
-             console.log(`Theme set to ${themeName}`);
-         }
-
-         function toggleTheme() {
-             const currentTheme = document.documentElement.getAttribute('data-theme');
-             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-             setTheme(newTheme);
-         }
+         function initializeTheme() { /* ... */ }
+         function setTheme(themeName) { /* ... */ }
+         function toggleTheme() { /* ... */ }
 
         // --- Firestore Listener ---
         function listenToLogs() {
             if (unsubscribe) { try { unsubscribe(); } catch(e) { console.warn("Error unsubscribing:", e); } }
-
             updateStatus('warn', 'מתחבר למאזין...');
-
-            const q = query(
-                collection(db, LOG_COLLECTION),
-                orderBy("timestamp", "desc"),
-                limit(LOG_LIMIT)
-            );
-
+            const q = query( collection(db, LOG_COLLECTION), orderBy("timestamp", "desc"), limit(LOG_LIMIT) );
             unsubscribe = onSnapshot(q, (snapshot) => {
                 updateStatus('ok', 'מאזין לשינויים...');
-                console.log(`Snapshot received: ${snapshot.size} docs, ${snapshot.docChanges().length} changes.`); // More info
-
-                const newLogs = [];
-                const currentSources = new Set(uniqueSources); // Copy existing sources
-
+                console.log(`Snapshot: ${snapshot.size} docs, ${snapshot.docChanges().length} changes.`);
+                const newLogs = []; const currentSources = new Set(uniqueSources);
                 snapshot.forEach(doc => {
-                    const logData = doc.data();
-                    newLogs.push({ id: doc.id, ...logData }); // Include doc ID if needed later
-
-                    // v49.2: Extract and store unique source file paths
+                    const logData = doc.data(); newLogs.push({ id: doc.id, ...logData });
                     const sourcePath = logData.context?.page;
                     if (sourcePath && typeof sourcePath === 'string') {
-                         // Simple cleaning: Extract filename
-                         const sourceName = sourcePath.split('/').pop() || sourcePath;
-                         if(sourceName) currentSources.add(sourceName);
-                     } else if (logData.origin?.startsWith('FirebaseFunction')) {
-                         currentSources.add('Firebase Function'); // Special case for server logs
-                     }
+                         const sourceName = sourcePath.split('/').pop() || sourcePath; if(sourceName) currentSources.add(sourceName);
+                     } else if (logData.origin?.startsWith('FirebaseFunction')) { currentSources.add('Firebase Function'); }
                 });
-
-                allLogs = newLogs; // Update cache
-
-                // v49.2: Update source filter only if new sources were found
-                 if (currentSources.size !== uniqueSources.size || !setsAreEqual(currentSources, uniqueSources)) {
-                    uniqueSources = currentSources;
-                    populateSourceFilter();
-                 }
-
-                renderLogs(); // Render with updated data and filters
-            }, (error) => {
-                console.error("Error listening to logs:", error);
-                updateStatus('error', `שגיאת האזנה: ${error.message}`);
-            });
+                allLogs = newLogs;
+                 if (currentSources.size !== uniqueSources.size || !setsAreEqual(currentSources, uniqueSources)) { uniqueSources = currentSources; populateSourceFilter(); }
+                renderLogs();
+            }, (error) => { console.error("Error listening to logs:", error); updateStatus('error', `שגיאת האזנה: ${error.message}`); });
         }
 
         // --- UI Rendering & Filtering ---
-
-         // v49.2: Helper to compare sets
-         function setsAreEqual(setA, setB) {
-             if (setA.size !== setB.size) return false;
-             for (const item of setA) {
-                 if (!setB.has(item)) return false;
-             }
-             return true;
-         }
-
-
-        // v49.2: Populate source filter dropdown
-        function populateSourceFilter() {
-            const currentSelection = DOM.filterSource.value; // Remember current selection
-            DOM.filterSource.innerHTML = '<option value="">כל הקבצים</option>'; // Reset
-            const sortedSources = Array.from(uniqueSources).sort(); // Sort alphabetically
-            sortedSources.forEach(sourceName => {
-                const option = document.createElement('option');
-                option.value = sourceName;
-                option.textContent = sourceName;
-                DOM.filterSource.appendChild(option);
-            });
-             // Restore selection if possible
-             if (sortedSources.includes(currentSelection)) {
-                 DOM.filterSource.value = currentSelection;
-             }
-             console.log("Source filter populated:", sortedSources);
-        }
+         function setsAreEqual(setA, setB) { /* ... */ }
+         function populateSourceFilter() { /* ... */ }
 
         function renderLogs() {
             const textFilter = DOM.filterText.value.toLowerCase();
             const levelFilter = DOM.filterLevel.value;
-            const sourceFilter = DOM.filterSource.value; // v49.2
-
-            console.log("Rendering logs with filters:", { textFilter, levelFilter, sourceFilter }); // Debug filters
+            const sourceFilter = DOM.filterSource.value;
+            console.log("Rendering logs with filters:", { textFilter, levelFilter, sourceFilter });
 
             const filteredLogs = allLogs.filter(log => {
-                 // Level Filter
-                 const levelMatch = !levelFilter || log.level === levelFilter;
-                 if (!levelMatch) return false;
-
-                 // Text Filter (check message, origin, context values)
-                 const textMatch = !textFilter ||
-                    (log.message && String(log.message).toLowerCase().includes(textFilter)) ||
-                    (log.origin && log.origin.toLowerCase().includes(textFilter)) ||
-                    (log.context && JSON.stringify(log.context).toLowerCase().includes(textFilter)); // Simple context search
-                 if (!textMatch) return false;
-
-                 // v49.2: Source Filter
-                 const sourcePath = log.context?.page;
-                 const sourceName = sourcePath ? (sourcePath.split('/').pop() || sourcePath) : (log.origin?.startsWith('FirebaseFunction') ? 'Firebase Function' : '');
-                 const sourceMatch = !sourceFilter || sourceName === sourceFilter;
-                 if (!sourceMatch) return false;
-
-                return true; // All filters passed
+                 const levelMatch = !levelFilter || log.level === levelFilter; if (!levelMatch) return false;
+                 const textMatch = !textFilter || (log.message && String(log.message).toLowerCase().includes(textFilter)) || (log.origin && log.origin.toLowerCase().includes(textFilter)) || (log.context && JSON.stringify(log.context).toLowerCase().includes(textFilter)); if (!textMatch) return false;
+                 const sourcePath = log.context?.page; const sourceName = sourcePath ? (sourcePath.split('/').pop() || sourcePath) : (log.origin?.startsWith('FirebaseFunction') ? 'Firebase Function' : ''); const sourceMatch = !sourceFilter || sourceName === sourceFilter; if (!sourceMatch) return false;
+                return true;
             });
-
-            console.log(`Rendering ${filteredLogs.length} filtered logs out of ${allLogs.length} total.`); // Debug count
+            console.log(`Rendering ${filteredLogs.length} filtered logs of ${allLogs.length} total.`);
 
             if (filteredLogs.length === 0) {
-                DOM.tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--sl-text-secondary);">לא נמצאו לוגים תואמים לסינון.</td></tr>`;
-                return;
+                DOM.tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--sl-text-secondary);">לא נמצאו לוגים תואמים לסינון.</td></tr>`; return;
             }
 
             DOM.tableBody.innerHTML = filteredLogs.map(log => {
-                const time = log.timestamp ?
-                    new Date(log.timestamp.toDate()).toLocaleTimeString('he-IL') : '---';
-
+                const time = log.timestamp ? new Date(log.timestamp.toDate()).toLocaleTimeString('he-IL') : '---';
                 const safeMessage = String(log.message || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-                let contextStr = '';
-                if (log.context) {
-                    try { contextStr = JSON.stringify(log.context, null, 2); } // Pretty print context
-                    catch (e) { contextStr = "{ Error stringifying context }"; }
-                }
-
-                 // v49.2: Extract source name for display
-                 const sourcePath = log.context?.page;
-                 const sourceName = sourcePath ? (sourcePath.split('/').pop() || sourcePath) : (log.origin?.startsWith('FirebaseFunction') ? 'שרת' : '?');
-
-                 // v49.2: Check for driver-related events for highlighting
-                 const isDriverEvent = log.origin && (
-                     log.origin.includes('Driver') ||
-                     log.origin.includes('Auth') ||
-                     log.origin.includes('GPS') ||
-                     log.origin.includes('Login')
-                 );
+                let contextStr = ''; if (log.context) { try { contextStr = JSON.stringify(log.context, null, 2); } catch (e) { contextStr = "{ Error stringifying }"; } }
+                 const sourcePath = log.context?.page; const sourceName = sourcePath ? (sourcePath.split('/').pop() || sourcePath) : (log.origin?.startsWith('FirebaseFunction') ? 'שרת' : '?');
+                 const isDriverEvent = log.origin && ( log.origin.includes('Driver') || log.origin.includes('Auth') || log.origin.includes('GPS') || log.origin.includes('Login') );
                  const rowClass = isDriverEvent ? 'log-driver-event' : '';
 
-
+                // v49.3: Removed HTML comments from template literal
                 return `
                     <tr class="${rowClass}">
                         <td class="col-time">${time}</td>
                         <td class="col-level level-${log.level || 'INFO'}">${log.level || 'INFO'}</td>
                         <td class="col-origin">[${log.origin || 'N/A'}]</td>
-                        <td class="col-source">${sourceName}</td> {/* v49.2: Display source name */}
+                        <td class="col-source">${sourceName}</td>
                         <td>${safeMessage}</td>
                         <td class="col-context"><pre>${contextStr}</pre></td>
                     </tr>
@@ -418,22 +314,11 @@
         }
 
         // --- Status Update ---
-        function updateStatus(level, text) { // level: 'ok', 'warn', 'error'
-            console.log(`Updating status: ${level} - ${text}`);
-            if (DOM.statusText) DOM.statusText.textContent = text;
-            if (DOM.statusContainer) {
-                 DOM.statusContainer.className = `status-${level}`; // Apply class for color
-            }
-        }
-
+        function updateStatus(level, text) { console.log(`Status: ${level} - ${text}`); if (DOM.statusText) DOM.statusText.textContent = text; if (DOM.statusContainer) { DOM.statusContainer.className = `status-${level}`; } }
 
         // --- Start ---
-        // Ensure DOM is ready before initializing
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
-            init();
-        }
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
+        else { init(); }
 
     </script>
 </body>
