@@ -3,21 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v39.0 - קוקפיט משופר</title>
+    <title>DeliveryMaster v40.0 - קוקפיט משודרג</title>
     
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- Leaflet Plugins -->
     <script src="https://unpkg.com/leaflet-geometryutil"></script> 
-    <!-- v39: Leaflet Polyline decorator for dashed lines -->
     <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
 
     <style>
-        /* Base & Theme (Light v37/38) - Minor adjustments */
+        /* Base & Theme (Light v39) - Refinements */
         *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
         html { line-height: 1.5; font-family: 'Inter', system-ui, sans-serif; direction: rtl; }
-        body { margin: 0; line-height: inherit; background-color: #f3f4f6; color: #1f2937; overflow: hidden; /* Prevent body scroll */ }
+        body { margin: 0; line-height: inherit; background-color: #f3f4f6; color: #1f2937; overflow: hidden; }
         .light-card { background-color: #ffffff; border-radius: 0.75rem; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05); }
 
         /* Layout & Spacing */
@@ -47,30 +46,33 @@
 
         /* Layout */
         .main-layout { display: grid; grid-template-columns: 240px 1fr; height: 100vh; padding: 1rem; gap: 1rem; background-color: #f3f4f6; }
-        main { height: calc(100vh - 2rem); overflow: hidden; /* Main area should not scroll */ }
-        .view-content { height: 100%; overflow-y: auto; /* Allow content within views to scroll */ }
+        main { display: flex; flex-direction: column; height: calc(100vh - 2rem); overflow: hidden; /* Prevent main scroll */ }
+        .main-content-area { flex-grow: 1; overflow: hidden; /* Area below ticker */ }
+        .view-content { height: 100%; overflow-y: auto; }
 
         /* Sidebar */
         .sidebar { background-color: #fff; }
         .sidebar-nav a { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.5rem; color: #4b5563; font-weight: 600; transition: all 0.2s ease; cursor: pointer; }
         .sidebar-nav a:hover { background-color: #e0f2fe; color: #0369a1; }
         .sidebar-nav a.active { background-color: #0ea5e9; color: white; }
-        .sidebar-nav a svg { width: 1.25rem; height: 1.25rem; }
+        .sidebar-nav a svg { width: 1.25rem; height: 1.25rem; flex-shrink: 0; } /* Prevent icon shrink */
+        .sidebar-nav span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* Prevent text wrap */
 
         /* Map */
         #leaflet-map-container { height: 100%; width: 100%; border-radius: 0.75rem; overflow: hidden; }
         #leaflet-map { height: 100%; width: 100%; z-index: 10; }
         .leaflet-container { background: #e5e7eb; }
-        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #fff; color: #1f2937; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #fff; color: #1f2937; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.8rem; /* Smaller popup text */ }
+        .leaflet-popup-content { margin: 10px 15px; } /* Adjust popup padding */
         .leaflet-popup-close-button { color: #374151 !important; }
-        .map-popup-button { margin-top: 8px; padding: 4px 8px; font-size: 12px; background-color: #0ea5e9; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .map-popup-button { margin-top: 6px; padding: 3px 6px; font-size: 11px; background-color: #0ea5e9; color: white; border: none; border-radius: 4px; cursor: pointer; }
         .leaflet-marker-draggable.leaflet-drag-target { cursor: grabbing !important; }
-        /* v39: Increase emoji size */
-        .leaflet-div-icon { font-size: 1.8rem; /* Make emojis bigger */ }
+        .leaflet-div-icon { background: none !important; border: none !important; /* Remove default background/border for SVG icons */ }
 
-        /* Buttons v39 - Refined */
-        .btn { padding: 0.6rem 1.2rem; border-radius: 0.75rem; /* More rounded */ font-weight: 600; cursor: pointer; transition: all 0.15s ease-out; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
-        .btn:active { transform: scale(0.98); box-shadow: none; }
+        /* Buttons v40 - Enhanced */
+        .btn { padding: 0.6rem 1.2rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease-out; border: 1px solid transparent; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; white-space: nowrap; } /* Prevent wrap */
+        .btn:hover { filter: brightness(1.1); }
+        .btn:active { transform: scale(0.97); box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); }
         .btn-primary { background-color: #0ea5e9; color: white; border-color: #0ea5e9; } .btn-primary:hover { background-color: #0284c7; border-color: #0284c7; }
         .btn-secondary { background-color: #fff; color: #374151; border-color: #d1d5db; } .btn-secondary:hover { background-color: #f9fafb; border-color: #adb5bd;}
         .btn-success { background-color: #22c55e; color: white; border-color: #22c55e; } .btn-success:hover { background-color: #16a34a; border-color: #16a34a; }
@@ -85,21 +87,94 @@
         
         /* Modal */
         .modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; z-index: 50; }
-        .modal-content { width: 90%; max-width: 500px; background-color: #fff; border-radius: 0.75rem; /* More rounded */ }
+        .modal-content { width: 90%; max-width: 500px; background-color: #fff; border-radius: 0.75rem; }
         .modal-header { border-bottom: 1px solid #e5e7eb; padding-bottom: 0.75rem; margin-bottom: 1rem; }
         .modal-footer { margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end; border-top: 1px solid #e5e7eb; padding-top: 1rem; }
         
-        /* Form & Filter Inputs */
-        .form-input, .filter-input { width: 100%; background-color: #f9fafb; border: 1px solid #d1d5db; color: #1f2937; padding: 0.75rem 1rem; border-radius: 0.5rem; }
+        /* Form & Filter Inputs v40 */
+        .form-input { width: 100%; background-color: #f9fafb; border: 1px solid #d1d5db; color: #1f2937; padding: 0.75rem 1rem; border-radius: 0.5rem; transition: border-color 0.2s, box-shadow 0.2s; }
+        .form-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2); outline: none; }
         .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #374151; }
-        .filter-input { margin-bottom: 1rem; }
-        
+        .filter-input-wrapper { position: relative; margin-bottom: 1rem; }
+        .filter-input { padding-left: 2.5rem; /* Space for icon */ }
+        .filter-input-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; /* gray-400 */ pointer-events: none; }
+
         /* Table */
         table { border-collapse: collapse; } thead { background-color: #f9fafb; } th { color: #4b5563; padding: 0.75rem; font-weight: 600; } tbody { background-color: #fff; } td { padding: 0.75rem; }
         
-        /* v39: Select Driver Modal List */
-        #driver-select-list button { display: block; width: 100%; text-align: right; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; }
-        #driver-select-list button:hover { background-color: #f3f4f6; } /* gray-100 */
+        /* Select Driver Modal List */
+        #driver-select-list button { display: block; width: 100%; text-align: right; padding: 0.75rem 1rem; border: none; background: none; cursor: pointer; border-radius: 0.5rem; }
+        #driver-select-list button:hover { background-color: #f3f4f6; }
+        
+        /* v40: Notification Ticker */
+        #notification-ticker {
+            height: 40px; /* Fixed height */
+            overflow: hidden;
+            background-color: #fff; /* White background */
+            border-bottom: 1px solid #e5e7eb; /* gray-200 border */
+            position: relative;
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        #notification-ticker ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            position: absolute;
+            width: 100%;
+            animation: ticker-scroll 30s linear infinite; /* Adjust duration as needed */
+        }
+        #notification-ticker li {
+            height: 40px;
+            padding: 0 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* Time on the left */
+            font-size: 0.8rem;
+            color: #4b5563; /* gray-600 */
+            border-bottom: 1px dashed #e5e7eb;
+        }
+         #notification-ticker li:last-child {
+             border-bottom: none;
+         }
+        #notification-ticker .time {
+            font-size: 0.7rem;
+            color: #9ca3af; /* gray-400 */
+        }
+         #notification-ticker .level-WARN { color: #d97706; } /* amber-600 */
+         #notification-ticker .level-ERROR { color: #dc2626; font-weight: bold; } /* red-600 */
+        
+        @keyframes ticker-scroll {
+            0% { transform: translateY(0); }
+            /* Calculate steps based on number of items - complex with dynamic items */
+            /* Simpler approach: continuous scroll */
+             100% { transform: translateY(-100%); } /* Scrolls one full height */
+        }
+        /* Pause animation on hover */
+        #notification-ticker:hover ul { animation-play-state: paused; }
+
+        /* v40: View Transitions */
+        .app-view {
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+        }
+        .app-view.hidden {
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none; /* Prevent interaction when hidden */
+            position: absolute; /* Take out of flow when hidden */
+             width: calc(100% - 2rem); /* Match parent padding */
+        }
+         #view-map.app-view.hidden { /* Map needs special handling */
+             /* Keep map dimensions but hide */
+             opacity: 0;
+             pointer-events: none;
+             position: absolute;
+             width: 100%; height: 100%; 
+         }
+         #view-map.app-view {
+             position: relative; /* Ensure map stays in flow */
+             width: 100%; height: 100%; 
+             opacity: 1; transform: translateY(0);
+         }
     </style>
 
     <!-- Firebase SDKs -->
@@ -112,15 +187,7 @@
         } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
         // --- Config ---
-        const firebaseConfig = { /* ... same config ... */ 
-            apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
-            authDomain: "saban94-78949.firebaseapp.com",
-            projectId: "saban94-78949",
-            storageBucket: "saban94-78949.firebasestorage.app",
-            messagingSenderId: "41553157903",
-            appId: "1:41553157903:web:cc33d252cff023be97a87a",
-            measurementId: "G-XV6RZDESSB"
-        };
+        const firebaseConfig = { /* ... same ... */ apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949", storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB" };
 
         // --- Globals ---
         let db;
@@ -130,92 +197,149 @@
         let driverMarkers = {}; 
         let orderMarkers = {}; 
         let currentlyDraggedOrder = null;
-        let assignmentLines = {}; // v39: Store assignment polylines
+        let assignmentLines = {}; 
+        let notificationQueue = []; // v40: For ticker
+        const MAX_NOTIFICATIONS = 10; // v40: Limit ticker items
 
-        // --- Icons v39: Truck Emoji + Pin ---
-        const driverIcon = L.divIcon({ html: '🚚', className: 'leaflet-div-icon', iconSize: [32, 32], iconAnchor: [16, 16] }); 
-        const orderIcon = L.divIcon({ html: '📍', className: 'leaflet-div-icon text-sky-500', iconSize: [32, 32], iconAnchor: [16, 32] }); // Pin anchor at bottom-center
+        // v40: Warehouse Coordinates
+        const WAREHOUSES = {
+            hatalmid: { name: "התלמיד 6", lat: 32.1860, lng: 34.9080 }, // Approximate coordinates for Hod HaSharon
+            haharash: { name: "החרש 10", lat: 32.1840, lng: 34.9095 }  // Approximate coordinates for Hod HaSharon
+        };
+        
+        // --- Icons v40: SVG Icons (or use URLs below) ---
+        // Optional: Replace these with your image URLs if preferred
+        const driverIconUrl = null; // למשל: 'https://example.com/truck.png';
+        const orderIconUrl = null; // למשל: 'https://example.com/pin.png';
+
+        const driverIcon = driverIconUrl ? L.icon({ iconUrl: driverIconUrl, iconSize: [38, 38], iconAnchor: [19, 38] }) : L.divIcon({ html: '🚛', className: 'leaflet-div-icon', iconSize: [32, 32], iconAnchor: [16, 16] }); // Truck Emoji
+        const orderIcon = orderIconUrl ? L.icon({ iconUrl: orderIconUrl, iconSize: [32, 42], iconAnchor: [16, 42] }) : L.divIcon({ html: '📍', className: 'leaflet-div-icon text-sky-500', iconSize: [32, 32], iconAnchor: [16, 32] }); // Pin Emoji
 
         // --- Init App ---
         document.addEventListener('DOMContentLoaded', async () => { /* ... same init logic ... */ 
-            try {
-                const app = initializeApp(firebaseConfig);
-                const auth = getAuth(app);
-                db = getFirestore(app);
-                setStatus('מתחבר...', 'text-yellow-500');
-                await signInAnonymously(auth);
-                setStatus('מחובר (מאזין לנתונים...)', 'text-green-500');
-                initNavigation();
-                initMap(); 
-                listenToDrivers();
-                listenToDriverLocations();
-                listenToOrders();
-                listenToCustomers();
-                listenToSystemLogs();
-                initFilters();
-            } catch (error) { console.error("Firebase Init Error", error); setStatus(`שגיאת התחברות: ${error.message}`, 'text-red-500'); }
+            try { /* Firebase Init */ const app=initializeApp(firebaseConfig); const auth=getAuth(app); db=getFirestore(app); setStatus('מתחבר...','text-yellow-500'); await signInAnonymously(auth); setStatus('מחובר (מאזין...)','text-green-500'); initNavigation(); initMap(); listenToDrivers(); listenToDriverLocations(); listenToOrders(); listenToCustomers(); listenToSystemLogs(); initFilters(); } catch (error) { console.error("Init Error", error); setStatus(`שגיאת התחברות: ${error.message}`, 'text-red-500'); }
         });
         
-        // --- Navigation ---
-        function initNavigation() { /* ... same ... */ const l=document.querySelectorAll('.sidebar-nav a');l.forEach(k=>{k.addEventListener('click',(e)=>{e.preventDefault();const v=e.currentTarget.getAttribute('href').substring(1);showView(v);l.forEach(j=>j.classList.remove('active'));e.currentTarget.classList.add('active');});});showView('view-map');document.querySelector('.sidebar-nav a[href="#view-map"]').classList.add('active'); }
-        window.showView = (viewId) => { /* ... same ... */ document.querySelectorAll('.app-view').forEach(v=>v.classList.add('hidden'));const t=document.getElementById(viewId);if(t)t.classList.remove('hidden');if(viewId==='view-map'&&mapInstance){setTimeout(()=>mapInstance.invalidateSize(),100);} }
+        // --- Navigation & View Transitions ---
+        function initNavigation() { /* ... same event listeners ... */ const l=document.querySelectorAll('.sidebar-nav a');l.forEach(k=>{k.addEventListener('click',(e)=>{e.preventDefault();const v=e.currentTarget.getAttribute('href').substring(1);showView(v);l.forEach(j=>j.classList.remove('active'));e.currentTarget.classList.add('active');});});showView('view-map');document.querySelector('.sidebar-nav a[href="#view-map"]').classList.add('active'); }
+        
+        window.showView = (viewId) => { 
+            document.querySelectorAll('.app-view').forEach(view => {
+                 // Add hidden class smoothly
+                 view.classList.add('hidden'); 
+            });
+            const targetView = document.getElementById(viewId); 
+            if (targetView) {
+                 // Remove hidden class after a tiny delay for transition
+                 setTimeout(() => targetView.classList.remove('hidden'), 50); 
+            }
+            if (viewId === 'view-map' && mapInstance) { 
+                // Delay invalidateSize even more for transition completion
+                setTimeout(() => mapInstance.invalidateSize(), 350); 
+            }
+        }
 
         // --- Real-time Listeners (READ) ---
-        // (No changes needed in listeners themselves)
-        function listenToDrivers() { /* ... same ... */ const c=collection(db,"drivers");onSnapshot(c,(s)=>{const d=[];allDrivers={};s.forEach((doc)=>{const dd=doc.data();allDrivers[doc.id]=dd;d.push({id:doc.id,...dd});});renderDriversTable();},(e)=>console.error("Drivers:",e)); }
-        function listenToDriverLocations() { /* ... same ... */ const c=collection(db,"driverLocations");onSnapshot(c,(s)=>{s.docChanges().forEach((ch)=>{const dId=ch.doc.id;const lData=ch.doc.data();if(ch.type==="added"||ch.type==="modified")updateDriverMarker(dId,lData);else if(ch.type==="removed"&&driverMarkers[dId]){mapInstance?.removeLayer(driverMarkers[dId]);delete driverMarkers[dId];}});},(e)=>console.error("Locations:",e)); }
-        function listenToOrders() { /* ... same ... */ const c=collection(db,"orders");const q=query(c,orderBy("createdAt","desc"));onSnapshot(q,(s)=>{const o=[];s.forEach((doc)=>o.push({id:doc.id,...doc.data()}));window.allOrdersData=o;renderOrdersTable();updateOrderMarkers(o);},(e)=>{console.error("Orders:",e);setStatus("שגיאה בהאזנה להזמנות",'text-red-500');}); }
+        // v40: Added calls to addNotification
+        function listenToDrivers() { const c=collection(db,"drivers");onSnapshot(c,(s)=>{const d=[];allDrivers={};s.forEach((doc)=>{const dd=doc.data();allDrivers[doc.id]=dd;d.push({id:doc.id,...dd});});renderDriversTable();},(e)=>console.error("Drivers:",e)); }
+        function listenToDriverLocations() { 
+            const c=collection(db,"driverLocations");
+            onSnapshot(c,(s)=>{
+                s.docChanges().forEach((ch)=>{
+                    const dId=ch.doc.id;
+                    const lData=ch.doc.data();
+                    const driverName = allDrivers[dId]?.name || dId;
+                    if(ch.type==="added" || ch.type==="modified") {
+                         updateDriverMarker(dId,lData);
+                         // Don't add notification on every single update - too noisy
+                         // Consider adding only on 'added' or if status changes
+                         // addNotification(`מיקום נהג ${driverName} עודכן`, 'INFO');
+                    } else if(ch.type==="removed" && driverMarkers[dId]){ 
+                        mapInstance?.removeLayer(driverMarkers[dId]); 
+                        delete driverMarkers[dId];
+                        addNotification(`נהג ${driverName} התנתק? (מיקום נמחק)`, 'WARN');
+                    }
+                });
+            },(e)=>console.error("Locations:",e)); 
+        }
+        function listenToOrders() { 
+            const c=collection(db,"orders");
+            const q=query(c,orderBy("createdAt","desc"));
+            let firstLoad = true; // Prevent notification storm on initial load
+            onSnapshot(q,(s)=>{
+                const o=[];
+                s.docChanges().forEach(change => {
+                    const orderData = { id: change.doc.id, ...change.doc.data() };
+                    o.push(orderData); // Still build full list for tables
+
+                    // Add notifications only for changes after initial load
+                    if (!firstLoad) {
+                        if (change.type === "added") {
+                            addNotification(`הזמנה חדשה: ${orderData.customer?.name || orderData.id}`, 'INFO');
+                        }
+                        // Note: Assignment/Completion notifications are handled in their respective functions
+                    }
+                });
+                 // If not using docChanges, update the full list
+                 if(o.length === 0 && s.docs.length > 0) {
+                     s.docs.forEach(doc => o.push({ id: doc.id, ...doc.data() }));
+                 }
+
+                window.allOrdersData=o; 
+                renderOrdersTable(); 
+                updateOrderMarkers(o); 
+                firstLoad = false; // Mark initial load as complete
+            },(e)=>{console.error("Orders:",e);setStatus("שגיאה בהאזנה להזמנות",'text-red-500');}); 
+        }
         function listenToCustomers() { /* ... same ... */ const c=collection(db,"customers");const q=query(c,orderBy("name","asc"));onSnapshot(q,(s)=>{const cust=[];s.forEach((doc)=>cust.push({id:doc.id,...doc.data()}));window.allCustomersData=cust;renderCustomersTable();},(e)=>console.error("Customers:",e)); }
         function listenToSystemLogs() { /* ... same ... */ const c=collection(db,"system_logs");const q=query(c,orderBy("timestamp","desc"));onSnapshot(q,(s)=>{const l=[];s.forEach((doc)=>l.push({id:doc.id,...doc.data()}));window.allLogsData=l;renderLogsTable();},(e)=>console.error("Logs:",e)); }
 
-        // --- Render Functions (v39: Filters included) ---
-        function initFilters() { /* ... same ... */ document.getElementById('filter-orders')?.addEventListener('input',renderOrdersTable);document.getElementById('filter-drivers')?.addEventListener('input',renderDriversTable);document.getElementById('filter-customers')?.addEventListener('input',renderCustomersTable); }
-        function renderOrdersTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('orders-table-body');const f=document.getElementById('filter-orders').value.toLowerCase();const o=(window.allOrdersData||[]).filter(d=>{if(!f)return!0;const c=d.customer?.name||'';const v=d.driver?.name||'';const s=d.status||'';const a=d.address||'';return d.id.toLowerCase().includes(f)||c.toLowerCase().includes(f)||v.toLowerCase().includes(f)||s.toLowerCase().includes(f)||a.toLowerCase().includes(f)});if(!t)return;if(!o||o.length===0){t.innerHTML=`<tr><td colspan="6" class="p-8 text-center text-gray-500">לא נמצאו הזמנות תואמות.</td></tr>`;return;}t.innerHTML=o.map(d=>{const c=d.customer?.name||'לא ידוע';const v=d.driver?.name||'טרם שויך';const s=d.status||'חדש';const k=`status-${s.replace(' ','_')}`||'status-default';let h='';if(s==='חדש')h=`<button class="btn btn-warning btn-sm" onclick="openAssignDriverModal('${d.id}')">שבץ</button>`;else if(s==='שויך')h=`<button class="btn btn-success btn-sm" onclick="handleMarkAsCompleted('${d.id}')">הושלם</button>`;return`<tr class="hover:bg-gray-100 text-sm"><td class="p-3">${d.id}</td><td class="p-3 text-gray-800 font-semibold">${c}</td><td class="p-3">${d.address}</td><td class="p-3 text-gray-800 font-semibold">${v}</td><td class="p-3"><span class="status-badge ${k}">${s}</span></td><td class="p-3 flex gap-2">${h}<button class="btn btn-secondary btn-sm" onclick="openEditOrderModal(JSON.stringify(window.allOrders['${d.id}']))">ערוך</button><button class="btn btn-danger btn-sm" onclick="handleDelete('orders','${d.id}')">מחק</button></td></tr>`}).join('');window.allOrders=o.reduce((a,c)=>{a[c.id]=c;return a},{})}
-        function renderDriversTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('drivers-table-body');const f=document.getElementById('filter-drivers').value.toLowerCase();const d=Object.values(allDrivers||{}).filter(v=>{if(!f)return!0;const n=v.name||'';const p=v.phone||'';const s=v.status||'';const i=Object.keys(allDrivers).find(k=>allDrivers[k]===v)||'';return n.toLowerCase().includes(f)||p.toLowerCase().includes(f)||s.toLowerCase().includes(f)||i.toLowerCase().includes(f)});if(!t)return;t.innerHTML=d.map(v=>{const i=Object.keys(allDrivers).find(k=>allDrivers[k]===v)||'N/A';return`<tr class="hover:bg-gray-100 text-sm"><td class="p-3 text-gray-800 font-semibold">${v.name||i}</td><td class="p-3">${v.phone||'---'}</td><td class="p-3">${v.vehicleType||'לא ידוע'}</td><td class="p-3">${v.status||'לא פעיל'}</td><td class="p-3 flex gap-2"><button class="btn btn-danger btn-sm" onclick="handleDelete('drivers','${i}')">מחק</button></td></tr>`}).join('')}
-        function renderCustomersTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('customers-table-body');const f=document.getElementById('filter-customers').value.toLowerCase();const c=(window.allCustomersData||[]).filter(u=>{if(!f)return!0;const n=u.name||'';const p=u.phone||'';const a=u.defaultAddress||'';return n.toLowerCase().includes(f)||p.toLowerCase().includes(f)||a.toLowerCase().includes(f)});if(!t)return;t.innerHTML=c.map(u=>`<tr class="hover:bg-gray-100 text-sm"><td class="p-3 text-gray-800 font-semibold">${u.name||u.id}</td><td class="p-3">${u.phone||'---'}</td><td class="p-3">${u.defaultAddress||'---'}</td><td class="p-3">${u.contactPerson||'---'}</td><td class="p-3 flex gap-2"><button class="btn btn-danger btn-sm" onclick="handleDelete('customers','${u.id}')">מחק</button></td></tr>`).join('')}
+        // --- Render Functions (v40 Filters) ---
+        function initFilters() { 
+            document.getElementById('filter-orders')?.addEventListener('input', renderOrdersTable);
+            document.getElementById('filter-drivers')?.addEventListener('input', renderDriversTable);
+            document.getElementById('filter-customers')?.addEventListener('input', renderCustomersTable); 
+        }
+        function renderOrdersTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('orders-table-body');const filterInput = document.getElementById('filter-orders'); const f= filterInput ? filterInput.value.toLowerCase() : ''; const o=(window.allOrdersData||[]).filter(d=>{if(!f)return!0;const c=d.customer?.name||'';const v=d.driver?.name||'';const s=d.status||'';const a=d.address||'';return d.id.toLowerCase().includes(f)||c.toLowerCase().includes(f)||v.toLowerCase().includes(f)||s.toLowerCase().includes(f)||a.toLowerCase().includes(f)});if(!t)return;if(!o||o.length===0){t.innerHTML=`<tr><td colspan="6" class="p-8 text-center text-gray-500">לא נמצאו הזמנות תואמות.</td></tr>`;return;}t.innerHTML=o.map(d=>{const c=d.customer?.name||'לא ידוע';const v=d.driver?.name||'טרם שויך';const s=d.status||'חדש';const k=`status-${s.replace(' ','_')}`||'status-default';let h='';if(s==='חדש')h=`<button class="btn btn-warning btn-sm" onclick="openAssignDriverModal('${d.id}')">שבץ</button>`;else if(s==='שויך')h=`<button class="btn btn-success btn-sm" onclick="handleMarkAsCompleted('${d.id}')">הושלם</button>`;return`<tr class="hover:bg-gray-100 text-sm"><td class="p-3">${d.id}</td><td class="p-3 text-gray-800 font-semibold">${c}</td><td class="p-3">${d.address}</td><td class="p-3 text-gray-800 font-semibold">${v}</td><td class="p-3"><span class="status-badge ${k}">${s}</span></td><td class="p-3 flex gap-2">${h}<button class="btn btn-secondary btn-sm" onclick="openEditOrderModal(JSON.stringify(window.allOrders['${d.id}']))">ערוך</button><button class="btn btn-danger btn-sm" onclick="handleDelete('orders','${d.id}')">מחק</button></td></tr>`}).join('');window.allOrders=o.reduce((a,c)=>{a[c.id]=c;return a},{})}
+        function renderDriversTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('drivers-table-body'); const filterInput = document.getElementById('filter-drivers'); const f = filterInput ? filterInput.value.toLowerCase() : ''; const d=Object.values(allDrivers||{}).filter(v=>{if(!f)return!0;const n=v.name||'';const p=v.phone||'';const s=v.status||'';const i=Object.keys(allDrivers).find(k=>allDrivers[k]===v)||'';return n.toLowerCase().includes(f)||p.toLowerCase().includes(f)||s.toLowerCase().includes(f)||i.toLowerCase().includes(f)});if(!t)return;t.innerHTML=d.map(v=>{const i=Object.keys(allDrivers).find(k=>allDrivers[k]===v)||'N/A';return`<tr class="hover:bg-gray-100 text-sm"><td class="p-3 text-gray-800 font-semibold">${v.name||i}</td><td class="p-3">${v.phone||'---'}</td><td class="p-3">${v.vehicleType||'לא ידוע'}</td><td class="p-3">${v.status||'לא פעיל'}</td><td class="p-3 flex gap-2"><button class="btn btn-danger btn-sm" onclick="handleDelete('drivers','${i}')">מחק</button></td></tr>`}).join('')}
+        function renderCustomersTable() { /* ... same filtering and rendering ... */ const t=document.getElementById('customers-table-body'); const filterInput = document.getElementById('filter-customers'); const f = filterInput ? filterInput.value.toLowerCase() : ''; const c=(window.allCustomersData||[]).filter(u=>{if(!f)return!0;const n=u.name||'';const p=u.phone||'';const a=u.defaultAddress||'';return n.toLowerCase().includes(f)||p.toLowerCase().includes(f)||a.toLowerCase().includes(f)});if(!t)return;t.innerHTML=c.map(u=>`<tr class="hover:bg-gray-100 text-sm"><td class="p-3 text-gray-800 font-semibold">${u.name||u.id}</td><td class="p-3">${u.phone||'---'}</td><td class="p-3">${u.defaultAddress||'---'}</td><td class="p-3">${u.contactPerson||'---'}</td><td class="p-3 flex gap-2"><button class="btn btn-danger btn-sm" onclick="handleDelete('customers','${u.id}')">מחק</button></td></tr>`).join('')}
         function renderLogsTable() { /* ... same rendering ... */ const t=document.getElementById('logs-table-body');if(!t)return;const l=window.allLogsData||[];t.innerHTML=l.map(g=>{const v=g.level||'INFO';const i=g.timestamp?.toDate().toLocaleString('he-IL')||'---';return`<tr class="hover:bg-gray-100 text-sm font-mono"><td class="p-3 text-gray-500">${i}</td><td class="p-3 font-bold level-${v}">${v}</td><td class="p-3 text-cyan-500">[${g.origin||'N/A'}]</td><td class="p-3 text-gray-800">${g.message||'---'}</td><td class="p-3 text-xs text-gray-500">${g.data||''}</td></tr>`}).join('')}
         function setStatus(message, cssClass) { /* ... same ... */ const el=document.getElementById('connection-status'); if(el) { el.textContent=message; el.className=`text-sm ${cssClass}`; } }
 
         // --- Map Functions ---
-        window.initMap = () => { 
-            const mapElement = document.getElementById('leaflet-map'); 
-            if (!mapElement) { console.error("Map container #leaflet-map not found!"); return; } 
-            try { 
-                if (typeof L === 'undefined') { console.error("Leaflet (L) not defined."); setStatus('שגיאה בטעינת מפת', 'text-red-500'); return; } 
-                if (!mapInstance) { 
-                    // v39: Increased zoom level
-                    mapInstance = L.map(mapElement).setView([31.7683, 35.2137], 9); 
-                    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 19 }).addTo(mapInstance); 
-                    mapInstance.on('load', () => { console.log("Map initialized."); setStatus('מחובר | מפה טעונה', 'text-green-500'); }); 
-                    mapInstance.on('tileerror', (e) => { console.error('Tile error:', e); setStatus('שגיאת אריחי מפה', 'text-red-500'); }); 
-                } else { mapInstance.invalidateSize(); } 
-            } catch (e) { console.error("Map init failed:", e); mapElement.innerHTML = `<div class="p-4 text-center text-red-500">Map Error: ${e.message}</div>`; setStatus('שגיאה קריטית במפה', 'text-red-500'); } 
-        }
+        window.initMap = () => { /* ... same init ... */ const e=document.getElementById('leaflet-map');if(!e){console.error("Map container #leaflet-map not found!");return}try{if(typeof L==='undefined'){console.error("Leaflet (L) not defined.");setStatus('שגיאה בטעינת מפת','text-red-500');return}if(!mapInstance){mapInstance=L.map(e).setView([31.7683,35.2137],9);L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:19}).addTo(mapInstance);mapInstance.on('load',()=>{console.log("Map initialized.");setStatus('מחובר | מפה טעונה','text-green-500')});mapInstance.on('tileerror',(e)=>{console.error('Tile error:',e);setStatus('שגיאת אריחי מפה','text-red-500')})}else{mapInstance.invalidateSize()}}catch(e){console.error("Map init failed:",e);e.innerHTML=`<div class="p-4 text-center text-red-500">Map Error: ${e.message}</div>`;setStatus('שגיאה קריטית במפה','text-red-500')} }
         
-        function updateDriverMarker(driverId, locationData) { 
-            if (!mapInstance || !locationData.latitude || !locationData.longitude) return; 
-            const latLng = [locationData.latitude, locationData.longitude]; 
-            const driverName = allDrivers[driverId]?.name || driverId; 
-            const popupContent = `<b>נהג: ${driverName}</b><br>עודכן: ${locationData.lastUpdate?.toDate().toLocaleTimeString('he-IL') || 'N/A'}`; 
-            if (driverMarkers[driverId]) {
-                 driverMarkers[driverId].setLatLng(latLng).setPopupContent(popupContent); 
-            } else { 
-                driverMarkers[driverId] = L.marker(latLng, { icon: driverIcon, draggable: false }).addTo(mapInstance).bindPopup(popupContent);
-                driverMarkers[driverId]._driverInfo = { id: driverId, name: driverName }; // v39: Store driver info
-            }
-        }
+        function updateDriverMarker(driverId, locationData) { /* ... same logic ... */ if (!mapInstance || !locationData.latitude || !locationData.longitude) return; const latLng = [locationData.latitude, locationData.longitude]; const driverName = allDrivers[driverId]?.name || driverId; const popupContent = `<b>נהג: ${driverName}</b><br>עודכן: ${locationData.lastUpdate?.toDate().toLocaleTimeString('he-IL') || 'N/A'}`; if (driverMarkers[driverId]) driverMarkers[driverId].setLatLng(latLng).setPopupContent(popupContent); else { driverMarkers[driverId] = L.marker(latLng, { icon: driverIcon, draggable: false }).addTo(mapInstance).bindPopup(popupContent); driverMarkers[driverId]._driverInfo = { id: driverId, name: driverName }; } }
         
         function updateOrderMarkers(orders) {
             if (!mapInstance) return;
             const currentOrderIds = orders.map(o => o.id);
             Object.keys(orderMarkers).forEach(markerId => { if (!currentOrderIds.includes(markerId)) { mapInstance.removeLayer(orderMarkers[markerId]); delete orderMarkers[markerId]; } });
             
+            let ordersWithoutCoords = 0; // v40: Counter for missing coords
+
             orders.forEach(order => {
-                if (order.status !== 'הושלם' && order.latitude && order.longitude) {
+                // v40: Check for coordinates FIRST
+                if (!order.latitude || !order.longitude) {
+                    if (order.status !== 'הושלם') ordersWithoutCoords++; // Count only active orders
+                     // Ensure marker is removed if coordinates disappear
+                     if (orderMarkers[order.id]) { mapInstance.removeLayer(orderMarkers[order.id]); delete orderMarkers[order.id]; }
+                    return; // Skip this order if no coords
+                }
+
+                if (order.status !== 'הושלם') {
                     const latLng = [order.latitude, order.longitude];
-                    // v39: New popup content with "Select Driver" button
-                    const popupContent = `<b>${order.customer?.name || 'לקוח'}</b> (${order.id})<br>${order.address}<br>סטטוס: ${order.status}` + 
+                    
+                    // v40: Calculate distances
+                    const distHatalmid = L.GeometryUtil.distance(mapInstance, latLng, [WAREHOUSES.hatalmid.lat, WAREHOUSES.hatalmid.lng]);
+                    const distHaharash = L.GeometryUtil.distance(mapInstance, latLng, [WAREHOUSES.haharash.lat, WAREHOUSES.haharash.lng]);
+                    const distHatalmidKm = (distHatalmid / 1000).toFixed(1);
+                    const distHaharashKm = (distHaharash / 1000).toFixed(1);
+
+                    const popupContent = `<b>${order.customer?.name || 'לקוח'}</b> (${order.id})<br>${order.address}<br>סטטוס: ${order.status}<hr class="my-1 border-gray-200">` +
+                                         `מרחק מהתלמיד: ${distHatalmidKm} ק"מ<br>מרחק מהחרש: ${distHaharashKm} ק"מ` +
                                          (order.status === 'חדש' ? `<br><button class="map-popup-button" onclick="openSelectDriverModal('${order.id}')">שבץ מרשימה</button>` : '');
+                    
                     const orderId = order.id;
                     const draggable = order.status === 'חדש'; 
 
@@ -226,59 +350,39 @@
                     } else {
                         orderMarkers[orderId] = L.marker(latLng, { icon: orderIcon, draggable: draggable })
                         .addTo(mapInstance)
-                        .bindPopup(popupContent);
+                        .bindPopup(popupContent, { minWidth: 200 }); // Wider popup
                         
                         orderMarkers[orderId]._orderData = order; 
                         orderMarkers[orderId].on('dragstart', () => { currentlyDraggedOrder = order; }); 
                         orderMarkers[orderId].on('dragend', handleOrderDrop); 
                     }
-                } else if (orderMarkers[order.id]) {
+                } else if (orderMarkers[order.id]) { // Remove completed orders
                     mapInstance.removeLayer(orderMarkers[order.id]); delete orderMarkers[order.id];
                 }
             });
+
+             // v40: Log warning if orders are missing coords
+             if (ordersWithoutCoords > 0) {
+                 console.warn(`${ordersWithoutCoords} active orders are missing latitude/longitude and are not displayed on the map.`);
+                 // Optionally add this to the notification ticker
+                 // addNotification(`${ordersWithoutCoords} הזמנות ללא מיקום במפה`, 'WARN');
+             }
         }
         
-        // --- v39: Drag & Drop Logic (No changes, still uses confirmation modal) ---
-        function handleOrderDrop(event) { /* ... same logic as v38 ... */ if (!currentlyDraggedOrder) return; const droppedOrderMarker = event.target; const droppedLatLng = droppedOrderMarker.getLatLng(); const DRAG_ASSIGN_THRESHOLD_METERS = 50; let closestDriver = null; let minDistance = Infinity; Object.keys(driverMarkers).forEach(driverId => { const driverMarker = driverMarkers[driverId]; const distance = droppedLatLng.distanceTo(driverMarker.getLatLng()); if (distance < minDistance) { minDistance = distance; closestDriver = { id: driverId, name: allDrivers[driverId]?.name || driverId, marker: driverMarker }; } }); if (closestDriver && minDistance <= DRAG_ASSIGN_THRESHOLD_METERS) { openConfirmAssignModal(currentlyDraggedOrder.id, closestDriver.id, currentlyDraggedOrder.customer?.name || 'לא ידוע', closestDriver.name); } else { droppedOrderMarker.setLatLng([currentlyDraggedOrder.latitude, currentlyDraggedOrder.longitude]); alert("לא נמצא נהג קרוב מספיק לשיוך."); } currentlyDraggedOrder = null; }
+        // --- Drag & Drop ---
+        function handleOrderDrop(event) { /* ... same ... */ if (!currentlyDraggedOrder) return; const droppedOrderMarker = event.target; const droppedLatLng = droppedOrderMarker.getLatLng(); const DRAG_ASSIGN_THRESHOLD_METERS = 50; let closestDriver = null; let minDistance = Infinity; Object.keys(driverMarkers).forEach(driverId => { const driverMarker = driverMarkers[driverId]; const distance = droppedLatLng.distanceTo(driverMarker.getLatLng()); if (distance < minDistance) { minDistance = distance; closestDriver = { id: driverId, name: allDrivers[driverId]?.name || driverId, marker: driverMarker }; } }); if (closestDriver && minDistance <= DRAG_ASSIGN_THRESHOLD_METERS) { openConfirmAssignModal(currentlyDraggedOrder.id, closestDriver.id, currentlyDraggedOrder.customer?.name || 'לא ידוע', closestDriver.name); } else { droppedOrderMarker.setLatLng([currentlyDraggedOrder.latitude, currentlyDraggedOrder.longitude]); alert("לא נמצא נהג קרוב מספיק לשיוך."); } currentlyDraggedOrder = null; }
         
-        // --- CRUD Functions ---
-        window.openAddOrderModal = () => { /* ... same ... */ currentEditDoc = null; document.getElementById('addOrderModalTitle').textContent = "יצירת הזמנה חדשה"; document.getElementById('addOrderForm').reset(); document.getElementById('addOrderModal').style.display = 'flex'; }
-        window.openEditOrderModal = (orderJson) => { /* ... same ... */ const order = JSON.parse(orderJson); currentEditDoc = order; const form = document.getElementById('addOrderForm'); /* ... form population ... */ document.getElementById('addOrderModalTitle').textContent = `עריכת הזמנה ${order.id}`; document.getElementById('addOrderModal').style.display = 'flex'; }
-        window.openAssignDriverModal = (orderId) => { /* ... same ... */ currentEditDoc = { id: orderId }; document.getElementById('assignDriverModal').style.display = 'flex'; }
-        window.openConfirmAssignModal = (orderId, driverId, customerName, driverName) => { /* ... same ... */ document.getElementById('confirmAssignText').innerHTML = `האם אתה בטוח שברצונך לשייך את ההזמנה של <b>${customerName}</b> לנהג <b>${driverName}</b>?`; const confirmBtn = document.getElementById('confirmAssignBtn'); confirmBtn.onclick = () => handleConfirmAssign(orderId, driverId, driverName); document.getElementById('confirmAssignModal').style.display = 'flex'; }
+        // --- CRUD ---
+        window.openAddOrderModal = () => { /* ... */ currentEditDoc = null; document.getElementById('addOrderModalTitle').textContent = "יצירת הזמנה חדשה"; document.getElementById('addOrderForm').reset(); document.getElementById('addOrderModal').style.display = 'flex'; }
+        window.openEditOrderModal = (orderJson) => { /* ... */ const order = JSON.parse(orderJson); currentEditDoc = order; const form = document.getElementById('addOrderForm'); form.customerName.value = order.customer?.name || ''; form.customerPhone.value = order.customer?.phone || ''; form.address.value = order.address || ''; form.latitude.value = order.latitude || ''; form.longitude.value = order.longitude || ''; form.deliveryType.value = order.deliveryType || ''; form.customerId.value = order.customer?.id || ''; document.getElementById('addOrderModalTitle').textContent = `עריכת הזמנה ${order.id}`; document.getElementById('addOrderModal').style.display = 'flex'; }
+        window.openAssignDriverModal = (orderId) => { /* ... */ currentEditDoc = { id: orderId }; document.getElementById('assignDriverModal').style.display = 'flex'; }
+        window.openConfirmAssignModal = (orderId, driverId, customerName, driverName) => { /* ... */ document.getElementById('confirmAssignText').innerHTML = `האם אתה בטוח שברצונך לשייך את ההזמנה של <b>${customerName}</b> לנהג <b>${driverName}</b>?`; const confirmBtn = document.getElementById('confirmAssignBtn'); confirmBtn.onclick = () => handleConfirmAssign(orderId, driverId, driverName); document.getElementById('confirmAssignModal').style.display = 'flex'; }
+        window.openSelectDriverModal = (orderId) => { /* ... */ currentEditDoc = { id: orderId }; const driverListDiv = document.getElementById('driver-select-list'); driverListDiv.innerHTML = ''; Object.values(driverMarkers).forEach(marker => { const driverInfo = marker._driverInfo; if(driverInfo) { const button = document.createElement('button'); button.textContent = driverInfo.name; button.onclick = () => { const orderData = orderMarkers[orderId]?._orderData; closeModal('selectDriverModal'); openConfirmAssignModal(orderId, driverInfo.id, orderData?.customer?.name || 'לקוח', driverInfo.name); }; driverListDiv.appendChild(button); } }); if(driverListDiv.innerHTML === '') { driverListDiv.innerHTML = '<p class="p-4 text-center text-gray-500">לא נמצאו נהגים פעילים במפה.</p>'; } document.getElementById('selectDriverModal').style.display = 'flex'; }
+        window.closeModal = (modalId) => { /* ... */ const el = document.getElementById(modalId); if(el) el.style.display = 'none'; }
         
-        // v39: New Modal for Selecting Driver from List
-        window.openSelectDriverModal = (orderId) => {
-            currentEditDoc = { id: orderId }; // Store order ID
-            const driverListDiv = document.getElementById('driver-select-list');
-            driverListDiv.innerHTML = ''; // Clear previous list
-            
-            // Populate with currently active drivers (those with markers)
-            Object.values(driverMarkers).forEach(marker => {
-                const driverInfo = marker._driverInfo;
-                if(driverInfo) {
-                    const button = document.createElement('button');
-                    button.textContent = driverInfo.name;
-                    // When a driver is clicked, open the confirmation modal
-                    button.onclick = () => {
-                         const orderData = orderMarkers[orderId]?._orderData;
-                         closeModal('selectDriverModal'); // Close this modal first
-                         openConfirmAssignModal(orderId, driverInfo.id, orderData?.customer?.name || 'לקוח', driverInfo.name);
-                    };
-                    driverListDiv.appendChild(button);
-                }
-            });
-            
-            if(driverListDiv.innerHTML === '') {
-                 driverListDiv.innerHTML = '<p class="p-4 text-center text-gray-500">לא נמצאו נהגים פעילים במפה.</p>';
-            }
-            
-            document.getElementById('selectDriverModal').style.display = 'flex';
+        window.handleSaveOrder = async () => { 
+            const form = document.getElementById('addOrderForm'); const isEditMode = !!currentEditDoc; const orderId = isEditMode ? currentEditDoc.id : Date.now().toString(); const orderRef = doc(db, "orders", orderId); try { const orderData = { /* ... build orderData object ... */ orderId: orderId, address: form.address.value, latitude: parseFloat(form.latitude.value) || null, longitude: parseFloat(form.longitude.value) || null, deliveryType: form.deliveryType.value, customer: { name: form.customerName.value, phone: form.customerPhone.value, id: form.customerId.value || null }, ...(isEditMode && { driver: currentEditDoc.driver, status: currentEditDoc.status, orderDate: currentEditDoc.orderDate, createdAt: currentEditDoc.createdAt }), ...(!isEditMode && { driver: null, status: "חדש", orderDate: new Date().toLocaleDateString('he-IL'), createdAt: serverTimestamp() }) }; if (isEditMode) await updateDoc(orderRef, orderData); else await setDoc(orderRef, orderData); closeModal('addOrderModal'); form.reset(); currentEditDoc = null; /* v40: No notification here, handled by listener */ } catch (e) { console.error("Error saving: ", e); alert("שגיאה בשמירה: " + e.message); } 
         }
-        
-        window.closeModal = (modalId) => { /* ... same ... */ const el = document.getElementById(modalId); if(el) el.style.display = 'none'; }
-        
-        window.handleSaveOrder = async () => { /* ... same logic ... */ };
         
         window.handleAssignDriver = async (orderId, driverId, driverName) => { 
             const orderRef = doc(db, "orders", orderId);
@@ -286,61 +390,88 @@
                  if (!driverName) { /* Find driver if coming from modal */ driverName = document.getElementById('driverNameInput').value; driverId = Object.keys(allDrivers).find(id => allDrivers[id].name === driverName) || driverName; }
                  const driverData = { id: driverId, name: driverName };
                  await updateDoc(orderRef, { driver: driverData, status: "שויך" });
-                 
-                 // v39: Draw assignment line
                  drawAssignmentLine(orderId, driverId);
-                 
-                 closeModal('assignDriverModal');
-                 closeModal('confirmAssignModal');
-                 closeModal('selectDriverModal'); // Close all possible modals
-                 const driverInput = document.getElementById('driverNameInput');
-                 if(driverInput) driverInput.value = '';
+                 closeModal('assignDriverModal'); closeModal('confirmAssignModal'); closeModal('selectDriverModal'); 
+                 const driverInput = document.getElementById('driverNameInput'); if(driverInput) driverInput.value = '';
                  currentEditDoc = null; 
-            } catch (e) { console.error("Error assigning driver: ", e); alert("שגיאה בשיבוץ נהג: " + e.message); } 
+                 // v40: Add notification
+                 addNotification(`הזמנה ${orderId} שויכה לנהג ${driverName}`, 'INFO');
+            } catch (e) { console.error("Error assigning: ", e); alert("שגיאה בשיבוץ: " + e.message); } 
         }
         
         window.handleConfirmAssign = (orderId, driverId, driverName) => { handleAssignDriver(orderId, driverId, driverName); }
-        window.handleMarkAsCompleted = async (orderId) => { /* ... same logic + remove line ... */ if (!confirm(`...`)) return; const orderRef = doc(db, "orders", orderId); try { await updateDoc(orderRef, { status: "הושלם" }); removeAssignmentLine(orderId); } catch (e) { /*...*/ alert("שגיאה בסיום: " + e.message); } }
-        window.handleDelete = async (collectionName, docId) => { /* ... same logic + remove line if order */ if (!confirm(`...`)) return; const docRef = doc(db, collectionName, docId); try { await deleteDoc(docRef); if(collectionName === 'orders') removeAssignmentLine(docId); } catch (e) { /*...*/ alert("שגיאה במחיקה: " + e.message); } }
+        window.handleMarkAsCompleted = async (orderId) => { 
+            if (!confirm(`האם אתה בטוח שברצונך לסמן הזמנה ${orderId} כ"הושלם"?`)) return; 
+            const orderRef = doc(db, "orders", orderId); 
+            try { 
+                await updateDoc(orderRef, { status: "הושלם" }); 
+                removeAssignmentLine(orderId); 
+                // v40: Add notification
+                addNotification(`הזמנה ${orderId} הושלמה`, 'INFO');
+            } catch (e) { console.error("Error completing: ", e); alert("שגיאה בסיום: " + e.message); } 
+        }
+        window.handleDelete = async (collectionName, docId) => { 
+            if (!confirm(`האם אתה בטוח שברצונך למחוק פריט ${docId} מ-${collectionName}?`)) return; 
+            const docRef = doc(db, collectionName, docId); 
+            try { 
+                await deleteDoc(docRef); 
+                if(collectionName === 'orders') removeAssignmentLine(docId); 
+                 // v40: Add notification
+                 addNotification(`פריט ${docId} נמחק מ-${collectionName}`, 'WARN');
+            } catch (e) { console.error("Error deleting: ", e); alert("שגיאה במחיקה: " + e.message); } 
+        }
         
-        // --- v39: Assignment Line Visualization ---
-        function drawAssignmentLine(orderId, driverId) {
-            if (!mapInstance || !orderMarkers[orderId] || !driverMarkers[driverId]) return;
-            
-            // Remove previous line if exists
-            removeAssignmentLine(orderId);
+        // --- Assignment Line ---
+        function drawAssignmentLine(orderId, driverId) { /* ... same ... */ if (!mapInstance || !orderMarkers[orderId] || !driverMarkers[driverId]) return; removeAssignmentLine(orderId); const oLatLng = orderMarkers[orderId].getLatLng(); const dLatLng = driverMarkers[driverId].getLatLng(); const line = L.polyline([oLatLng, dLatLng], { color: '#f59e0b', weight: 3, opacity: 0.7 }); const decorator = L.polylineDecorator(line, { patterns: [{ offset: '0%', repeat: 10, symbol: L.Symbol.dash({ pixelSize: 5, pathOptions: { color: '#f59e0b', weight: 3, opacity: 0.7 } }) }] }).addTo(mapInstance); assignmentLines[orderId] = { line, decorator }; setTimeout(() => removeAssignmentLine(orderId), 5000); }
+        function removeAssignmentLine(orderId) { /* ... same ... */ if (assignmentLines[orderId]) { if (assignmentLines[orderId].line) mapInstance?.removeLayer(assignmentLines[orderId].line); if (assignmentLines[orderId].decorator) mapInstance?.removeLayer(assignmentLines[orderId].decorator); delete assignmentLines[orderId]; } }
 
-            const orderLatLng = orderMarkers[orderId].getLatLng();
-            const driverLatLng = driverMarkers[driverId].getLatLng();
-            
-            const line = L.polyline([orderLatLng, driverLatLng], { 
-                color: '#f59e0b', // Amber color
-                weight: 3,
-                opacity: 0.7 
-            });
+         // --- v40: Notification Ticker ---
+         function addNotification(message, level = 'INFO') {
+             const timestamp = new Date();
+             notificationQueue.unshift({ message, level, timestamp }); // Add to beginning
 
-            // Add dashed pattern using decorator
-            const decorator = L.polylineDecorator(line, {
-                patterns: [
-                    { offset: '0%', repeat: 10, symbol: L.Symbol.dash({ pixelSize: 5, pathOptions: { color: '#f59e0b', weight: 3, opacity: 0.7 } }) }
-                ]
-            }).addTo(mapInstance);
+             // Keep only the last MAX_NOTIFICATIONS
+             if (notificationQueue.length > MAX_NOTIFICATIONS) {
+                 notificationQueue.pop(); // Remove the oldest
+             }
+             renderNotifications();
+         }
 
-            assignmentLines[orderId] = { line, decorator }; // Store both parts
+         function renderNotifications() {
+             const tickerList = document.getElementById('notification-ticker-list');
+             if (!tickerList) return;
 
-            // Fade out and remove after a delay
-            setTimeout(() => {
-                removeAssignmentLine(orderId);
-            }, 5000); // Remove after 5 seconds
-        }
-
-        function removeAssignmentLine(orderId) {
-             if (assignmentLines[orderId]) {
-                if (assignmentLines[orderId].line) mapInstance?.removeLayer(assignmentLines[orderId].line);
-                if (assignmentLines[orderId].decorator) mapInstance?.removeLayer(assignmentLines[orderId].decorator);
-                delete assignmentLines[orderId];
+             tickerList.innerHTML = notificationQueue.map(n => `
+                 <li class="level-${n.level}">
+                     <span>${n.message}</span>
+                     <span class="time">${n.timestamp.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
+                 </li>
+             `).join('');
+             
+             // Reset animation (complex for dynamic content, simple restart for now)
+            const ticker = document.getElementById('notification-ticker');
+            if (ticker) {
+                const ul = ticker.querySelector('ul');
+                if (ul) {
+                    ul.style.animation = 'none';
+                    // Force reflow
+                    ul.offsetHeight; /* trigger reflow */
+                    // Restart animation only if needed (more than fits)
+                    if (ul.offsetHeight > ticker.offsetHeight) {
+                         // Adjust animation duration based on content height
+                         const scrollHeight = ul.scrollHeight;
+                         const containerHeight = ticker.offsetHeight;
+                         const duration = (scrollHeight / containerHeight) * 15; // Base 15s per screen height
+                         ul.style.animation = `ticker-scroll ${duration}s linear infinite`;
+                    } else {
+                         ul.style.animation = ''; // No animation if content fits
+                         ul.style.transform = 'translateY(0)'; // Ensure it's at the top
+                    }
+                }
             }
-        }
+         }
+         // Initial render of ticker (empty)
+         document.addEventListener('DOMContentLoaded', renderNotifications);
 
         // --- Attach handlers ---
         window.handleMarkAsCompleted = handleMarkAsCompleted;
@@ -354,81 +485,77 @@
         
         <!-- Sidebar -->
         <aside class="light-card sidebar p-4 flex flex-col justify-between">
-            <!-- Sidebar content (nav links - SVG content omitted for brevity) -->
-             <div> 
-                 <h1 class="text-2xl font-bold text-gray-800 p-2 mb-6">ח. סבן (v39)</h1> 
-                 <nav class="sidebar-nav space-y-2"> 
-                     <a href="#view-map"><svg>...</svg><span>חדר מצב (מפה)</span></a> 
-                     <a href="#view-orders"><svg>...</svg><span>ניהול הזמנות</span></a> 
-                     <a href="#view-drivers"><svg>...</svg><span>ניהול נהגים</span></a> 
-                     <a href="#view-customers"><svg>...</svg><span>ניהול לקוחות</span></a> 
-                     <a href="#view-logs"><svg>...</svg><span>צג לוגים</span></a> 
-                 </nav> 
-             </div> 
-             <div id="connection-status" class="text-sm text-yellow-500 p-2 text-center"> טוען... </div>
+            <!-- Sidebar content -->
+             <div> <h1 class="text-2xl font-bold text-gray-800 p-2 mb-6">ח. סבן (v40)</h1> <nav class="sidebar-nav space-y-2">...</nav> </div> <div id="connection-status">...</div>
         </aside>
 
         <!-- Main Content -->
-        <main class="h-full overflow-hidden light-card">
+        <main class="h-full overflow-hidden light-card flex flex-col">
             
-            <!-- View 1: Map (Default) -->
-            <div id="view-map" class="app-view h-full">
-                <div id="leaflet-map-container" class="h-full"> <div id="leaflet-map"></div> </div>
+            <!-- v40: Notification Ticker -->
+            <div id="notification-ticker" class="flex-shrink-0">
+                 <ul id="notification-ticker-list">
+                     <!-- Notifications generated by JS -->
+                      <li><span class="time">--:--</span><span>מערכת v40.0 טעונה. ממתין לאירועים...</span></li>
+                 </ul>
             </div>
 
-            <!-- View 2: Orders Table -->
-            <div id="view-orders" class="app-view hidden h-full flex flex-col gap-4 p-4">
-                 <header class="flex-shrink-0 flex justify-between items-center"> <h2 class="text-2xl font-bold text-gray-800">ניהול הזמנות</h2> <button class="btn btn-primary" onclick="openAddOrderModal()"> + הוסף הזמנה </button> </header>
-                 <input type="text" id="filter-orders" class="filter-input" placeholder="🔍 חפש הזמנה...">
-                 <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="orders-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
-            </div>
+            <!-- Main Content Area (Scrollable within views) -->
+            <div class="main-content-area flex-grow overflow-hidden">
+                <!-- View 1: Map (Default) -->
+                <div id="view-map" class="app-view h-full">
+                    <div id="leaflet-map-container" class="h-full"> <div id="leaflet-map"></div> </div>
+                </div>
 
-            <!-- View 3: Drivers Table -->
-            <div id="view-drivers" class="app-view hidden h-full flex flex-col gap-4 p-4">
-                 <header class="flex-shrink-0 flex justify-between items-center"> <h2 class="text-2xl font-bold text-gray-800">ניהול נהגים</h2> </header>
-                 <input type="text" id="filter-drivers" class="filter-input" placeholder="🔍 חפש נהג...">
-                 <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="drivers-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
-            </div>
-            
-            <!-- View 4: Customers Table -->
-             <div id="view-customers" class="app-view hidden h-full flex flex-col gap-4 p-4">
-                 <header class="flex-shrink-0 flex justify-between items-center"> <h2 class="text-2xl font-bold text-gray-800">ניהול לקוחות</h2> </header>
-                 <input type="text" id="filter-customers" class="filter-input" placeholder="🔍 חפש לקוח...">
-                 <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="customers-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
-            </div>
-            
-            <!-- View 5: Logs Table -->
-             <div id="view-logs" class="app-view hidden h-full flex flex-col gap-4 p-4">
-                 <header class="flex-shrink-0 flex justify-between items-center"> <h2 class="text-2xl font-bold text-gray-800">צג לוגים</h2> </header>
-                 <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content"> <div class="h-full"> <table class="w-full min-w-full text-right"> <thead class="sticky top-0 bg-gray-50 z-10">...</thead> <tbody id="logs-table-body" class="divide-y divide-gray-200"></tbody> </table> </div> </div>
+                <!-- View 2: Orders Table -->
+                <div id="view-orders" class="app-view hidden h-full flex flex-col gap-4 p-4">
+                     <header class="flex-shrink-0 flex justify-between items-center">...</header>
+                     <div class="filter-input-wrapper">
+                         <span class="filter-input-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></span>
+                         <input type="text" id="filter-orders" class="filter-input" placeholder="חפש הזמנה...">
+                    </div>
+                     <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content"> <div class="h-full"> <table class="w-full min-w-full text-right">...</table> </div> </div>
+                </div>
+
+                <!-- View 3: Drivers Table -->
+                <div id="view-drivers" class="app-view hidden h-full flex flex-col gap-4 p-4">
+                     <header class="flex-shrink-0 flex justify-between items-center">...</header>
+                      <div class="filter-input-wrapper">
+                         <span class="filter-input-icon"><svg>...</svg></span>
+                         <input type="text" id="filter-drivers" class="filter-input" placeholder="חפש נהג...">
+                     </div>
+                     <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content"> <div class="h-full"> <table class="w-full min-w-full text-right">...</table> </div> </div>
+                </div>
+                
+                <!-- View 4: Customers Table -->
+                 <div id="view-customers" class="app-view hidden h-full flex flex-col gap-4 p-4">
+                     <header class="flex-shrink-0 flex justify-between items-center">...</header>
+                     <div class="filter-input-wrapper">
+                         <span class="filter-input-icon"><svg>...</svg></span>
+                          <input type="text" id="filter-customers" class="filter-input" placeholder="חפש לקוח...">
+                     </div>
+                     <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content"> <div class="h-full"> <table class="w-full min-w-full text-right">...</table> </div> </div>
+                </div>
+                
+                <!-- View 5: Logs Table -->
+                 <div id="view-logs" class="app-view hidden h-full flex flex-col gap-4 p-4">
+                     <header class="flex-shrink-0 flex justify-between items-center">...</header>
+                     <div class="overflow-hidden flex-grow border border-gray-200 rounded-lg view-content"> <div class="h-full"> <table class="w-full min-w-full text-right">...</table> </div> </div>
+                </div>
             </div>
 
         </main>
     </div>
     
     <!-- Modals -->
-    <!-- Add/Edit Order Modal (content omitted) -->
-    <div id="addOrderModal" class="modal-backdrop"> <div class="light-card modal-content p-6 space-y-4 max-h-[90vh] overflow-y-auto"> <h2 id="addOrderModalTitle">...</h2> <form id="addOrderForm">...</form> </div> </div>
-    <!-- Assign Driver Modal (content omitted) -->
-    <div id="assignDriverModal" class="modal-backdrop"> <div class="light-card modal-content p-6 space-y-4"> <h2>שיבוץ נהג</h2> <form>...</form> </div> </div>
-    <!-- Confirm Assign Modal (content omitted) -->
+    <!-- Add/Edit Order Modal -->
+    <div id="addOrderModal" class="modal-backdrop"> <div class="light-card modal-content p-6 space-y-4 max-h-[90vh] overflow-y-auto"> <div class="modal-header"><h2 id="addOrderModalTitle">...</h2></div> <form id="addOrderForm">...</form> </div> </div>
+    <!-- Assign Driver Modal -->
+    <div id="assignDriverModal" class="modal-backdrop"> <div class="light-card modal-content p-6 space-y-4"> <div class="modal-header"><h2>שיבוץ נהג</h2></div> <form>...</form> </div> </div>
+    <!-- Confirm Assign Modal -->
     <div id="confirmAssignModal" class="modal-backdrop"> <div class="light-card modal-content p-6 space-y-4"> <div class="modal-header"><h2>אישור שיבוץ</h2></div> <p id="confirmAssignText">...</p> <div class="modal-footer">...</div> </div> </div>
-
-    <!-- v39: Select Driver From List Modal -->
-    <div id="selectDriverModal" class="modal-backdrop" style="display: none;">
-        <div class="light-card modal-content p-6 space-y-4">
-            <div class="modal-header">
-                 <h2 class="text-xl font-bold text-gray-800">בחר נהג לשיבוץ</h2>
-            </div>
-            <div id="driver-select-list" class="space-y-2 max-h-60 overflow-y-auto">
-                <!-- Driver buttons will be inserted here by JS -->
-                <p class="p-4 text-center text-gray-500">טוען רשימת נהגים...</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('selectDriverModal')">ביטול</button>
-            </div>
-        </div>
-    </div>
+    <!-- Select Driver Modal -->
+    <div id="selectDriverModal" class="modal-backdrop"> <div class="light-card modal-content p-6 space-y-4"> <div class="modal-header"><h2>בחר נהג לשיבוץ</h2></div> <div id="driver-select-list">...</div> <div class="modal-footer">...</div> </div> </div>
 
 </body>
 </html>
