@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryMaster - כניסת נהג</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Rubik', sans-serif; }
+         /* Style for focus state */
+         input:focus {
+             outline: none;
+             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5); /* blue-500 shadow */
+             border-color: #3B82F6; /* blue-500 border */
+         }
+         /* Simple loader */
+         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3a86ff; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; margin-left: 8px; vertical-align: middle;}
+         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-sm bg-white p-8 rounded-xl shadow-lg">
+        <div class="w-16 h-16 bg-blue-500 rounded-lg flex items-center justify-center mb-6 mx-auto">
+            <!-- Simple icon or logo placeholder -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        </div>
+        <h1 class="text-2xl font-bold text-center mb-2 text-gray-800">DeliveryMaster</h1>
+        <p class="text-center text-gray-600 mb-6">כניסת נהגים</p>
+
+        <form id="login-form">
+            <div class="mb-4">
+                <label for="driver-name-input" class="block text-sm font-medium text-gray-700 mb-1 text-right">שם הנהג</label>
+                <input type="text" id="driver-name-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-gray-50 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50" placeholder="לדוגמה: עלי, חכמת..." required>
+            </div>
+
+            <button type="submit" id="login-btn" class="w-full bg-blue-500 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-600 transition duration-200 flex items-center justify-center">
+                <span>כניסה לאפליקציה</span>
+                <span id="loading-spinner" class="loader hidden"></span>
+            </button>
+
+            <p id="error-message" class="text-red-500 text-center mt-3 text-sm"></p>
+        </form>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('login-form');
+        const nameInput = document.getElementById('driver-name-input');
+        const loginButton = document.getElementById('login-btn');
+        const loginButtonText = loginButton.querySelector('span:not(.loader)');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const errorMessage = document.getElementById('error-message');
+
+        loginForm.addEventListener('submit', (event) => {
+            event.preventDefault(); // Prevent default form submission
+            errorMessage.textContent = ''; // Clear previous errors
+            loginButton.disabled = true; // Disable button during login
+            loginButtonText.textContent = 'מתחבר...';
+            loadingSpinner.classList.remove('hidden');
+
+            const driverName = nameInput.value.trim();
+
+            if (!driverName) {
+                errorMessage.textContent = 'אנא הזן שם נהג.';
+                loginButton.disabled = false;
+                loginButtonText.textContent = 'כניסה לאפליקציה';
+                loadingSpinner.classList.add('hidden');
+                return;
+            }
+
+            try {
+                // Save both ID and Name using the entered name
+                localStorage.setItem('driverId', driverName);
+                localStorage.setItem('driverName', driverName);
+                console.log(`Driver logged in: ID=${driverName}, Name=${driverName}`);
+
+                // Redirect to the main app page
+                window.location.href = 'index.html';
+
+            } catch (error) {
+                console.error("Error saving to localStorage:", error);
+                errorMessage.textContent = 'שגיאה בשמירת פרטי ההתחברות.';
+                loginButton.disabled = false;
+                loginButtonText.textContent = 'כניסה לאפליקציה';
+                loadingSpinner.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
