@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v45.0 - צג לוגים</title>
+    <title>DeliveryMaster v45.1 - צג לוגים</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -139,7 +139,7 @@
 
     <div class="header-container">
         <h1>
-            <span>[v45.0]</span> צג לוגים בזמן אמת
+            <span>[v45.1]</span> צג לוגים בזמן אמת
             <span id="status" style="font-size: 0.9rem; color: var(--m3-warning); margin-right: 10px;">(מתחבר...)</span>
         </h1>
         <button id="theme-toggle" title="שנה מצב תצוגה">
@@ -175,8 +175,12 @@
     </div>
 
     <script type="module">
-        // v45.0: ייבוא Promise האימות
-        import { db, authReady } from './config.js'; 
+        // v45.1: הגדרת נתיב אבסולוטי בראש הקובץ
+        const APP_ROOT = "/admin-v44"; // ודא שנתיב זה תואם לשרת שלך
+
+        // v45.1: ייבוא כל המודולים המקומיים עם הנתיב האבסולוטי
+        import { db, authReady } from `${APP_ROOT}/config.js`; 
+        import { SmartLog } from `${APP_ROOT}/SmartLog.js`;
         import { 
             collection, 
             query, 
@@ -185,8 +189,6 @@
             onSnapshot 
         } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
-        // v45.0: נתיב הקבצים
-        const APP_ROOT = "/admin-v44"; 
 
         const LOG_COLLECTION = 'system_logs_v3';
         const LOG_LIMIT = 200; // הצג 200 לוגים אחרונים
@@ -205,7 +207,7 @@
 
         function init() {
             // v45.0: הפונקציה רצה רק אחרי אימות
-            console.log("Auth Ready. Log Viewer v45.0 Initializing.");
+            console.log("Auth Ready. Log Viewer v45.1 Initializing.");
             
             // האזנה לפילטרים
             DOM.filterText.addEventListener('input', renderLogs);
@@ -314,11 +316,8 @@
         // --- v45.0: Start App ---
         // המתן לאימות לפני אתחול האפליקציה
         authReady.then(() => {
-            // v45.0: אנו מייבאים את SmartLog כאן רק כדי שנוכל לדווח
-            // שדף הלוג נטען בהצלחה.
-            import(`${APP_ROOT}/SmartLog.js`).then(({ SmartLog }) => {
-                SmartLog.info("Log Viewer Page Loaded (v45.0)", "LogViewer");
-            });
+            // v45.1: כעת שהלוגר מיובא למעלה, אפשר להשתמש בו ישר
+            SmartLog.info("Log Viewer Page Loaded (v45.1)", "LogViewer");
             init();
         }).catch(err => {
             console.error("Fatal Auth Error", err);
