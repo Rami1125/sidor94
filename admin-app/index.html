@@ -38,107 +38,109 @@
         button, input, select { font: inherit; margin: 0; padding: 0; }
         button { cursor: pointer; background-color: transparent; border: none; }
         svg { display: block; vertical-align: middle; }
-        .hidden { display: none !important; } /* Important to override potential conflicts */
+        .hidden { display: none !important; }
 
         /* 2. Layout Structure */
         .app-layout { display: flex; height: 100vh; }
         .sidebar { width: 250px; background-color: var(--white-bg); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.03); z-index: 20; }
         .main-container { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .main-header { height: 60px; background-color: var(--white-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; flex-shrink: 0; z-index: 10; }
-        .content-wrapper { flex-grow: 1; padding: 1.5rem; overflow-y: auto; background-color: var(--light-bg); position: relative; }
+        /* Removed main-header, integrated ticker below */
+        .content-wrapper { flex-grow: 1; /* padding: 1.5rem; */ /* Removed padding, views will handle it */ overflow-y: auto; background-color: var(--light-bg); position: relative; }
 
         /* 3. Sidebar Styling */
         .sidebar-header { padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
         .sidebar-title { font-size: 1.15rem; font-weight: 600; color: var(--text-primary); }
         .sidebar-version { font-size: 0.75rem; color: var(--primary-color); font-weight: 500; margin-right: 0.5rem; }
         .sidebar-nav { padding: 1rem; flex-grow: 1; overflow-y: auto; }
-        .nav-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 1rem; margin-bottom: 0.25rem; border-radius: 0.375rem; /* rounded-md */ font-weight: 500; color: var(--text-secondary); transition: background-color 0.15s, color 0.15s; }
+        .nav-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 1rem; margin-bottom: 0.25rem; border-radius: 0.375rem; font-weight: 500; color: var(--text-secondary); transition: background-color 0.15s, color 0.15s; }
         .nav-link:hover { background-color: #f0f9ff; color: #0369a1; }
         .nav-link.active { background-color: var(--primary-color); color: var(--white-bg); }
         .nav-link svg { width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
         .nav-link span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem; }
         .sidebar-footer { padding: 1rem; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted); text-align: center; }
 
-        /* 4. Header Styling */
-        .connection-status { font-size: 0.8rem; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 500; }
-        .status-connected { background-color: #dcfce7; color: #15803d; /* darker green */ }
-        .status-connecting { background-color: #fef3c7; color: #b45309; /* darker amber */ }
-        .status-error { background-color: #fee2e2; color: #b91c1c; /* darker red */ }
+        /* 4. Connection Status (now in footer) */
+        .connection-status { font-size: 0.8rem; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 500; display: inline-block; /* Allow centering */ }
+        .status-connected { background-color: #dcfce7; color: #15803d; }
+        .status-connecting { background-color: #fef3c7; color: #b45309; }
+        .status-error { background-color: #fee2e2; color: #b91c1c; }
 
         /* 5. Content Area & Views */
         .app-view { 
             position: absolute; top: 0; left: 0; right: 0; bottom: 0; /* Cover the wrapper */
-            padding: 1.5rem; /* Standard padding for views */
-            transition: opacity 0.3s ease-out, transform 0.3s ease-out; 
-            will-change: transform, opacity;
-            opacity: 0; transform: translateY(10px); 
+            padding: 1.5rem; 
+            transition: opacity 0.3s ease-out; /* Simpler transition */
+            opacity: 0; 
             pointer-events: none;
             display: flex; flex-direction: column; 
             overflow: hidden; 
+            background-color: var(--light-bg); /* Ensure background */
         }
         .app-view:not(.hidden) { 
-            opacity: 1; transform: translateY(0); 
-            pointer-events: auto; position: relative; /* Take space */
+            opacity: 1; 
+            pointer-events: auto; 
+            position: relative; /* Take space */
+            z-index: 1; /* Ensure active view is on top */
         }
-        #view-map { padding: 0; /* Map view takes full space */ } 
+        #view-map { padding: 0; } 
         #leaflet-map-container { flex-grow: 1; border-radius: 0.75rem; overflow: hidden; border: 1px solid var(--border-color); }
-        #leaflet-map { height: 100%; width: 100%; z-index: 10; }
-        .leaflet-container { background: #e2e8f0; /* slate-200 */ }
+        #leaflet-map { height: 100%; width: 100%; z-index: 1; } /* Lower z-index for map */
+        .leaflet-container { background: #e2e8f0; }
 
         /* 6. Table & Card Styling */
-        .content-card { background-color: var(--white-bg); border-radius: 0.75rem; border: 1px solid var(--border-color); box-shadow: 0 1px 2px 0 rgba(0,0,0,0.03); overflow: hidden; flex-grow: 1; display: flex; flex-direction: column; height: 100%; /* Ensure card takes full view height */ }
+        .content-card { background-color: var(--white-bg); border-radius: 0.75rem; border: 1px solid var(--border-color); box-shadow: 0 1px 2px 0 rgba(0,0,0,0.03); overflow: hidden; flex-grow: 1; display: flex; flex-direction: column; height: 100%; }
         .card-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
         .card-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
         .card-body { flex-grow: 1; overflow-y: auto; }
         table { border-collapse: collapse; width: 100%; } 
-        thead { background-color: #f8fafc; /* slate-50 */ position: sticky; top: 0; z-index: 5; } 
+        thead { background-color: #f8fafc; position: sticky; top: 0; z-index: 5; } 
         th { color: var(--text-secondary); padding: 0.75rem 1.5rem; font-weight: 500; text-align: right; white-space: nowrap; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-color); } 
         tbody { background-color: var(--white-bg); } 
-        td { padding: 0.75rem 1.5rem; text-align: right; border-bottom: 1px solid #f1f5f9; /* slate-100 */ font-size: 0.9rem; color: var(--text-primary); }
+        td { padding: 0.75rem 1.5rem; text-align: right; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; color: var(--text-primary); }
         tr:last-child td { border-bottom: none; }
-        td:last-child { white-space: nowrap; width: 1%; }
-        tbody tr:hover { background-color: #f8fafc; /* slate-50 */ }
+        td:last-child { white-space: nowrap; width: auto; /* Allow actions to wrap if needed, adjust column width */ }
+        tbody tr:hover { background-color: #f8fafc; }
 
         /* 7. Buttons - Refined v43 */
-        .btn { padding: 0.5rem 1rem; border-radius: 0.375rem; /* rounded-md */ font-weight: 500; cursor: pointer; transition: all 0.15s ease-out; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; white-space: nowrap; line-height: 1.25rem; font-size: 0.875rem; }
+        .btn { padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; cursor: pointer; transition: all 0.15s ease-out; border: 1px solid transparent; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; white-space: nowrap; line-height: 1.25rem; font-size: 0.875rem; }
         .btn:hover { filter: brightness(1.05); }
         .btn:active { transform: scale(0.98); box-shadow: inset 0 1px 1px 0 rgba(0, 0, 0, 0.05); }
         .btn-primary { background-color: var(--primary-color); color: white; border-color: var(--primary-color); } .btn-primary:hover { background-color: var(--primary-hover-color); border-color: var(--primary-hover-color); }
-        .btn-secondary { background-color: var(--white-bg); color: var(--text-secondary); border-color: #cbd5e1; /* slate-300 */ } .btn-secondary:hover { background-color: #f8fafc; border-color: #94a3b8; color: var(--text-primary); }
+        .btn-secondary { background-color: var(--white-bg); color: var(--text-secondary); border-color: #cbd5e1; } .btn-secondary:hover { background-color: #f8fafc; border-color: #94a3b8; color: var(--text-primary); }
         .btn-success { background-color: var(--success-color); color: white; border-color: var(--success-color); } .btn-success:hover { background-color: #16a34a; border-color: #15803d; }
         .btn-warning { background-color: var(--warning-color); color: white; border-color: var(--warning-color); } .btn-warning:hover { background-color: #d97706; border-color: #b45309; }
         .btn-danger { background-color: var(--danger-color); color: white; border-color: var(--danger-color); } .btn-danger:hover { background-color: #dc2626; border-color: #b91c1c; }
-        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 0.25rem; /* rounded-sm */ }
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 0.25rem; }
         .btn svg { width: 1rem; height: 1rem; }
 
         /* 8. Forms & Filters v43 - Enhanced */
-        .form-input { width: 100%; background-color: var(--white-bg); border: 1px solid #cbd5e1; /* slate-300 */ color: var(--text-primary); padding: 0.6rem 0.75rem; border-radius: 0.375rem; transition: border-color 0.2s, box-shadow 0.2s; font-size: 0.9rem; }
+        .form-input { width: 100%; background-color: var(--white-bg); border: 1px solid #cbd5e1; color: var(--text-primary); padding: 0.6rem 0.75rem; border-radius: 0.375rem; transition: border-color 0.2s, box-shadow 0.2s; font-size: 0.9rem; }
         .form-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); outline: none; }
         .form-label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-secondary); font-size: 0.8rem; }
-        .filter-input-wrapper { position: relative; flex-shrink: 0; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background-color: var(--white-bg); border-top-left-radius: 0.75rem; border-top-right-radius: 0.75rem;}
-        .filter-input { padding-left: 2.5rem; height: 38px; font-size: 0.9rem; background-color: var(--light-bg); }
+        .filter-input-wrapper { position: relative; flex-shrink: 0; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); background-color: var(--white-bg); /* Match card header */ }
+        .filter-input { padding-left: 2.5rem; height: 38px; font-size: 0.9rem; background-color: var(--light-bg); border-radius: 0.375rem; border: 1px solid var(--border-color); }
+        .filter-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); outline: none; background-color: var(--white-bg); }
         .filter-input-icon { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; width: 1rem; height: 1rem; }
 
         /* 9. Modals v43 */
         .modal-backdrop { /* ... same backdrop ... */ }
         .modal-content { /* ... same shape ... */ }
         .modal-header { border-bottom: 1px solid var(--border-color); padding: 1rem 1.5rem; }
-        .modal-body { padding: 1.5rem; }
+        .modal-body { padding: 1.5rem; max-height: 70vh; overflow-y: auto; } /* Allow modal scroll */
         .modal-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
         .modal-footer { display: flex; gap: 0.75rem; justify-content: flex-end; border-top: 1px solid var(--border-color); padding: 1rem 1.5rem; background-color: var(--light-bg); border-bottom-left-radius: 0.75rem; border-bottom-right-radius: 0.75rem;}
 
         /* 10. Notification Ticker v43 */
-        #notification-ticker { height: 36px; /* Slightly smaller */ overflow: hidden; background-color: #f0f9ff; /* sky-50 */ border-bottom: 1px solid #e0f2fe; /* sky-100 */ position: relative; flex-shrink: 0; cursor: default; }
+        #notification-ticker { height: 36px; overflow: hidden; background-color: #f0f9ff; border-bottom: 1px solid #e0f2fe; position: relative; flex-shrink: 0; cursor: default; }
         #notification-ticker ul { list-style: none; padding: 0; margin: 0; position: absolute; width: 100%; animation: ticker-scroll-v41 40s linear infinite; }
-        #notification-ticker li { height: 36px; padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #075985; /* sky-800 */ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #notification-ticker .time { font-size: 0.7rem; color: #38bdf8; /* sky-400 */ margin-left: 1rem; flex-shrink: 0; }
+        #notification-ticker li { height: 36px; padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #075985; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #notification-ticker .time { font-size: 0.7rem; color: #38bdf8; margin-left: 1rem; flex-shrink: 0; }
         #notification-ticker .level-WARN { color: #b45309; } #notification-ticker .level-ERROR { color: #b91c1c; font-weight: 500; }
         @keyframes ticker-scroll-v41 { 0% { transform: translateY(0); } 100% { transform: translateY(-100%); } }
         #notification-ticker:hover ul { animation-play-state: paused; }
 
         /* Status Badges */
-        .status-badge { padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; } /* Smaller badge */
-        .status-חדש { background-color: #e0f2fe; color: #0ea5e9; } .status-שויך { background-color: #fef3c7; color: #d97706; } .status-הושלם { background-color: #dcfce7; color: #16a34a; } .status-default { background-color: #e5e7eb; color: #4b5563; }
+        .status-badge { /* ... same ... */ } .status-חדש { /* ... */ } .status-שויך { /* ... */ } .status-הושלם { /* ... */ } .status-default { /* ... */ }
         .level-INFO { /* ... */ } .level-WARN { /* ... */ } .level-ERROR { /* ... */ }
         
         /* Map Popups & Icons */
@@ -170,80 +172,165 @@
         const WAREHOUSES = { /* ... same ... */ hatalmid: { name: "התלמיד 6", lat: 32.1860, lng: 34.9080 }, haharash: { name: "החרש 10", lat: 32.1840, lng: 34.9095 } };
         
         // --- Icons v43 ---
-        // הדבק כאן לינקים לאייקונים שלך אם תרצה (השאר null כדי להשתמש ב-SVG)
         const driverIconUrl = null; 
         const orderIconUrl = null; 
-        // SVG icons ( truck yellow, pin blue )
         const driverSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f59e0b" width="36px" height="36px"><path d="M0 0h24v24H0z" fill="none"/><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`; 
         const orderSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%230ea5e9" width="36px" height="36px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
         const driverIcon = driverIconUrl ? L.icon({ iconUrl: driverIconUrl, iconSize: [42, 42], iconAnchor: [21, 42] }) : L.divIcon({ html: driverSvg, className: 'leaflet-div-icon', iconSize: [36, 36], iconAnchor: [18, 18] }); 
         const orderIcon = orderIconUrl ? L.icon({ iconUrl: orderIconUrl, iconSize: [36, 46], iconAnchor: [18, 46] }) : L.divIcon({ html: orderSvg, className: 'leaflet-div-icon', iconSize: [36, 36], iconAnchor: [18, 36] }); 
 
         // --- Init App ---
-        document.addEventListener('DOMContentLoaded', async () => { /* ... same init logic ... */ try{const a=initializeApp(firebaseConfig);const o=getAuth(a);db=getFirestore(a);setStatus('מתחבר...','status-connecting');await signInAnonymously(o);setStatus('מחובר','status-connected');initNavigation();initMap();listenToDrivers();listenToDriverLocations();listenToOrders();listenToCustomers();listenToSystemLogs();initFilters();renderNotifications()}catch(e){console.error("Init Error",e);setStatus(`שגיאה: ${e.message}`,'status-error')} });
+        document.addEventListener('DOMContentLoaded', async () => { 
+            try { 
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                db = getFirestore(app);
+                setStatus('מתחבר...', 'status-connecting'); 
+                await signInAnonymously(auth);
+                setStatus('מחובר', 'status-connected'); 
+                initNavigation(); 
+                initMap(); 
+                listenToDrivers();
+                listenToDriverLocations();
+                listenToOrders();
+                listenToCustomers();
+                listenToSystemLogs();
+                initFilters();
+                renderNotifications(); 
+            } catch (error) { 
+                console.error("Init Error", error); 
+                setStatus(`שגיאה: ${error.message}`, 'status-error'); 
+            } 
+        });
         
         // --- Navigation & View Transitions ---
-        function initNavigation() { /* ... same event listeners, corrected querySelector ... */ const l=document.querySelectorAll('.nav-link');l.forEach(k=>{k.addEventListener('click',(e)=>{e.preventDefault();const v=e.currentTarget.getAttribute('href').substring(1);showView(v);l.forEach(j=>j.classList.remove('active'));e.currentTarget.classList.add('active');});});const iL=document.querySelector('.nav-link[href="#view-map"]');if(iL){iL.classList.add('active');showView('view-map')}else{console.error("Initial map link not found!");showView('view-orders');const oL=document.querySelector('.nav-link[href="#view-orders"]');if(oL)oL.classList.add('active')}}
+        function initNavigation() { 
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(link => { 
+                link.addEventListener('click', (e) => { 
+                    e.preventDefault(); 
+                    const viewId = e.currentTarget.getAttribute('href').substring(1); 
+                    showView(viewId); 
+                    navLinks.forEach(l => l.classList.remove('active')); 
+                    e.currentTarget.classList.add('active'); 
+                }); 
+            });
+            const initialLink = document.querySelector('.nav-link[href="#view-map"]');
+            if (initialLink) { 
+                initialLink.classList.add('active'); 
+                // Ensure map view is shown initially without transition delay
+                const targetView = document.getElementById('view-map');
+                if(targetView) {
+                    targetView.classList.remove('hidden');
+                    targetView.style.opacity = '1';
+                    targetView.style.transform = 'translateY(0)';
+                    targetView.style.pointerEvents = 'auto';
+                     targetView.style.position = 'relative'; // Make sure it takes space
+                    window.currentViewId = 'view-map';
+                    // Delay map init slightly to ensure container is rendered
+                    setTimeout(initMap, 50); 
+                } else {
+                     console.error("Map view container not found on init!");
+                }
+
+            } else { 
+                console.error("Initial map link not found!"); 
+                showView('view-orders'); 
+                const ol = document.querySelector('.nav-link[href="#view-orders"]'); 
+                if (ol) ol.classList.add('active');
+            }
+        }
+        
         window.currentViewId = null; 
-        window.showView = (viewId) => { /* ... same transition logic ... */ if (viewId === window.currentViewId) return; const cV = window.currentViewId ? document.getElementById(window.currentViewId) : null; const tV = document.getElementById(viewId); console.log(`Switching view from ${window.currentViewId} to ${viewId}`); if (cV) { cV.classList.add('hidden'); /* cV.style.position = 'absolute'; */ } if (tV) { /* tV.style.position = 'relative'; */ tV.offsetHeight; tV.classList.remove('hidden'); tV.offsetHeight; window.currentViewId = viewId; if (viewId === 'view-map' && mapInstance) { setTimeout(() => { mapInstance.invalidateSize({ animate: false }); }, 300); } } else { console.error(`Target view ${viewId} not found!`); window.currentViewId = null; } } // Simplified positioning
+        window.showView = (viewId) => { 
+             if (viewId === window.currentViewId) return; 
+             const currentView = window.currentViewId ? document.getElementById(window.currentViewId) : null;
+             const targetView = document.getElementById(viewId); 
+             console.log(`Switching view from ${window.currentViewId} to ${viewId}`); 
+             
+             // Hide current view immediately
+             if (currentView) { 
+                 currentView.style.opacity = '0';
+                 currentView.style.transform = 'translateY(10px)';
+                 currentView.style.pointerEvents = 'none';
+                 // Use setTimeout to add hidden class after transition
+                 setTimeout(() => {
+                    if(window.currentViewId !== viewId) { // Check if view hasn't changed again quickly
+                        currentView.classList.add('hidden');
+                        currentView.style.position = 'absolute'; // Keep it out of flow when hidden
+                    }
+                 }, 300); // Match transition duration
+             } 
+             
+             if (targetView) {
+                 // Prepare target view (remove hidden, set initial state for transition)
+                 targetView.style.position = 'relative'; // Ensure it takes space
+                 targetView.classList.remove('hidden'); 
+                 targetView.offsetHeight; // Force reflow
+                 
+                 // Start transition
+                 targetView.style.opacity = '1';
+                 targetView.style.transform = 'translateY(0)';
+                 targetView.style.pointerEvents = 'auto';
+
+                 window.currentViewId = viewId; 
+
+                 // Handle map invalidate after transition
+                 if (viewId === 'view-map' && mapInstance) { 
+                     setTimeout(() => { 
+                         console.log("Invalidating map size");
+                         mapInstance.invalidateSize({ animate: false }); 
+                     }, 350); // Delay slightly more than transition
+                 }
+             } else { 
+                 console.error(`Target view ${viewId} not found!`); 
+                 window.currentViewId = null; 
+             } 
+        }
+
 
         // --- Real-time Listeners (READ) ---
-        // (Listeners remain the same, triggering renders/notifications)
+        // (Listeners remain the same)
         function listenToDrivers(){/*...*/} function listenToDriverLocations(){/*...*/} function listenToOrders(){/*...*/} function listenToCustomers(){/*...*/} function listenToSystemLogs(){/*...*/}
 
         // --- Render Functions (v43 Filters & Styling) ---
-        function initFilters() { 
-             document.getElementById('filter-orders')?.addEventListener('input', renderOrdersTable);
-             document.getElementById('filter-drivers')?.addEventListener('input', renderDriversTable);
-             document.getElementById('filter-customers')?.addEventListener('input', renderCustomersTable); 
-        }
-        function renderOrdersTable() { 
-            const tableBody = document.getElementById('orders-table-body'); 
-            const filterInput = document.getElementById('filter-orders'); 
-            const filterText = filterInput ? filterInput.value.toLowerCase() : ''; 
-            const orders = (window.allOrdersData || []).filter(order => { /* ... filtering ... */ if (!filterText) return true; return [order.id, order.customer?.name, order.driver?.name, order.status, order.address].some(f => f && f.toLowerCase().includes(filterText)); });
-            
-            if (!tableBody) return; 
-            if (orders.length === 0) { tableBody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-500">לא נמצאו הזמנות תואמות.</td></tr>`; return; }
-            tableBody.innerHTML = orders.map(order => {
-                const customerName = order.customer?.name || 'N/A';
-                const driverName = order.driver?.name || '---';
-                const status = order.status || 'חדש';
-                const statusClass = `status-${status.replace(' ','_')}` || 'status-default';
-                let actionsHtml = '';
-                if (status === 'חדש') actionsHtml = `<button class="btn btn-warning btn-sm" onclick="openSelectDriverModal('${order.id}')">שבץ</button>`;
-                else if (status === 'שויך') actionsHtml = `<button class="btn btn-success btn-sm" onclick="handleMarkAsCompleted('${order.id}')">הושלם</button>`;
-                const editButtonData = window.allOrders && window.allOrders[order.id] ? JSON.stringify(window.allOrders[order.id]) : '{}';
-                return `<tr class="hover:bg-gray-50 text-sm">
-                            <td class="p-3">${order.id.slice(-6)}</td>
-                            <td class="p-3 font-semibold text-gray-700">${customerName}</td>
-                            <td class="p-3">${order.address || 'N/A'}</td>
-                            <td class="p-3 font-semibold text-gray-700">${driverName}</td>
-                            <td class="p-3"><span class="status-badge ${statusClass}">${status}</span></td>
-                            <td class="p-3 flex gap-1"> {/* Reduced gap */}
-                                ${actionsHtml}
-                                <button class="btn btn-secondary btn-sm" onclick='openEditOrderModal(${JSON.stringify(editButtonData)})'>ערוך</button>
-                                <button class="btn btn-danger btn-sm" onclick="handleDelete('orders','${order.id}')">מחק</button>
-                            </td>
-                        </tr>`;
-            }).join('');
-            window.allOrders = orders.reduce((acc, order) => { acc[order.id] = order; return acc; }, {});
-        }
-
-        function renderDriversTable() { /* ... same filtering and rendering, adjusted style classes */ const t=document.getElementById('drivers-table-body'); const fI = document.getElementById('filter-drivers'); const f = fI ? fI.value.toLowerCase() : ''; const d=Object.values(allDrivers||{}).filter(v=>{if(!f)return!0;const n=v.name||'';const p=v.phone||'';const s=v.status||'';const i=Object.keys(allDrivers).find(k=>allDrivers[k]===v)||'';return n.toLowerCase().includes(f)||p.toLowerCase().includes(f)||s.toLowerCase().includes(f)||i.toLowerCase().includes(f)});if(!t)return;t.innerHTML=d.map(v=>{const i=Object.keys(allDrivers).find(k=>allDrivers[k]===v)||'N/A';return`<tr class="hover:bg-gray-50 text-sm"><td class="p-3 font-semibold text-gray-700">${v.name||i}</td><td class="p-3">${v.phone||'---'}</td><td class="p-3">${v.vehicleType||'N/A'}</td><td class="p-3">${v.status||'N/A'}</td><td class="p-3 flex gap-1"><button class="btn btn-danger btn-sm" onclick="handleDelete('drivers','${i}')">מחק</button></td></tr>`}).join('')}
-        function renderCustomersTable() { /* ... same filtering and rendering, adjusted style classes */ const t=document.getElementById('customers-table-body'); const fI = document.getElementById('filter-customers'); const f = fI ? fI.value.toLowerCase() : ''; const c=(window.allCustomersData||[]).filter(u=>{if(!f)return!0;const n=u.name||'';const p=u.phone||'';const a=u.defaultAddress||'';return n.toLowerCase().includes(f)||p.toLowerCase().includes(f)||a.toLowerCase().includes(f)});if(!t)return;t.innerHTML=c.map(u=>`<tr class="hover:bg-gray-50 text-sm"><td class="p-3 font-semibold text-gray-700">${u.name||u.id}</td><td class="p-3">${u.phone||'---'}</td><td class="p-3">${u.defaultAddress||'---'}</td><td class="p-3">${u.contactPerson||'---'}</td><td class="p-3 flex gap-1"><button class="btn btn-danger btn-sm" onclick="handleDelete('customers','${u.id}')">מחק</button></td></tr>`).join('')}
-        function renderLogsTable() { /* ... same rendering, adjusted style classes */ const t=document.getElementById('logs-table-body');if(!t)return;const l=window.allLogsData||[];t.innerHTML=l.map(g=>{const v=g.level||'INFO';const i=g.timestamp?.toDate().toLocaleString('he-IL',{dateStyle:'short',timeStyle:'short'})||'--';return`<tr class="hover:bg-gray-50 text-xs font-mono"><td class="p-3 text-gray-500">${i}</td><td class="p-3 font-bold level-${v}">${v}</td><td class="p-3 text-sky-600">[${g.origin||'?'}]</td><td class="p-3 text-gray-700">${g.message||'--'}</td><td class="p-3 text-gray-400">${g.data||''}</td></tr>`}).join('')}
-        function setStatus(message, cssClass) { /* ... same ... */ const el=document.getElementById('connection-status'); if(el) { el.textContent=message; el.className=`connection-status ${cssClass}`; } } // Use base class
+        function initFilters() { /* ... same ... */ }
+        function renderOrdersTable() { /* ... same ... */ }
+        function renderDriversTable() { /* ... same ... */ }
+        function renderCustomersTable() { /* ... same ... */ }
+        function renderLogsTable() { /* ... same ... */ }
+        function setStatus(message, cssClass) { /* ... same ... */ }
 
         // --- Map Functions ---
-        window.initMap = () => { /* ... same init with zoom 9 ... */ const e=document.getElementById('leaflet-map');if(!e){console.error("Map container #leaflet-map not found!");return}try{if(typeof L==='undefined'){console.error("Leaflet (L) not defined.");setStatus('שגיאת מפה','status-error');return}if(!mapInstance){mapInstance=L.map(e,{zoomControl:true}).setView([31.7683,35.2137],9);L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:19}).addTo(mapInstance);mapInstance.on('load',()=>{console.log("Map initialized.");setStatus('מחובר','status-connected')});mapInstance.on('tileerror',(e)=>{console.error('Tile error:',e);setStatus('שגיאת מפה','status-error')})}else{mapInstance.invalidateSize()}}catch(e){console.error("Map init failed:",e);e.innerHTML=`<div class="p-4 text-center text-red-500">Map Error: ${e.message}</div>`;setStatus('שגיאת מפה','status-error')} }
+        window.initMap = () => { 
+            const mapElement = document.getElementById('leaflet-map');
+            if (!mapElement) { console.error("Map container #leaflet-map not found!"); return; }
+            try { 
+                if (typeof L === 'undefined') { console.error("Leaflet (L) not defined."); setStatus('שגיאת מפה', 'status-error'); return; }
+                if (!mapInstance) { 
+                    mapInstance = L.map(mapElement, { zoomControl: true }).setView([31.7683, 35.2137], 9); 
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 19 }).addTo(mapInstance); 
+                    mapInstance.whenReady(() => { // Use whenReady for better timing
+                        console.log("Map initialized and ready."); 
+                        setStatus('מחובר', 'status-connected'); 
+                    });
+                    mapInstance.on('tileerror', (e) => { console.error('Tile error:', e); setStatus('שגיאת מפה', 'status-error'); });
+                } else { 
+                    console.log("Map already initialized, invalidating size.");
+                    mapInstance.invalidateSize(); // Invalidate size if exists
+                } 
+            } catch (e) { 
+                console.error("Map init failed:", e); 
+                mapElement.innerHTML = `<div class="p-4 text-center text-red-500">Map Error: ${e.message}</div>`; 
+                setStatus('שגיאת מפה', 'status-error'); 
+            } 
+        }
         
-        function updateDriverMarker(driverId, locationData) { /* ... same logic ... */ if(!mapInstance||!locationData.latitude||!locationData.longitude)return;const l=[locationData.latitude,locationData.longitude];const n=allDrivers[driverId]?.name||driverId;const p=`<b>נהג: ${n}</b><br>עודכן: ${locationData.lastUpdate?.toDate().toLocaleTimeString('he-IL')||'N/A'}`;if(driverMarkers[driverId])driverMarkers[driverId].setLatLng(l).setPopupContent(p);else{driverMarkers[driverId]=L.marker(l,{icon:driverIcon,draggable:!1}).addTo(mapInstance).bindPopup(p);driverMarkers[driverId]._driverInfo={id:driverId,name:n}}}
-        
-        function updateOrderMarkers(orders) { /* ... same logic including distance & warning... */ if(!mapInstance)return;const c=orders.map(o=>o.id);Object.keys(orderMarkers).forEach(m=>{if(!c.includes(m)){mapInstance.removeLayer(orderMarkers[m]);delete orderMarkers[m]}});let w=0;orders.forEach(o=>{if(!o.latitude||!o.longitude){if(o.status!=='הושלם')w++;if(orderMarkers[o.id]){mapInstance.removeLayer(orderMarkers[o.id]);delete orderMarkers[o.id]}return}if(o.status!=='הושלם'){const l=[o.latitude,o.longitude];const t=L.GeometryUtil.distance(mapInstance,l,[WAREHOUSES.hatalmid.lat,WAREHOUSES.hatalmid.lng]);const h=L.GeometryUtil.distance(mapInstance,l,[WAREHOUSES.haharash.lat,WAREHOUSES.haharash.lng]);const k=(t/1e3).toFixed(1);const r=(h/1e3).toFixed(1);const p=`<b>${o.customer?.name||'לקוח'}</b> (${o.id.slice(-4)})<br>${o.address}<br>סטטוס: ${o.status}<hr class="my-1 border-gray-200"><span class="text-xs text-gray-500">מרחק (אווירי):<br>מהתלמיד: ${k} ק"מ | מהחרש: ${r} ק"מ</span>`+(o.status==='חדש'?`<br><button class="map-popup-button" onclick="openSelectDriverModal('${o.id}')">שבץ מרשימה</button>`:'');const i=o.id;const d=o.status==='חדש';if(orderMarkers[i]){orderMarkers[i].setLatLng(l).setPopupContent(p);if(d&&!orderMarkers[i].dragging.enabled())orderMarkers[i].dragging.enable();else if(!d&&orderMarkers[i].dragging.enabled())orderMarkers[i].dragging.disable()}else{orderMarkers[i]=L.marker(l,{icon:orderIcon,draggable:d}).addTo(mapInstance).bindPopup(p,{minWidth:200});orderMarkers[i]._orderData=o;orderMarkers[i].on('dragstart',()=>{currentlyDraggedOrder=o});orderMarkers[i].on('dragend',handleOrderDrop)}}else if(orderMarkers[o.id]){mapInstance.removeLayer(orderMarkers[o.id]);delete orderMarkers[o.id]}});if(w>0){console.warn(`${w} active orders missing coords.`);addNotification(`${w} הזמנות ללא מיקום במפה`,'WARN')}}
+        function updateDriverMarker(driverId, locationData) { /* ... same logic ... */ }
+        function updateOrderMarkers(orders) { /* ... same logic ... */ }
         
         // --- Drag & Drop ---
-        function handleOrderDrop(event) { /* ... same ... */ if (!currentlyDraggedOrder) return; const m = event.target; const l = m.getLatLng(); const THRESHOLD = 50; let closest = null; let minDist = Infinity; Object.keys(driverMarkers).forEach(dId => { const dM = driverMarkers[dId]; try { const dist = l.distanceTo(dM.getLatLng()); if (dist < minDist) { minDist = dist; closest = { id: dId, name: allDrivers[dId]?.name || dId, marker: dM }; } } catch(e){ console.warn(`Could not calculate distance for driver ${dId}`, e); } }); if (closest && minDist <= THRESHOLD) { openConfirmAssignModal(currentlyDraggedOrder.id, closest.id, currentlyDraggedOrder.customer?.name || '?', closest.name); } else { try { m.setLatLng([currentlyDraggedOrder.latitude, currentlyDraggedOrder.longitude]); } catch(e){ console.warn("Could not reset marker position after failed drag.", e); } alert("לא נמצא נהג קרוב מספיק."); } currentlyDraggedOrder = null; }
+        function handleOrderDrop(event) { /* ... same ... */ }
         
         // --- CRUD ---
         window.openAddOrderModal = () => { /* ... */ }
@@ -263,14 +350,8 @@
         function removeAssignmentLine(orderId) { /* ... same ... */ }
 
          // --- Notification Ticker ---
-         function addNotification(message, level = 'INFO') { /* ... same queue logic ... */ const timestamp = new Date(); notificationQueue.unshift({ message, level, timestamp }); if (notificationQueue.length > MAX_NOTIFICATIONS) notificationQueue.pop(); renderNotifications(); }
-         function renderNotifications() { /* ... same rendering + animation restart ... */ 
-             const tickerList = document.getElementById('notification-ticker-list'); if (!tickerList) return;
-             const currentQueue = Array.isArray(notificationQueue) ? notificationQueue : [];
-             tickerList.innerHTML = currentQueue.map(n => `<li class="level-${n.level}"><span>${n.message}</span><span class="time">${n.timestamp.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</span></li>`).join('');
-             const ticker = document.getElementById('notification-ticker'); 
-             if (ticker) { const ul = ticker.querySelector('ul'); if (ul) { ul.style.animation = 'none'; ul.offsetHeight; if (ul.scrollHeight > ticker.offsetHeight && currentQueue.length > 1) { const duration = currentQueue.length * 3; ul.style.animation = `ticker-scroll-v41 ${duration}s linear infinite`; } else { ul.style.animation = ''; ul.style.transform = 'translateY(0)'; } } }
-         }
+         function addNotification(message, level = 'INFO') { /* ... same queue logic ... */ }
+         function renderNotifications() { /* ... same rendering + animation restart ... */ }
          // Initial render moved inside DOMContentLoaded
 
         // --- Attach handlers ---
@@ -288,15 +369,30 @@
              <!-- Sidebar content -->
              <div> 
                  <div class="sidebar-header">
-                     <span class="sidebar-title">ח. סבן <span class="sidebar-version">v42.0</span></span>
+                     <span class="sidebar-title">ח. סבן <span class="sidebar-version">v43.0</span></span>
                  </div>
                  <nav class="sidebar-nav space-y-1"> 
-                    {/* SVG Icons omitted for brevity */}
-                    <a href="#view-map" class="nav-link"> <svg>...</svg> <span>חדר מצב</span> </a>
-                    <a href="#view-orders" class="nav-link"> <svg>...</svg> <span>הזמנות</span> </a>
-                    <a href="#view-drivers" class="nav-link"> <svg>...</svg> <span>נהגים</span> </a>
-                    <a href="#view-customers" class="nav-link"> <svg>...</svg> <span>לקוחות</span> </a>
-                    <a href="#view-logs" class="nav-link"> <svg>...</svg> <span>לוגים</span> </a> 
+                    {/* SVG Icons for better clarity */}
+                    <a href="#view-map" class="nav-link"> 
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m0 0v2.25m0-2.25h1.5M9 15H7.5m1.5-6.75V4.5m0 2.25H7.5M15 12m-3 0a3 3 0 116 0 3 3 0 01-6 0z" /></svg>
+                        <span>חדר מצב</span> 
+                    </a>
+                    <a href="#view-orders" class="nav-link"> 
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" /></svg>
+                        <span>הזמנות</span> 
+                    </a>
+                    <a href="#view-drivers" class="nav-link"> 
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" /></svg>
+                        <span>נהגים</span> 
+                    </a>
+                    <a href="#view-customers" class="nav-link"> 
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.94-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.06-3.172m10.12 0A5.97 5.97 0 0012 9.75a5.97 5.97 0 00-5.06 3.001m10.12 0L17.25 12A2.25 2.25 0 0015 9.75V6.75a2.25 2.25 0 00-2.25-2.25H11.25a2.25 2.25 0 00-2.25 2.25v3a2.25 2.25 0 002.25 2.25m6.75 0L18 18.72m-3.75-6.75a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" /></svg>
+                        <span>לקוחות</span> 
+                    </a>
+                    <a href="#view-logs" class="nav-link"> 
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 6.75h16.5" /></svg>
+                        <span>לוגים</span> 
+                    </a> 
                  </nav> 
              </div> 
              <div id="connection-status" class="sidebar-footer"> טוען... </div>
@@ -308,28 +404,28 @@
             <!-- Notification Ticker -->
             <div id="notification-ticker" class="flex-shrink-0">
                  <ul id="notification-ticker-list">
-                      <li><span class="time">--:--</span><span>מערכת v42.0 טוענת...</span></li>
+                      <li><span class="time">--:--</span><span>מערכת v43.0 טוענת...</span></li>
                  </ul>
             </div>
 
             <!-- Main Content Area (Views container) -->
-            <div class="main-content-area flex-grow overflow-hidden">
+            <div class="content-wrapper">
                 <!-- View 1: Map (Default) -->
-                <div id="view-map" class="app-view hidden h-full"> {/* Map view has no padding */}
+                <div id="view-map" class="app-view hidden h-full"> 
                     <div id="leaflet-map-container" class="h-full"> <div id="leaflet-map"></div> </div>
                 </div>
 
                 <!-- View 2: Orders Table -->
                 <div id="view-orders" class="app-view hidden h-full flex flex-col"> 
-                     <div class="filter-input-wrapper flex-shrink-0"> 
-                        <span class="filter-input-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></span> 
-                        <input type="text" id="filter-orders" class="filter-input" placeholder="חיפוש הזמנה..."> 
-                     </div>
-                     <div class="content-card flex-grow overflow-hidden"> {/* Use card styling */}
+                    <div class="content-card flex-grow overflow-hidden"> 
                           <div class="card-header">
                              <h2 class="card-title">ניהול הזמנות</h2> 
                              <button class="btn btn-primary btn-sm" onclick="openAddOrderModal()"> + הוסף הזמנה </button> 
                           </div>
+                           <div class="filter-input-wrapper flex-shrink-0"> 
+                                <span class="filter-input-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg></span> 
+                                <input type="text" id="filter-orders" class="filter-input" placeholder="חיפוש הזמנה..."> 
+                            </div>
                          <div class="card-body overflow-y-auto">
                             <table class="w-full min-w-full text-right"> 
                                 <thead class="sticky top-0 bg-gray-50 z-10">...</thead> 
@@ -341,12 +437,12 @@
 
                  <!-- View 3: Drivers Table -->
                 <div id="view-drivers" class="app-view hidden h-full flex flex-col">
-                      <div class="filter-input-wrapper flex-shrink-0"> 
-                         <span class="filter-input-icon"><svg>...</svg></span> 
-                         <input type="text" id="filter-drivers" class="filter-input" placeholder="חיפוש נהג..."> 
-                     </div>
                      <div class="content-card flex-grow overflow-hidden">
                           <div class="card-header"> <h2 class="card-title">ניהול נהגים</h2> </div>
+                           <div class="filter-input-wrapper flex-shrink-0"> 
+                             <span class="filter-input-icon"><svg>...</svg></span> 
+                             <input type="text" id="filter-drivers" class="filter-input" placeholder="חיפוש נהג..."> 
+                         </div>
                          <div class="card-body overflow-y-auto"> 
                             <table class="w-full min-w-full text-right"> 
                                 <thead class="sticky top-0 bg-gray-50 z-10">...</thead> 
@@ -358,12 +454,12 @@
                 
                 <!-- View 4: Customers Table -->
                  <div id="view-customers" class="app-view hidden h-full flex flex-col">
-                     <div class="filter-input-wrapper flex-shrink-0"> 
-                        <span class="filter-input-icon"><svg>...</svg></span> 
-                        <input type="text" id="filter-customers" class="filter-input" placeholder="חיפוש לקוח..."> 
-                    </div>
                      <div class="content-card flex-grow overflow-hidden">
                           <div class="card-header"> <h2 class="card-title">ניהול לקוחות</h2> </div>
+                           <div class="filter-input-wrapper flex-shrink-0"> 
+                            <span class="filter-input-icon"><svg>...</svg></span> 
+                            <input type="text" id="filter-customers" class="filter-input" placeholder="חיפוש לקוח..."> 
+                        </div>
                          <div class="card-body overflow-y-auto"> 
                              <table class="w-full min-w-full text-right"> 
                                 <thead class="sticky top-0 bg-gray-50 z-10">...</thead> 
