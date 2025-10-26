@@ -1,4 +1,5 @@
-// config.js (v44.0)
+// config.js (v45.0)
+// v45.0: הוספת ייצוא של authReady Promise
 // קובץ הגדרות מרכזי לכלל האפליקציה
 // משתמש ב-SDK v9 (Modular)
 
@@ -24,18 +25,19 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app, 'europe-west1'); // בחר את האזור שלך
 
-// התחברות אנונימית אוטומטית לכל סשן
-const connect = async () => {
-    try {
-        await signInAnonymously(auth);
-        console.log("Firebase Connected Anonymously.");
-    } catch (error) {
-        console.error("Firebase Anonymous Auth Failed", error);
-    }
-};
+// v45.0: התחברות אנונימית אוטומטית, מחזירה Promise
+const authReady = new Promise((resolve, reject) => {
+    signInAnonymously(auth)
+        .then((userCredential) => {
+            console.log("Firebase Connected Anonymously.", userCredential.user.uid);
+            resolve(userCredential.user);
+        })
+        .catch((error) => {
+            console.error("Firebase Anonymous Auth Failed", error);
+            reject(error);
+        });
+});
 
-// הפעל התחברות מיידית
-connect();
 
-// ייצוא הרכיבים לשימוש במודולים אחרים
-export { app, auth, db, functions };
+// ייצוא הרכיבים וה-Promise
+export { app, auth, db, functions, authReady };
