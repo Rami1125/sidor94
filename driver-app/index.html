@@ -24,7 +24,7 @@
     <!-- Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
 
-    <!-- v52.3: Load Firebase COMPAT SDKs first (Step 3) -->
+    <!-- v54.0: Load Firebase COMPAT SDKs first (Step 3) -->
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
@@ -130,11 +130,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
 
-    <!-- v54.1: Main application logic using compat SDK and window.onload -->
+    <!-- v54.0: Main application logic using compat SDK and window.onload -->
     <script>
-        console.log('Driver App script started (v53.5)'); // v53.5
+        // v54.0: Removed type="module" for compat SDK
+        console.log('Driver App script started (v54.0)');
 
-        // --- Config Logic (v53.5: FINAL CORRECTED CONFIG) ---
+        // --- Config Logic ---
         const firebaseConfig = {
              apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
              authDomain: "saban94-78949.firebaseapp.com",
@@ -147,7 +148,7 @@
         let app, auth, db; let initializationError = null;
         let authReadyPromise = null;
 
-        // v53.5: SmartLog Default Definition (Sync)
+        // v54.0: SmartLog Default Definition (Sync)
         window.SmartLog = function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
             const prefix = `[${origin} ${level}]`;
             const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log);
@@ -172,7 +173,23 @@
         }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
-        async function ensureAuth() { /* ... Logic ... */ }
+        // v54.0: ensureAuth uses async/await which is generally safe in modern browsers
+        async function ensureAuth() {
+            console.log("ensureAuth (v54.0): Starting..."); let tries = 0;
+            while (tries < MAX_AUTH_RETRIES) {
+                tries++;
+                try {
+                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
+                    if (!auth) throw new Error("Auth object missing");
+                    if (auth.currentUser) { console.log("ensureAuth: Already authenticated.", auth.currentUser.uid); return auth.currentUser; }
+                    console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
+                    const userCredential = await auth.signInAnonymously();
+                    if (!userCredential?.user?.uid) { throw new Error("Invalid user object from Auth."); }
+                    console.log("ensureAuth: Success.", userCredential.user.uid);
+                    return userCredential.user;
+                } catch (e) { console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message); if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; } console.log(`Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS)); }
+            } throw new Error("ensureAuth: Max retries reached.");
+        }
         if (!initializationError && auth) {
              authReadyPromise = ensureAuth();
         } else {
@@ -180,7 +197,7 @@
         }
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v53.5: Overwrite with Async DB Writer) ---
+        // --- SmartLog Logic (v54.0: Overwrite with Async DB Writer) ---
         console.warn("SmartLog: ❗❗❗ ודא שחוקי האבטחה מאפשרים כתיבה ל־'system_logs_v3'. ❗❗❗");
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
         let canWriteToFirestore = null;
@@ -231,7 +248,11 @@
                 criticalErrorDisplay: document.getElementById('critical-error-display'), criticalErrorMessage: document.getElementById('critical-error-message'),
                 errorSuggestion: document.getElementById('error-suggestion'),
                 appContainer: document.getElementById('app-container'),
-                loginContainer: document.getElementById('login-container')
+                loginContainer: document.getElementById('login-container'),
+                loginForm: document.getElementById('login-form'), // New
+                nameInput: document.getElementById('driver-name-input'), // New
+                loginButton: document.getElementById('login-btn'), // New
+                errorMessageEl: document.getElementById('error-message') // New
              };
              SmartLog("DOM elements referenced.", "INFO", "Init.DOM");
 
@@ -241,12 +262,11 @@
              if (missingElements.length > 0) {
                  const msg = `Missing DOM elements: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return;
              }
-             SmartLog(`Initializing Driver App (v53.5) on ${getDeviceType()}`, "INFO", "Init"); // v53.5
+             SmartLog(`Initializing Driver App (v54.0) on ${getDeviceType()}`, "INFO", "Init"); // v54.0
 
             try {
                 // Display driver name immediately
-                // FIX: Check if DOM elements exist before setting textContent
-                if (DOM.driverNameDisplay) DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`;
+                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`;
                 SmartLog("Driver ID found.", "INFO", "Auth");
 
                 // Step 2: Wait for Firebase Auth
@@ -305,6 +325,54 @@
         function registerServiceWorker() { /* ... */ }
         function getDeviceType() { /* ... */ }
 
+        // --- Setup Login ---
+        function setupLogin() {
+            const loginForm = DOM.loginForm;
+            const nameInput = DOM.nameInput;
+            const loginButton = DOM.loginButton;
+            const errorMsgEl = DOM.errorMessageEl;
+            const loadingSpinner = document.getElementById('loading-spinner');
+
+            if (!loginForm) {
+                 SmartLog("Login form element missing!", "ERROR", "Login");
+                 return;
+            }
+
+            loginForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                errorMsgEl.textContent = '';
+                const driverName = nameInput.value.trim();
+
+                if (!driverName) {
+                    errorMsgEl.textContent = 'אנא הזן שם נהג.';
+                    return;
+                }
+
+                loginButton.disabled = true;
+                loadingSpinner.classList.remove('hidden');
+
+                try {
+                    localStorage.setItem('driverId', driverName);
+                    localStorage.setItem('driverName', driverName);
+                    SmartLog(`Login success. Name=${driverName}. Starting app.`, "INFO", "Login");
+                    
+                    // Hide login, show app, and call the initializer function
+                    loginButton.textContent = 'מתחבר...';
+                    DOM.loginContainer.style.display = 'none';
+                    DOM.appContainer.style.display = 'flex';
+                    initializeDriverApp();
+
+                } catch (error) {
+                    console.error("Error saving to localStorage:", error);
+                    errorMsgEl.textContent = 'שגיאה: לא ניתן לשמור פרטי התחברות.';
+                    loginButton.disabled = false;
+                    loginButton.textContent = 'כניסה לאפליקציה';
+                    loadingSpinner.classList.add('hidden');
+                    SmartLog(`Login failed.`, "ERROR", "Login");
+                }
+            });
+        }
+
 
         // --- Start Application (v53.5: Using DOMContentLoaded) ---
         console.log("Attaching DOMContentLoaded listener (v53.5)...");
@@ -312,7 +380,7 @@
             console.log('DOMContentLoaded fired (v53.5). Running initialization...');
             if (typeof SmartLog === 'undefined') { /* ... Fallback ... */ }
             try {
-                // Initialize DOM elements here (essential for initial check and SmartLog)
+                // Initialize DOM elements here to ensure availability
                 DOM.driverNameDisplay = document.getElementById('driver-name-display');
                 DOM.statusIndicator = document.getElementById('status-indicator');
                 DOM.statusText = document.getElementById('status-text');
@@ -328,21 +396,27 @@
                 DOM.criticalErrorDisplay = document.getElementById('critical-error-display');
                 DOM.criticalErrorMessage = document.getElementById('critical-error-message');
                 DOM.errorSuggestion = document.getElementById('error-suggestion');
+                DOM.loginContainer = document.getElementById('login-container');
+                DOM.appContainer = document.getElementById('app-container');
+                DOM.loginForm = document.getElementById('login-form');
+                DOM.nameInput = document.getElementById('driver-name-input');
+                DOM.loginButton = document.getElementById('login-btn');
+                DOM.errorMessageEl = document.getElementById('error-message');
                 
                 
                 // --- Check Login Status and Redirect/Start ---
                  const storedId = localStorage.getItem('driverId');
                  if (!storedId) {
                      // Not logged in: Show login, attach handler
-                     document.getElementById('login-container').style.display = 'flex';
-                     document.getElementById('app-container').style.display = 'none';
-                     setupLogin();
+                     if(DOM.loginContainer) DOM.loginContainer.style.display = 'flex';
+                     if(DOM.appContainer) DOM.appContainer.style.display = 'none';
+                     setupLogin(); // Attach event listener to login form
                      return; // Stop initialization
                  }
 
                  // Logged in: Hide login, show app
-                 document.getElementById('login-container').style.display = 'none';
-                 document.getElementById('app-container').style.display = 'flex';
+                 if(DOM.loginContainer) DOM.loginContainer.style.display = 'none';
+                 if(DOM.appContainer) DOM.appContainer.style.display = 'flex';
 
 
                 SmartLog("DOMContentLoaded fired.", "INFO", "Init");
