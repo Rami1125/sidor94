@@ -97,7 +97,8 @@
     </div>
 
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxelIUS1M4vJ-r_fAuZoyzZDL9iC6Hcop-3_Eg_lLiSdWZVTQXnOpSSlGhxGjhojxot/exec';
+        // --- FIX: Updated API URL ---
+        const API_URL = 'https://script.google.com/macros/s/AKfycbwc6sMzYWKm61T1dv_HHrNCwKKYpovUIC8_Xy0ghhiB8UjtnEZKjZnjqMDNCRHKVIwB/exec';
         
         const loginView = document.getElementById('loginView');
         const mainView = document.getElementById('mainView');
@@ -112,8 +113,14 @@
         let refreshInterval;
         let knownOrderIds = new Set();
 
+        // --- NEW: "מלשינון" Logger ---
         function logEvent(message, type = 'info', data = '') {
-            console.log(`[${type.toUpperCase()}] ${new Date().toLocaleTimeString()}: ${message}`, data);
+            const styles = {
+                info: 'color: #03a9f4;',
+                success: 'color: #4caf50; font-weight: bold;',
+                error: 'color: #f44336; font-weight: bold;',
+            };
+            console.log(`%c[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}]`, styles[type], message, data);
         }
 
         window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -127,7 +134,6 @@
             }
         });
 
-        // --- FIX: Restored full function implementations ---
         function initializeApp(oneSignalFailed = false) {
             logEvent("Initializing app...");
             loginBtn.addEventListener('click', () => onLogin(oneSignalFailed));
@@ -166,10 +172,10 @@
         }
         
         function startPolling() {
-            logEvent("Starting to poll for orders...");
+            logEvent("Starting to poll for orders every 20 seconds.");
             if (refreshInterval) clearInterval(refreshInterval);
             const poll = async () => { await fetchWarehouseOrders(); };
-            poll();
+            poll(); // Initial fetch
             refreshInterval = setInterval(poll, 20000);
         }
 
@@ -178,31 +184,46 @@
             logEvent(`Fetching orders for warehouse: ${currentManager.warehouse}...`);
             try {
                 const response = await fetch(`${API_URL}?action=getWarehouseOrders&warehouse=${currentManager.warehouse}`);
-                if (!response.ok) throw new Error(`Server returned error: ${response.status}`);
+                logEvent(`Fetch response status: ${response.status}`);
+
+                if (!response.ok) {
+                    throw new Error(`שרת החזיר שגיאה: ${response.status} ${response.statusText}`);
+                }
                 const result = await response.json();
+                
                 if (result.status === 'success' && Array.isArray(result.data)) {
                     logEvent(`Successfully fetched ${result.data.length} orders.`, 'success');
                     renderOrders(result.data);
-                } else {
-                    throw new Error(result.message || 'Invalid data format from server');
+                } else { 
+                    throw new Error(result.message || 'פורמט הנתונים שהתקבל מהשרת שגוי.'); 
                 }
             } catch (error) {
-                logEvent('Error fetching orders', 'error', error);
-                newOrdersList.innerHTML = `<p style="color:red;">שגיאת תקשורת עם השרת.</p>`;
+                logEvent("Error fetching warehouse orders", 'error', error);
+                newOrdersList.innerHTML = `<p style="color:red; font-weight:bold;">שגיאת תקשורת עם השרת: ${error.message}</p>`;
             }
         }
-
+        
         function renderOrders(orders) {
             newOrdersList.innerHTML = '';
             inProgressOrdersList.innerHTML = '';
             
+            // --- FIX: Flexible status filtering ---
             const NEW_ORDER_STATUSES = ['ממתין לאישור מחסן', 'חדש', 'חדשה'];
             const newOrders = orders.filter(o => NEW_ORDER_STATUSES.includes(o.status));
+            // --- END FIX ---
+            
             const inProgress = orders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
 
             if (knownOrderIds.size > 0) {
                 const newIncomingIds = new Set(newOrders.map(o => o.orderId));
-                if ([...newIncomingIds].some(id => !knownOrderIds.has(id))) {
+                let hasNewOrder = false;
+                newIncomingIds.forEach(id => {
+                    if (!knownOrderIds.has(id)) {
+                        hasNewOrder = true;
+                    }
+                });
+                if (hasNewOrder) {
+                    logEvent("New order detected, playing sound.");
                     playNotificationSound();
                 }
             }
@@ -218,9 +239,9 @@
         function createOrderCard(order, type) {
             let buttonHtml = '';
             if (type === 'acknowledge') {
-                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.orderId}', 'באיסוף', 'acknowledge')">אשר קבלת הזמנה</button>`;
+                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.orderId}', 'באיסוף')">אשר קבלת הזמנה</button>`;
             } else if (order.status === 'באיסוף') {
-                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.orderId}', 'טעון', 'load')">סמן כטעון</button>`;
+                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.orderId}', 'טעון')">סמן כטעון</button>`;
             } else {
                  buttonHtml = `<p style="color:var(--success); font-weight:bold; text-align:center; margin-top: 15px;">הועמס בהצלחה ✔️</p>`;
             }
@@ -234,38 +255,22 @@
                 </div>`;
         }
         
-        async function updateOrderStatus(event, orderId, newStatus, type) {
+        async function updateOrderStatus(event, orderId, newStatus) {
             logEvent(`Updating order ${orderId} to status: ${newStatus}`);
             const btn = event.target;
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעדכן...';
              try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } }),
-                    redirect: 'follow'
+                await fetch(API_URL, {
+                    method: 'POST', mode: 'no-cors',
+                    body: JSON.stringify({ action: 'updateOrder', data: { orderId, updates: { status: newStatus } } })
                 });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-
-                const result = await response.json();
-                if (result.status !== 'success') {
-                    throw new Error(result.message || 'Unknown server error');
-                }
-
                 logEvent(`Update request sent for order ${orderId}.`, 'success');
                 setTimeout(fetchWarehouseOrders, 1000);
             } catch (error) {
                 logEvent(`Error updating status for order ${orderId}`, 'error', error);
                 btn.disabled = false;
-                btn.innerHTML = 'שגיאה! נסה שוב';
-                setTimeout(() => {
-                    btn.innerHTML = type === 'acknowledge' ? 'אשר קבלת הזמנה' : 'סמן כטעון';
-                }, 3000);
+                btn.innerHTML = 'נסה שוב';
             }
         }
         
@@ -274,25 +279,26 @@
                 await Tone.start();
                 const synth = new Tone.Synth().toDestination();
                 synth.triggerAttackRelease("C5", "8n");
-            } catch(e) {
-                console.error('Could not play sound', e);
+                logEvent("Notification sound played.", 'info');
+            } catch (e) {
+                logEvent("Could not play notification sound", 'error', e);
             }
         }
-        
+
         function switchView(viewId) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
         }
-
+        
         async function initializeNotifications(managerId) {
-            try {
+             try {
                 await OneSignal.Notifications.requestPermission();
                 await OneSignal.login(managerId);
                 const playerId = OneSignal.User.onesignalId;
                 if (playerId) {
+                    logEvent(`Registering device with OneSignal Player ID for manager ${managerId}`);
                     await fetch(API_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
+                        method: 'POST', mode: 'no-cors',
                         body: JSON.stringify({ 
                             action: 'registerWarehouseDevice', 
                             data: { managerId, deviceId: playerId } 
