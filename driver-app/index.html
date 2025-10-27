@@ -24,10 +24,10 @@
     <!-- Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
 
-    <!-- v52.3: Load Firebase COMPAT SDKs first (Step 3) -->
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    <!-- v54.3: Load Firebase MODULAR SDKs in head (no compat) -->
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"></script>
 
 
     <style>
@@ -144,9 +144,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
 
-    <!-- v54.0: Main application logic using compat SDK and window.onload -->
-    <script>
-        console.log('Driver App script started (v54.2)'); // v54.2
+    <!-- v54.3: Main application logic using MODULAR SDK -->
+    <script type="module">
+        console.log('Driver App script started (v54.3)'); // v54.3
+
+        // --- Firebase SDK Imports ---
+        // (Step 3: Import Modular SDK functions into the module scope)
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc, where, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        console.log("Firebase Modular SDKs imported.");
+
 
         // --- Config Logic ---
         const firebaseConfig = {
@@ -161,7 +169,7 @@
         let app, auth, db; let initializationError = null;
         let authReadyPromise = null;
 
-        // v54.1: SmartLog Default Definition (Sync)
+        // v54.3: SmartLog Default Definition (Sync)
         window.SmartLog = function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
             const prefix = `[${origin} ${level}]`;
             const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log);
@@ -171,13 +179,10 @@
 
 
         try {
-             if (typeof firebase === 'undefined') { throw new Error('Firebase SDK global object not found.'); }
-            app = firebase.initializeApp(firebaseConfig);
+            app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
             console.log("✅ Firebase App initialized successfully.");
-            auth = firebase.auth();
-            db = firebase.firestore();
-            console.log('Firebase SDK object:', firebase);
-            console.log('Firestore DB object:', db);
+            auth = getAuth(app);
+            db = getFirestore(app);
             if (!db) { throw new Error("Firestore DB invalid."); }
             console.log("✅ Firestore connected");
         } catch (error) {
@@ -188,7 +193,7 @@
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
         // ensureAuth uses async/await which is generally safe in modern browsers
         async function ensureAuth() {
-            console.log("ensureAuth (v54.2): Starting..."); let tries = 0;
+            console.log("ensureAuth (v54.3): Starting..."); let tries = 0;
             while (tries < MAX_AUTH_RETRIES) {
                 tries++;
                 try {
@@ -196,7 +201,7 @@
                     if (!auth) throw new Error("Auth object missing");
                     if (auth.currentUser) { console.log("ensureAuth: Already authenticated.", auth.currentUser.uid); return auth.currentUser; }
                     console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
-                    const userCredential = await auth.signInAnonymously();
+                    const userCredential = await signInAnonymously(auth);
                     if (!userCredential?.user?.uid) { throw new Error("Invalid user object from Auth."); }
                     console.log("ensureAuth: Success.", userCredential.user.uid);
                     return userCredential.user;
@@ -210,7 +215,7 @@
         }
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v54.2: Final Async DB Writer) ---
+        // --- SmartLog Logic (v54.3: Final Async DB Writer) ---
         console.warn("SmartLog: ❗❗❗ ודא שחוקי האבטחה מאפשרים כתיבה ל־'system_logs_v3'. ❗❗❗");
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
         let canWriteToFirestore = null;
@@ -223,7 +228,7 @@
                 if (!db) throw new Error('Firestore unavailable');
                 await authReadyPromise;
                 if (!auth?.currentUser) throw new Error("Not authenticated");
-                await db.collection(LOG_COLLECTION).add({ message: String(msg), level, origin, context: { ...context, sessionId }, category, solution, timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId: auth.currentUser.uid });
+                await addDoc(collection(db, LOG_COLLECTION), { message: String(msg), level, origin, context: { ...context, sessionId }, category, solution, timestamp: serverTimestamp(), userId: auth.currentUser.uid });
                 if (canWriteToFirestore === null) { console.log("SmartLog: ✅ FS write confirmed."); canWriteToFirestore = true; }
             } catch (err) {
                 if (canWriteToFirestore === null || canWriteToFirestore === true) { console.warn(`SmartLog: FS write failed (${err.message}). Console only.`, err); try { localStorage.setItem('SL_Backup_' + Date.now(), JSON.stringify({ msg, level, origin, context, ts: new Date().toISOString() })); } catch (lsError) {} }
@@ -235,7 +240,8 @@
 
 
         // --- Driver App Logic ---
-        let map; let driverMarker; let currentDriverId = null; let currentDriverName = null; let watchId = null; let currentOrders = {}; let notificationAudio = null; let hasNotificationPermission = false; let hasGeolocationPermission = false; let lastLocationUpdate = 0;
+        let map; let driverMarker; let currentOrderMarker; // v54.3: New marker for order
+        let currentDriverId = null; let currentDriverName = null; let watchId = null; let currentOrders = {}; let notificationAudio = null; let hasNotificationPermission = false; let hasGeolocationPermission = false; let lastLocationUpdate = 0;
         let DOM = {};
         let appInitialized = false;
 
@@ -275,7 +281,7 @@
              if (missingElements.length > 0) {
                  const msg = `Missing DOM elements: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return;
              }
-             SmartLog(`Initializing Driver App (v54.2) on ${getDeviceType()}`, "INFO", "Init"); // v54.2
+             SmartLog(`Initializing Driver App (v54.3) on ${getDeviceType()}`, "INFO", "Init"); // v54.3
 
             try {
                 // Display driver name immediately
@@ -325,18 +331,20 @@
         function startGeolocation() { /* ... */ }
         async function updateLocationInFirestore(lat, lng) { /* ... */ }
         async function updateLocationText(lat, lng) { /* ... */ }
+        
+        // v54.3: Init Map now resolves when map is truly ready
         async function initMap() {
              SmartLog("initMap: Starting...", "INFO", "Map.Init");
              try {
                  if (map) map.remove();
 
-                 // v54.2 FIX: Use reliable OSM tile server
+                 // Use reliable OSM tile server
                  const osmTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
                     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                  });
 
-                 // v54.2 FIX: Center map on Israel's center
+                 // Center map on Israel's center
                  map = L.map(DOM.mapElement).setView([32.0853, 34.7818], 13);
                  osmTileLayer.addTo(map);
 
@@ -356,7 +364,87 @@
                  throw e;
              }
         }
-        function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
+        
+        // v54.3: Update marker logic to include order marker display and map centering
+        function updateDriverMarkerOnMap(lat, lng) {
+             if (!map) return;
+             const latLng = [lat, lng];
+
+             // 1. Update/create Driver Marker (Blue Circle)
+             if (driverMarker) {
+                 driverMarker.setLatLng(latLng);
+             } else {
+                 driverMarker = L.circleMarker(latLng, { radius: 8, fillColor: "#3a86ff", color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.8 }).addTo(map);
+                 SmartLog("Driver marker added.", "Map");
+             }
+
+             // 2. Check for nearest assigned order and update its marker
+             const nearestOrder = findNearestAssignedOrder(lat, lng);
+             if (nearestOrder) {
+                 const orderLatLng = [nearestOrder.latitude, nearestOrder.longitude];
+                 const orderAddress = nearestOrder.address;
+
+                 // Update/create Order Marker (Red Pin)
+                 if (currentOrderMarker) {
+                     currentOrderMarker.setLatLng(orderLatLng);
+                 } else {
+                     currentOrderMarker = L.marker(orderLatLng, {
+                        icon: L.divIcon({
+                            className: 'order-pin', // Use the custom CSS pin
+                            iconSize: [25, 25],
+                            iconAnchor: [12.5, 12.5]
+                        })
+                     }).addTo(map);
+                     currentOrderMarker.bindPopup(`<b>משימה:</b> ${orderAddress}`).openPopup();
+                 }
+                 
+                 // 3. Center/Zoom map to show both driver and order
+                 const bounds = L.latLngBounds([latLng, orderLatLng]);
+                 map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 }); // Zoom out slightly to show context
+                 
+                 // 4. Update ETA info display
+                 updateEtaDisplay(lat, lng, orderAddress, nearestOrder.orderId);
+
+             } else {
+                 // No assigned order: center map on driver only
+                 map.panTo(latLng);
+                 // Clear old order marker if it exists
+                 if(currentOrderMarker) { map.removeLayer(currentOrderMarker); currentOrderMarker = null; }
+                 DOM.etaText.classList.add('hidden');
+             }
+        }
+
+        // v54.3: Find the nearest assigned order (simple Euclidean distance approximation)
+        function findNearestAssignedOrder(driverLat, driverLng) {
+            const activeOrders = Object.values(currentOrders).filter(o => 
+                o.status === 'שויך' && o.latitude && o.longitude
+            );
+            if (activeOrders.length === 0) return null;
+
+            let nearest = null;
+            let minDistanceSq = Infinity;
+
+            activeOrders.forEach(order => {
+                const distanceSq = Math.pow(order.latitude - driverLat, 2) + Math.pow(order.longitude - driverLng, 2);
+                if (distanceSq < minDistanceSq) {
+                    minDistanceSq = distanceSq;
+                    nearest = order;
+                }
+            });
+            return nearest;
+        }
+
+        // v54.3: Calculate and display distance/ETA
+        function updateEtaDisplay(driverLat, driverLng, targetAddress, orderId) {
+             const distKm = map.distance([driverLat, driverLng], [nearestOrder.latitude, nearestOrder.longitude]) / 1000;
+             const avgSpeedKpH = 40; // Assumed average speed in city driving
+             const timeHours = distKm / avgSpeedKpH;
+             const timeMinutes = Math.max(5, Math.ceil(timeHours * 60)); // Minimum 5 minutes
+
+             DOM.etaText.textContent = `ממך לכתובת: ${targetAddress.split(',')[0]} | ${distKm.toFixed(1)} ק"מ | כ- ${timeMinutes} דק'.`;
+             DOM.etaText.classList.remove('hidden');
+        }
+
         function listenToOrders() { /* ... */ }
         function renderOrderList() { /* ... */ }
         function createOrderCard(order) { /* ... */ }
@@ -418,10 +506,10 @@
         }
 
 
-        // --- Start Application (v54.2: Using DOMContentLoaded) ---
-        console.log("Attaching DOMContentLoaded listener (v54.2)...");
+        // --- Start Application (v54.3: Using DOMContentLoaded) ---
+        console.log("Attaching DOMContentLoaded listener (v54.3)...");
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (v54.2). Running initialization...');
+            console.log('DOMContentLoaded fired (v54.3). Running initialization...');
             if (typeof SmartLog === 'undefined') { /* ... Fallback ... */ }
             try {
                 // Initialize DOM elements here to ensure availability
