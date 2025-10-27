@@ -25,7 +25,6 @@
     <script src="https://unpkg.com/feather-icons"></script>
 
     <!-- v52.3: Load Firebase COMPAT SDKs first (Step 3) -->
-    <!-- שימוש ב-compat כדי לחשוף את האובייקט הגלובלי 'firebase' -->
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
@@ -103,11 +102,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
 
-    <!-- v52.4: Main application logic using compat SDK -->
+    <!-- v53.1: Main application logic using compat SDK -->
     <script>
-        console.log('Driver App script starting (v52.4)');
+        console.log('Driver App script starting (v53.1)'); // v53.1
 
-        // --- Config Logic (Step 4) ---
+        // --- Config Logic ---
         const firebaseConfig = {
              apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
              authDomain: "saban94-78949.firebaseapp.com",
@@ -121,24 +120,24 @@
         let authReadyPromise = null;
 
         try {
-             // Step 3 verification
-             if (typeof firebase === 'undefined') { throw new Error('Firebase SDK global object not found. Check script loading order.'); }
+             if (typeof firebase === 'undefined') { throw new Error('Firebase SDK global object not found.'); }
             app = firebase.initializeApp(firebaseConfig);
-            console.log("✅ Firebase App initialized successfully."); // Step 9 verification
+            console.log("✅ Firebase App initialized successfully.");
             auth = firebase.auth();
             db = firebase.firestore();
             console.log('Firebase SDK object:', firebase);
             console.log('Firestore DB object:', db);
             if (!db) { throw new Error("Firestore DB invalid."); }
-            console.log("✅ Firestore connected"); // Step 9 verification
+            console.log("✅ Firestore connected");
         } catch (error) {
              console.error("❌ CRITICAL: Firebase init failed!", error); initializationError = error;
              try { document.getElementById('status-text').textContent = `Firebase Error: ${error.message}`; } catch(e){}
         }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
+        // v53.1: ensureAuth adapted to use global auth object
         async function ensureAuth() {
-            console.log("ensureAuth (v52.4): Starting..."); let tries = 0;
+            console.log("ensureAuth (v53.1): Starting..."); let tries = 0;
             while (tries < MAX_AUTH_RETRIES) {
                 tries++;
                 try {
@@ -153,6 +152,7 @@
                 } catch (e) { console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message); if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; } console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS)); }
             } throw new Error("ensureAuth: Max retries reached.");
         }
+        // Create the promise only if initialization didn't fail
         if (!initializationError && auth) {
              authReadyPromise = ensureAuth();
         } else {
@@ -160,12 +160,11 @@
         }
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v52.4: Global function using global db/auth) ---
+        // --- SmartLog Logic (v53.1: Global function using global db/auth) ---
         console.warn("SmartLog: ❗❗❗ ודא שחוקי האבטחה מאפשרים כתיבה ל־'system_logs_v3'. ❗❗❗");
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
         let canWriteToFirestore = null;
 
-        // Step 8: Define SmartLog globally
         window.SmartLog = async function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
             const prefix = `[${origin} ${level}]`; const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log); logFn(`${prefix} ${msg}`, context);
             if (canWriteToFirestore === false) return;
@@ -191,15 +190,25 @@
 
         // --- Initialization ---
         async function initializeDriverApp() {
-             // Ensure SmartLog exists (fallback)
-             if (typeof SmartLog === 'undefined') { window.SmartLog = function(msg, level='INFO', origin='Fallback') { console.log(`[${origin} ${level}] ${msg}`); }; console.warn("Using basic SmartLog fallback."); }
+             // v53.1: Moved localStorage check outside of try block for redirect
+             const storedId = localStorage.getItem('driverId');
+             const storedName = localStorage.getItem('driverName');
 
+             if (!storedId || !storedName) {
+                 console.warn("Driver ID not found in localStorage. Redirecting to login.html.");
+                 window.location.href = 'login.html'; // Redirect to login page
+                 return; // Stop execution
+             }
+             currentDriverId = storedId;
+             currentDriverName = storedName;
+             
+             // Initial check passed, continue with SmartLog initialization
              SmartLog('🚀 Driver App initializeDriverApp loaded', 'INFO', 'Init');
              if (appInitialized) { SmartLog("Init called multiple times.", "WARN", "Init.Duplicate"); return; }
              appInitialized = true;
 
              // Define DOM elements FIRST
-             DOM = {
+             DOM = { /* ... DOM elements ... */
                 driverNameDisplay: document.getElementById('driver-name-display'), statusIndicator: document.getElementById('status-indicator'),
                 statusText: document.getElementById('status-text'), statusDot: document.getElementById('status-dot'),
                 mapElement: document.getElementById('map'), orderList: document.getElementById('order-list'),
@@ -215,20 +224,18 @@
              const essentialIDs = ['driver-name-display', 'status-indicator', 'status-text', 'map', 'order-list'];
              const missingElements = essentialIDs.filter(id => !document.getElementById(id));
              if (missingElements.length > 0) {
-                 const msg = `Missing DOM: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return;
+                 const msg = `Missing DOM elements: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return;
              }
-             SmartLog(`Initializing Driver App (v52.4) on ${getDeviceType()}`, "INFO", "Init");
+             SmartLog(`Initializing Driver App (v53.1) on ${getDeviceType()}`, "INFO", "Init"); // v53.1
 
             try {
-                // Step 1: Check driver ID
-                SmartLog("Step 1: Checking localStorage...", "INFO", "Init");
-                currentDriverId = localStorage.getItem('driverId'); currentDriverName = localStorage.getItem('driverName');
-                if (!currentDriverId || !currentDriverName) { throw new Error("Missing driverId/Name in localStorage"); }
-                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`; SmartLog("Driver ID found.", "INFO", "Auth");
+                // Display driver name immediately
+                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`;
+                SmartLog("Driver ID found.", "INFO", "Auth");
 
                 // Step 2: Wait for Firebase Auth
                 updateStatus("ממתין לאימות...", "yellow", true); SmartLog("Step 2: Waiting for Auth...", "INFO", "Init.Auth");
-                const user = await authReadyPromise;
+                const user = await authReadyPromise; // Auth success!
                 if (!user || !user.uid) { throw new Error("Invalid user object post-auth."); }
                 SmartLog(`Auth successful. User: ${user.uid}`, "INFO", "Init.Auth");
 
@@ -260,7 +267,7 @@
             }
         }
 
-        // --- Other Functions (Implementations unchanged) ---
+        // --- Other Functions ---
         function displayCriticalError(message, errorObject = null) { /* ... */ }
         function updateStatus(text, color = "gray", pulse = false) { /* ... */ }
         function updateFinalStatus() { /* ... */ }
@@ -279,14 +286,14 @@
         function initNotifications() { /* ... */ }
         function handleNewOrderNotification() { /* ... */ }
         function stopNotificationSound() { /* ... */ }
-        function registerServiceWorker() { /* ... */ }
-        function getDeviceType() { /* ... */ }
+        function registerServiceWorker() { /* ... */ */ }
+        function getDeviceType() { const ua=navigator.userAgent; if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return "tablet"; if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) return "mobile"; return "desktop"; }
 
 
-        // --- Start Application (v52.3: Using DOMContentLoaded) ---
-        console.log("Attaching DOMContentLoaded listener (v52.3)...");
+        // --- Start Application (v53.1: Using DOMContentLoaded) ---
+        console.log("Attaching DOMContentLoaded listener (v53.1)...");
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (v52.3). Running initialization...');
+            console.log('DOMContentLoaded fired (v53.1). Running initialization...');
             if (typeof SmartLog === 'undefined') { /* ... Fallback ... */ }
             try {
                 SmartLog("DOMContentLoaded fired.", "INFO", "Init");
@@ -296,7 +303,7 @@
                 catch (e) { SmartLog("Feather fail.", "WARN", "UI", { error: e.message }); }
             } catch (criticalError) { /* ... Error Handling ... */ }
         });
-        console.log("DOMContentLoaded listener attached (v52.3).");
+        console.log("DOMContentLoaded listener attached (v53.1).");
         // HTTPS check
         if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) { console.warn("⚠️ App not on HTTPS."); } else { console.log("HTTPS check passed."); }
 
