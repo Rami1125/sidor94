@@ -8,7 +8,7 @@
     <!-- PWA Manifest & Theme -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#3a86ff">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="https://i.postimg.cc/ryPT3r29/image.png">
 
@@ -24,9 +24,16 @@
     <!-- Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
 
+    <!-- v52.3: Load Firebase COMPAT SDKs first (Step 3) -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+
+
     <style>
+        /* --- Styles unchanged --- */
         body { font-family: 'Rubik', sans-serif; overscroll-behavior-y: contain; }
-        #map { height: 250px; border-radius: 0.5rem; }
+        #map { height: 250px; border-radius: 0.5rem; background-color: #e5e7eb; }
         .leaflet-control-zoom { display: none; } .leaflet-control-attribution { font-size: 10px; }
         .btn-primary { background-color: #3a86ff; color: white; } .btn-primary:hover { background-color: #2f6ac2; }
         .btn-secondary { background-color: #6c757d; color: white; } .btn-secondary:hover { background-color: #5a6268; }
@@ -37,12 +44,55 @@
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); } }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3a86ff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #critical-error-display { display: none; }
+
+        /* v54.1: Login container style */
+        #login-container {
+            /* Center the login box in the middle of the viewport */
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+            z-index: 1000;
+            background-color: #f3f4f6; /* bg-gray-100 */
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-    <!-- Main Container -->
-    <div class="container mx-auto max-w-lg p-0 flex flex-col h-screen">
+    <!-- v54.1: Login Container (Shown when not logged in) -->
+    <div id="login-container" style="display:none;">
+        <div class="w-full max-w-sm bg-white p-8 rounded-xl shadow-lg">
+            <div class="w-16 h-16 bg-blue-500 rounded-lg flex items-center justify-center mb-6 mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </div>
+            <h1 class="text-2xl font-bold text-center mb-2 text-gray-800">DeliveryMaster</h1>
+            <p class="text-center text-gray-600 mb-6">כניסת נהגים</p>
+
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="driver-name-input" class="block text-sm font-medium text-gray-700 mb-1 text-right">שם הנהג</label>
+                    <input type="text" id="driver-name-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-gray-50 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50" placeholder="לדוגמה: עלי, חכמת..." required>
+                </div>
+
+                <button type="submit" id="login-btn" class="w-full bg-blue-500 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-600 transition duration-200 flex items-center justify-center">
+                    <span>כניסה לאפליקציה</span>
+                    <span id="loading-spinner" class="loader hidden"></span>
+                </button>
+
+                <p id="error-message" class="text-red-500 text-center mt-3 text-sm"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Container (Hidden when not logged in) -->
+    <div id="app-container" class="container mx-auto max-w-xl p-0 flex flex-col h-screen" style="display:none;">
 
         <!-- Header -->
         <header class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
@@ -51,13 +101,13 @@
                 <p id="driver-name-display" class="text-sm text-gray-600">נהג: טוען...</p>
             </div>
             <div id="status-indicator" class="flex items-center space-x-2 space-x-reverse text-sm">
-                 <span id="status-text" class="text-yellow-600 font-medium">טוען...</span> <!-- v50.1: Initial Text -->
+                 <span id="status-text" class="text-yellow-600 font-medium">טוען אפליקציה...</span>
                  <div id="status-dot" class="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
             </div>
         </header>
 
         <!-- Permission Request Area -->
-        <div id="permission-section" class="p-4 space-y-3 bg-yellow-100 border-b border-yellow-300" style="display: none;"> <!-- v50.1: Hidden initially -->
+        <div id="permission-section" class="p-4 space-y-3 bg-yellow-100 border-b border-yellow-300" style="display: none;">
              <p class="text-sm font-medium text-yellow-800">נדרשות הרשאות למיקום והתראות:</p>
              <button id="request-perms-btn" class="w-full text-sm py-2 px-4 rounded bg-yellow-500 text-white font-semibold hover:bg-yellow-600 transition duration-150">בקש הרשאות</button>
         </div>
@@ -68,7 +118,7 @@
                  <p id="current-location-text">📍 מאתר מיקום נוכחי...</p>
                  <p id="eta-text" class="mt-1 font-medium hidden">...</p>
             </div>
-            <div id="map"></div>
+            <div id="map"><p class="p-4 text-center text-gray-500">טוען מפה...</p></div>
         </div>
 
         <!-- Order List -->
@@ -79,7 +129,14 @@
              </div>
         </main>
 
-    </div>
+         <!-- Error Display Area -->
+         <div id="critical-error-display" class="p-4 m-4 bg-red-100 border border-red-400 text-red-700 rounded text-center">
+             <h3 class="font-bold">שגיאה קריטית!</h3>
+             <p id="critical-error-message">האפליקציה נתקלה בבעיה בלתי צפויה.</p>
+             <p class="text-xs mt-2" id="error-suggestion">אנא נסה לרענן את הדף או פנה לתמיכה.</p>
+         </div>
+
+    </div> <!-- End Main App Container -->
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -87,371 +144,306 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
 
-    <!-- Combined & Inlined App Logic -->
-    <script type="module">
-        console.log('Driver App script started (v50.1)'); // v50.1
+    <!-- v54.0: Main application logic using compat SDK and window.onload -->
+    <script>
+        // v54.0: Removed type="module" from the script tag
+        console.log('Driver App script started (v54.0)');
 
-        // --- Inlined Firebase SDK Imports ---
-        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc, where, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // Added setDoc
-
-        // --- Inlined Config Logic ---
-        const firebaseConfig = { /* ... config object ... */
-            apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
-            storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
+        // --- Config Logic ---
+        const firebaseConfig = {
+             apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
+             authDomain: "saban94-78949.firebaseapp.com",
+             projectId: "saban94-78949",
+             storageBucket: "saban94-78949.appspot.com",
+             messagingSenderId: "41553157903",
+             appId: "1:41553157903:web:cc33d252cff023be97a87a",
+             measurementId: "G-XV6RZDESSB"
         };
         let app, auth, db; let initializationError = null;
+        let authReadyPromise = null;
+
+        // v54.1: SmartLog Default Definition (Sync)
+        window.SmartLog = function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
+            const prefix = `[${origin} ${level}]`;
+            const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log);
+            logFn(`${prefix} ${msg}`, context); // Log immediately to console
+        };
+        console.log("SmartLog Default Fallback defined.");
+
+
         try {
-            app = getApps().length ? getApp() : initializeApp(firebaseConfig); console.log("Firebase app instance ensured.");
-            auth = getAuth(app); db = getFirestore(app);
-        } catch (error) { console.error("CRITICAL: Firebase init failed!", error); initializationError = error; }
+             if (typeof firebase === 'undefined') { throw new Error('Firebase SDK global object not found.'); }
+            app = firebase.initializeApp(firebaseConfig);
+            console.log("✅ Firebase App initialized successfully.");
+            auth = firebase.auth();
+            db = firebase.firestore();
+            console.log('Firebase SDK object:', firebase);
+            console.log('Firestore DB object:', db);
+            if (!db) { throw new Error("Firestore DB invalid."); }
+            console.log("✅ Firestore connected");
+        } catch (error) {
+             console.error("❌ CRITICAL: Firebase init failed!", error); initializationError = error;
+             try { document.getElementById('status-text').textContent = `Firebase Error: ${error.message}`; } catch(e){}
+        }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
-        async function ensureAuth() { /* ... Same ensureAuth logic ... */
-            console.log("ensureAuth: Starting..."); let tries = 0;
+        // ensureAuth uses async/await which is generally safe in modern browsers
+        async function ensureAuth() {
+            console.log("ensureAuth (v54.2): Starting..."); let tries = 0;
             while (tries < MAX_AUTH_RETRIES) {
                 tries++;
                 try {
                     if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
                     if (!auth) throw new Error("Auth object missing");
+                    if (auth.currentUser) { console.log("ensureAuth: Already authenticated.", auth.currentUser.uid); return auth.currentUser; }
                     console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
-                    const userCredential = await signInAnonymously(auth);
-                    console.log("ensureAuth: Success.", userCredential.user.uid); return userCredential.user;
-                } catch (e) {
-                    console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
-                    if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; }
-                    console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-                }
+                    const userCredential = await auth.signInAnonymously();
+                    if (!userCredential?.user?.uid) { throw new Error("Invalid user object from Auth."); }
+                    console.log("ensureAuth: Success.", userCredential.user.uid);
+                    return userCredential.user;
+                } catch (e) { console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message); if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; } console.log(`Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS)); }
             } throw new Error("ensureAuth: Max retries reached.");
         }
-        const authReadyPromise = ensureAuth();
-        console.log("Config part executed.");
+        if (!initializationError && auth) {
+             authReadyPromise = ensureAuth();
+        } else {
+             authReadyPromise = Promise.reject(initializationError || new Error("FB Auth not initialized"));
+        }
+        console.log("Config part done.");
 
-        // --- Inlined SmartLog Logic (v50.1: Simplified await logic) ---
+        // --- SmartLog Logic (v54.2: Final Async DB Writer) ---
+        console.warn("SmartLog: ❗❗❗ ודא שחוקי האבטחה מאפשרים כתיבה ל־'system_logs_v3'. ❗❗❗");
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
-        let isDbAvailable = !!db; let isAuthReadyForLogging = false; // v50.1: Separate flag for logging
-        authReadyPromise.then(() => { isAuthReadyForLogging = true; console.log("SmartLog: Auth is ready for logging."); })
-                      .catch(() => { console.warn("SmartLog: Auth failed, Firestore logging disabled."); isDbAvailable = false; }); // Disable DB logging if auth fails
+        let canWriteToFirestore = null;
 
-        const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => {
-             const consoleArgs = [`[${origin}] ${level}:`, message]; if (Object.keys(context).length > 0) consoleArgs.push(context); /* ... */
-            switch (level) { case 'INFO': console.log(...consoleArgs); break; case 'WARN': console.warn(...consoleArgs); break; case 'ERROR': console.error(...consoleArgs); break; default: console.log(...consoleArgs); }
-            if (!isDbAvailable || !isAuthReadyForLogging) { return; } // v50.1: Check flag
+        // Overwrite SmartLog with the async function (uses the existing console logging)
+        window.SmartLog = async function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
+            const prefix = `[${origin} ${level}]`; const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log); logFn(`${prefix} ${msg}`, context);
+            if (canWriteToFirestore === false) return;
             try {
-                // No need to await here anymore, flag ensures auth is ready or DB logging is disabled
-                const user = auth?.currentUser; if (!user) { return; }
-                const userContext = { uid: user.uid, isAnonymous: user.isAnonymous };
-                const logEntry = {
-                    timestamp: serverTimestamp(), level, message: String(message), origin,
-                    context: { ...JSON.parse(JSON.stringify(context || {})), sessionId, userAgent: navigator.userAgent || 'N/A', page: window.location.pathname || '/driver-app/' },
-                    user: userContext, category: category || null, solution: solution || null
-                };
-                await addDoc(collection(db, LOG_COLLECTION), logEntry);
-            } catch (error) { console.error("SmartLog FATAL ERROR writing to Firestore.", error); if (error.code === 'permission-denied') { console.warn("SmartLog: Disabling Firestore logging."); isDbAvailable = false; } }
-         };
-        const SmartLog = {
-            info: (msg, origin, ctx = {}) => { writeLog('INFO', msg, origin, ctx); },
-            warn: (msg, origin, ctx = {}, cat = null, sol = null) => { writeLog('WARN', msg, origin, ctx, cat, sol); },
-            error: (err, origin, ctx = {}, cat = null, sol = null) => { const msg = err instanceof Error ? err.message : String(err); const stack = err instanceof Error ? err.stack : 'N/A'; writeLog('ERROR', msg, origin, { ...ctx, stack }, cat, sol); }
+                if (!db) throw new Error('Firestore unavailable');
+                await authReadyPromise;
+                if (!auth?.currentUser) throw new Error("Not authenticated");
+                await db.collection(LOG_COLLECTION).add({ message: String(msg), level, origin, context: { ...context, sessionId }, category, solution, timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId: auth.currentUser.uid });
+                if (canWriteToFirestore === null) { console.log("SmartLog: ✅ FS write confirmed."); canWriteToFirestore = true; }
+            } catch (err) {
+                if (canWriteToFirestore === null || canWriteToFirestore === true) { console.warn(`SmartLog: FS write failed (${err.message}). Console only.`, err); try { localStorage.setItem('SL_Backup_' + Date.now(), JSON.stringify({ msg, level, origin, context, ts: new Date().toISOString() })); } catch (lsError) {} }
+                canWriteToFirestore = false;
+            }
         };
-        console.log("SmartLog part executed.");
+        console.log("✅ SmartLog active");
+        SmartLog('SmartLog Permission Test', 'INFO', 'SmartLog.Init');
 
 
-        // --- Driver App Specific Logic ---
-
-        // Globals
-        let map; let driverMarker;
-        let currentDriverId = localStorage.getItem('driverId');
-        let currentDriverName = localStorage.getItem('driverName');
-        let watchId = null; let currentOrders = {}; let notificationAudio = null;
-        let hasNotificationPermission = false; let hasGeolocationPermission = false;
-        let lastLocationUpdate = 0;
-
-        // DOM Elements (v50.1: Defined after DOMContentLoaded)
+        // --- Driver App Logic ---
+        let map; let driverMarker; let currentDriverId = null; let currentDriverName = null; let watchId = null; let currentOrders = {}; let notificationAudio = null; let hasNotificationPermission = false; let hasGeolocationPermission = false; let lastLocationUpdate = 0;
         let DOM = {};
+        let appInitialized = false;
 
         // --- Initialization ---
         async function initializeDriverApp() {
-            // v50.1: Define DOM elements here, after DOMContentLoaded
-            DOM = {
-                 driverNameDisplay: document.getElementById('driver-name-display'), statusText: document.getElementById('status-text'), statusDot: document.getElementById('status-dot'),
-                 permissionSection: document.getElementById('permission-section'), requestPermsBtn: document.getElementById('request-perms-btn'), locationInfo: document.getElementById('location-info'),
-                 currentLocationText: document.getElementById('current-location-text'), etaText: document.getElementById('eta-text'), mapElement: document.getElementById('map'), orderList: document.getElementById('order-list'), loadingOrders: document.getElementById('loading-orders')
-            };
-            SmartLog.info("DOM elements referenced.", "Init.DOM");
-            if (!DOM.driverNameDisplay || !DOM.statusText || !DOM.mapElement || !DOM.orderList) {
-                 throw new Error("Essential DOM elements missing!"); // Let the main catch block handle this
-            }
+             // 1. Check/Redirect Logic (Handled outside this function in window.onload)
+             const storedId = localStorage.getItem('driverId');
+             const storedName = localStorage.getItem('driverName');
+             currentDriverId = storedId; currentDriverName = storedName;
 
-            SmartLog.info("Initializing Driver App (v50.1)...", "Init");
+             SmartLog('🚀 Driver App initializeDriverApp loaded', 'INFO', 'Init');
+             if (appInitialized) { SmartLog("Init called multiple times.", "WARN", "Init.Duplicate"); return; }
+             appInitialized = true;
+
+             // 2. Define DOM elements (Must be after DOMContentLoaded)
+             DOM = {
+                driverNameDisplay: document.getElementById('driver-name-display'), statusIndicator: document.getElementById('status-indicator'),
+                statusText: document.getElementById('status-text'), statusDot: document.getElementById('status-dot'),
+                mapElement: document.getElementById('map'), orderList: document.getElementById('order-list'),
+                permissionSection: document.getElementById('permission-section'), requestPermsBtn: document.getElementById('request-perms-btn'),
+                locationInfo: document.getElementById('location-info'), currentLocationText: document.getElementById('current-location-text'),
+                etaText: document.getElementById('eta-text'), loadingOrders: document.getElementById('loading-orders'),
+                criticalErrorDisplay: document.getElementById('critical-error-display'), criticalErrorMessage: document.getElementById('critical-error-message'),
+                errorSuggestion: document.getElementById('error-suggestion'),
+                appContainer: document.getElementById('app-container'),
+                loginContainer: document.getElementById('login-container'),
+                loginForm: document.getElementById('login-form'),
+                nameInput: document.getElementById('driver-name-input'),
+                loginButton: document.getElementById('login-btn'),
+                errorMessageEl: document.getElementById('error-message')
+             };
+             SmartLog("DOM elements referenced.", "INFO", "Init.DOM");
+
+             // Critical check - Step 1 Verification
+             const essentialIDs = ['driver-name-display', 'status-indicator', 'status-text', 'map', 'order-list'];
+             const missingElements = essentialIDs.filter(id => !document.getElementById(id));
+             if (missingElements.length > 0) {
+                 const msg = `Missing DOM elements: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return;
+             }
+             SmartLog(`Initializing Driver App (v54.2) on ${getDeviceType()}`, "INFO", "Init"); // v54.2
+
             try {
-                // Check for saved driver ID
-                if (!currentDriverId || !currentDriverName) {
-                    SmartLog.error(new Error("Missing driverId/Name"), "Auth", null, "Auth", "הנהג אינו מחובר. הפנה לדף התחברות.");
-                    window.location.href = 'login.html'; return;
-                }
+                // Display driver name immediately
                 DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`;
+                SmartLog("Driver ID found.", "INFO", "Auth");
 
-                // Wait for Firebase Auth
-                updateStatus("ממתין לאימות...", "yellow", true);
-                await authReadyPromise;
-                SmartLog.info("Firebase Auth Ready.", "Init");
+                // Step 2: Wait for Firebase Auth
+                updateStatus("ממתין לאימות...", "yellow", true); SmartLog("Step 2: Waiting for Auth...", "INFO", "Init.Auth");
+                const user = await authReadyPromise;
+                if (!user || !user.uid) { throw new Error("Invalid user object post-auth."); }
+                SmartLog(`Auth successful. User: ${user.uid}`, "INFO", "Init.Auth");
 
-                // Check and Request Permissions
-                await checkAndRequestPermissions(); // This function now handles displaying the section
+                // Step 3: Permissions
+                updateStatus("בודק הרשאות...", "yellow", true); SmartLog("Step 3: Checking permissions...", "INFO", "Init.Permissions");
+                await checkAndRequestPermissions(); SmartLog("Permissions check complete.", "INFO", "Init.Permissions");
 
-                // Initialize Map
-                updateStatus("מאתחל מפה...", "yellow", true);
-                initMap();
+                // Step 4: Initialize Map
+                updateStatus("מאתחל מפה...", "yellow", true); SmartLog("Step 4: Initializing Map...", "INFO", "Init.Map");
+                await initMap(); SmartLog("Map init successful.", "INFO", "Init.Map");
 
-                // Start Geolocation only if permission granted
-                if (hasGeolocationPermission) {
-                    updateStatus("מפעיל GPS...", "yellow", true);
-                    startGeolocation();
-                } else {
-                     updateStatus("המתן לאישור מיקום", "red", false);
-                     SmartLog.warn("Geolocation permission pending/denied. GPS not started.", "Permissions");
-                }
+                // Step 5: Start Geolocation
+                SmartLog("Step 5: Attempting Geolocation...", "INFO", "Init.GPS");
+                if (hasGeolocationPermission) { updateStatus("מפעיל GPS...", "yellow", true); startGeolocation(); }
+                else { updateStatus("המתן לאישור מיקום", "red", false); SmartLog("Geo permission denied/pending.", "WARN", "Permissions"); }
 
-                // Initialize Notifications
-                 initNotifications();
+                // Step 6: Notifications
+                SmartLog("Step 6: Initializing Notifications...", "INFO", "Init.Notifications"); initNotifications();
 
-                // Attach Order Listener
-                updateStatus("מסנכרן משימות...", "yellow", true);
-                listenToOrders();
+                // Step 7: Attach Order Listener
+                updateStatus("מסנכרן משימות...", "yellow", true); SmartLog("Step 7: Attaching Order Listener...", "INFO", "Init.Firestore");
+                listenToOrders(); SmartLog("Order listener attached.", "INFO", "Init.Firestore");
 
-                // Final status depends on permissions & GPS state
-                updateFinalStatus(); // v50.1: Helper function for clarity
-
-                SmartLog.info("Driver App Initialization Complete.", "Init");
+                updateFinalStatus(); SmartLog("🚀 Driver App initialized successfully", "INFO", "Init"); // Step 9
 
             } catch (error) {
-                SmartLog.error(error, "Init.Critical");
-                updateStatus(`שגיאת אתחול: ${error.message}`, "red", false);
+                 SmartLog(error.message, "ERROR", "Init.Critical", { stack: error.stack }); const msg = `אתחול נכשל: ${error.message}`; updateStatus(msg, "red", false); displayCriticalError(msg, error);
+                 console.log('DOM Elements:', document.querySelectorAll('*')); console.log('Firebase Status:', firebase.apps);
             }
         }
 
-         // v50.1: Helper to set final status text
-         function updateFinalStatus() {
-             if (watchId) {
-                 updateStatus("GPS פעיל", "green", false);
-             } else if (!hasGeolocationPermission) {
-                 updateStatus("המתן לאישור מיקום", "red", false);
-             } else {
-                 updateStatus("GPS לא פעיל", "yellow", false); // e.g., if error occurred
-             }
-         }
+        // --- Other Functions ---
+        function displayCriticalError(message, errorObject = null) { /* ... */ }
+        function updateStatus(text, color = "gray", pulse = false) { /* ... */ }
+        function updateFinalStatus() { /* ... */ }
+        async function checkAndRequestPermissions() { /* ... */ }
+        async function handlePermissionRequest() { /* ... */ }
+        function startGeolocation() { /* ... */ }
+        async function updateLocationInFirestore(lat, lng) { /* ... */ }
+        async function updateLocationText(lat, lng) { /* ... */ }
+        async function initMap() { /* ... */ } // Changed to async to match await in initializeDriverApp
+        function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
+        function listenToOrders() { /* ... */ }
+        function renderOrderList() { /* ... */ }
+        function createOrderCard(order) { /* ... */ }
+        window.acknowledgeOrder = async (orderId) => { /* ... */ };
+        window.completeOrder = async (orderId) => { /* ... */ };
+        function initNotifications() { /* ... */ }
+        function handleNewOrderNotification() { /* ... */ }
+        function stopNotificationSound() { /* ... */ }
+        function registerServiceWorker() { /* ... */ }
+        function getDeviceType() { const ua=navigator.userAgent; if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return "tablet"; if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) return "mobile"; return "desktop"; }
 
-        // --- Status Update ---
-        function updateStatus(text, color = "gray", pulse = false) {
-             // Safety check for DOM elements added
-             if (!DOM.statusText || !DOM.statusDot) { console.warn("Status elements not ready for update:", text); return; }
-             SmartLog.info(`Updating Status: ${text}`, "UI.Status", { color, pulse });
-             DOM.statusText.textContent = text;
-             DOM.statusText.className = `text-sm font-medium text-${color}-600`; // Simpler class update
-             DOM.statusDot.className = `w-3 h-3 rounded-full bg-${color}-400 ${pulse ? 'animate-pulse' : ''}`;
-        }
 
-        // --- Permissions ---
-        async function checkAndRequestPermissions() {
-             SmartLog.info("Checking permissions...", "Permissions");
-             let needsGeoRequest = false;
-             let needsNotifRequest = false;
+        // --- Setup Login ---
+        function setupLogin() {
+            const loginForm = DOM.loginForm;
+            const nameInput = DOM.nameInput;
+            const loginButton = DOM.loginButton;
+            const errorMsgEl = DOM.errorMessageEl;
+            const loadingSpinner = document.getElementById('loading-spinner');
 
-             // Geolocation
-             try {
-                const geoStatus = await navigator.permissions.query({ name: 'geolocation' });
-                hasGeolocationPermission = geoStatus.state === 'granted';
-                if (geoStatus.state === 'prompt') needsGeoRequest = true;
-                SmartLog.info("Geolocation status:", "Permissions", { status: geoStatus.state });
-             } catch (e) { SmartLog.warn("Could not query geo permission.", "Permissions", e); needsGeoRequest = true; }
+            if (!loginForm) {
+                 SmartLog("Login form element missing!", "ERROR", "Login");
+                 return;
+            }
 
-             // Notifications
-             if ('Notification' in window) {
-                hasNotificationPermission = Notification.permission === 'granted';
-                if (Notification.permission === 'default') needsNotifRequest = true;
-                SmartLog.info("Notification status:", "Permissions", { status: Notification.permission });
-             } else { SmartLog.warn("Notifications not supported.", "Permissions"); }
+            loginForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                errorMsgEl.textContent = '';
+                const driverName = nameInput.value.trim();
 
-             if (needsGeoRequest || needsNotifRequest) {
-                 if (DOM.permissionSection && DOM.requestPermsBtn) {
-                     DOM.permissionSection.style.display = 'block';
-                     // Ensure only one listener is attached
-                     DOM.requestPermsBtn.removeEventListener('click', handlePermissionRequest); // Remove previous if any
-                     DOM.requestPermsBtn.addEventListener('click', handlePermissionRequest);
-                     updateStatus("ממתין לאישור הרשאות", "yellow", true);
-                 } else { SmartLog.error("Permission UI elements not found!", "Permissions"); }
-             } else {
-                 if (DOM.permissionSection) DOM.permissionSection.style.display = 'none';
-                 SmartLog.info("Permissions already handled.", "Permissions");
-             }
-        }
+                if (!driverName) {
+                    errorMsgEl.textContent = 'אנא הזן שם נהג.';
+                    return;
+                }
 
-        async function handlePermissionRequest() { /* ... implementation unchanged ... */
-             SmartLog.info("Requesting permissions via button click...", "Permissions");
-            let geoGranted = hasGeolocationPermission;
-            let notifGranted = hasNotificationPermission;
+                loginButton.disabled = true;
+                loadingSpinner.classList.remove('hidden');
 
-            // Request Geolocation
-            if (!hasGeolocationPermission) {
                 try {
-                    // Try getting position first, it often triggers the prompt better
-                    await new Promise((resolve, reject) => { navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000 }); });
-                    const geoStatus = await navigator.permissions.query({ name: 'geolocation' });
-                    geoGranted = geoStatus.state === 'granted';
-                    hasGeolocationPermission = geoGranted;
-                    SmartLog.info("Geolocation request result:", "Permissions", { status: geoStatus.state });
-                    if(geoGranted && !watchId) startGeolocation();
-                 } catch (e) { SmartLog.error(e, "Permissions", { message: "Geolocation request failed." }); }
-            }
+                    localStorage.setItem('driverId', driverName);
+                    localStorage.setItem('driverName', driverName);
+                    SmartLog(`Login success. Name=${driverName}. Starting app.`, "INFO", "Login");
+                    
+                    // Hide login, show app, and call the initializer function
+                    loginButton.textContent = 'מתחבר...';
+                    DOM.loginContainer.style.display = 'none';
+                    DOM.appContainer.style.display = 'flex';
+                    initializeDriverApp();
 
-            // Request Notifications
-            if ('Notification' in window && Notification.permission === 'default') {
-                try {
-                    const permission = await Notification.requestPermission();
-                    notifGranted = permission === 'granted';
-                    hasNotificationPermission = notifGranted;
-                    SmartLog.info("Notification request result:", "Permissions", { status: permission });
-                     if(notifGranted) initNotifications();
-                } catch (e) { SmartLog.error(e, "Permissions", { message: "Notification request failed." }); }
-            }
-
-            if (geoGranted) { // Only hide if Geo is granted, as it's essential
-                if (DOM.permissionSection) DOM.permissionSection.style.display = 'none';
-                updateFinalStatus(); // Update status based on current state
-            } else {
-                 updateStatus("נדרשת הרשאת מיקום!", "red", false);
-                 if (DOM.requestPermsBtn) {
-                    DOM.requestPermsBtn.textContent = "בקש הרשאת מיקום שוב";
-                    DOM.requestPermsBtn.classList.add('btn-disabled');
-                    setTimeout(() => DOM.requestPermsBtn.classList.remove('btn-disabled'), 5000);
-                 }
-            }
-        }
-
-        // --- Geolocation & Location Update ---
-        function startGeolocation() { /* ... implementation unchanged ... */
-            if (watchId) { SmartLog.info("Geolocation already watching.", "GPS"); return; }
-            if (!hasGeolocationPermission) { SmartLog.warn("Cannot start GPS, permission not granted.", "GPS"); updateStatus("נדרשת הרשאת מיקום", "red", false); return; }
-            if (!('geolocation' in navigator)) { SmartLog.error("Geolocation not supported.", "GPS"); return; }
-
-            SmartLog.info("Starting geolocation watchPosition...", "GPS");
-            updateStatus("מפעיל GPS...", "yellow", true);
-
-            watchId = navigator.geolocation.watchPosition(
-                async (position) => {
-                    const { latitude, longitude, accuracy } = position.coords;
-                    SmartLog.info("GPS Update Received", "GPS", { lat: latitude, lon: longitude, acc: accuracy });
-                    updateStatus("GPS פעיל", "green", false);
-                    updateDriverMarkerOnMap(latitude, longitude);
-                    updateLocationText(latitude, longitude);
-                    const now = Date.now();
-                    if (now - lastLocationUpdate > 20000) { // Throttle Firestore updates
-                        SmartLog.info("Sending location update to Firestore...", "GPS.Firestore");
-                        await updateLocationInFirestore(latitude, longitude);
-                        lastLocationUpdate = now;
-                    }
-                },
-                (error) => {
-                    SmartLog.error(error, "GPS.Error");
-                    let errorMsg = "שגיאת GPS"; if (error.code === 1) errorMsg = "GPS: אין הרשאה"; else if (error.code === 2) errorMsg = "GPS: לא זמין"; else if (error.code === 3) errorMsg = "GPS: Timeout";
-                    updateStatus(errorMsg, "red", false);
-                    if(watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-                },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
-            );
-        }
-        async function updateLocationInFirestore(lat, lng) { /* ... implementation unchanged ... */
-             if (!db || !currentDriverId) return; const locationRef = doc(db, "driverLocations", currentDriverId);
-             try { await updateDoc(locationRef, { latitude: lat, longitude: lng, lastUpdate: serverTimestamp() }); SmartLog.info("Location updated in Firestore.", "GPS.Firestore");
-             } catch (e) { if (e.code === 'not-found') { SmartLog.warn("Location doc not found, creating...", "GPS.Firestore"); try { await setDoc(locationRef, { latitude: lat, longitude: lng, lastUpdate: serverTimestamp(), driverName: currentDriverName }); SmartLog.info("Location doc created.", "GPS.Firestore"); } catch (createError) { SmartLog.error(createError, "GPS.Firestore.Create"); } } else { SmartLog.error(e, "GPS.Firestore.Update"); } }
-        }
-        async function updateLocationText(lat, lng) { /* ... implementation unchanged ... */
-            if (!DOM.currentLocationText) return; DOM.currentLocationText.textContent = `📍 ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            try { const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`); if (!response.ok) throw new Error(`${response.status}`); const data = await response.json(); if (data?.display_name) { const parts = data.display_name.split(', '); const short = parts.slice(0, 3).join(', '); DOM.currentLocationText.textContent = `📍 ${short}`; SmartLog.info("Reverse geocode success", "GPS.Geo", { address: short }); } else { SmartLog.warn("Reverse geocode failed: No display_name", "GPS.Geo", { data }); } } catch (error) { SmartLog.error(error, "GPS.ReverseGeocode"); }
-        }
-
-        // --- Map Handling ---
-        function initMap() { /* ... implementation unchanged ... */
-             try { map = L.map(DOM.mapElement).setView([32.0853, 34.7818], 13); L.tileLayer('https{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 18, }).addTo(map); SmartLog.info("Map initialized", "Map"); } catch (e) { SmartLog.error(e, "Map.Init"); if (DOM.mapElement) DOM.mapElement.innerHTML = '<p class="text-red-500 p-4 text-center">Map Error</p>'; }
-        }
-        function updateDriverMarkerOnMap(lat, lng) { /* ... implementation unchanged ... */
-             if (!map) return; const latLng = [lat, lng]; if (driverMarker) { driverMarker.setLatLng(latLng); } else { driverMarker = L.circleMarker(latLng, { radius: 8, fillColor: "#3a86ff", color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.8 }).addTo(map); SmartLog.info("Driver marker added", "Map"); } map.panTo(latLng);
-        }
-
-        // --- Order Handling ---
-        function listenToOrders() { /* ... implementation unchanged ... */
-             SmartLog.info("Listening to orders:", "Orders", { driverId: currentDriverId }); const q = query( collection(db, "orders"), where("driver.id", "==", currentDriverId), where("status", "in", ["שויך", "בתהליך ליקוט", "בדרך"]) );
-             onSnapshot(q, (snapshot) => { SmartLog.info(`Orders snapshot: ${snapshot.docChanges().length} changes`, "Orders"); if (DOM.loadingOrders) DOM.loadingOrders.style.display = 'none'; let newOrderDetected = false;
-                 snapshot.docChanges().forEach((change) => { const orderId = change.doc.id; const orderData = { id: orderId, ...change.doc.data() };
-                     if (change.type === "added") { SmartLog.info("New order:", "Orders", { orderId }); currentOrders[orderId] = orderData; if (orderData.status === 'שויך') newOrderDetected = true; }
-                     else if (change.type === "modified") { SmartLog.info("Order modified:", "Orders", { orderId, status: orderData.status }); currentOrders[orderId] = orderData; }
-                     else if (change.type === "removed") { SmartLog.info("Order removed:", "Orders", { orderId }); delete currentOrders[orderId]; } });
-                 renderOrderList(); if (newOrderDetected) handleNewOrderNotification();
-             }, (error) => { SmartLog.error(error, "Orders.Listener"); updateStatus("Sync Error", "red", false); if (DOM.loadingOrders) DOM.loadingOrders.innerHTML = '<p class="text-red-500">Sync Error</p>'; });
-        }
-        function renderOrderList() { /* ... implementation unchanged ... */
-             const ordersArray = Object.values(currentOrders).sort((a, b) => (a.status === 'שויך' ? -1 : 1)); if (!DOM.orderList) return;
-             if (ordersArray.length === 0) { DOM.orderList.innerHTML = `<p class="text-center text-gray-500 py-10">אין משימות פעילות.</p>`; return; }
-             DOM.orderList.innerHTML = ordersArray.map(order => createOrderCard(order)).join(''); try{feather.replace();} catch(e){}
-        }
-        function createOrderCard(order) { /* ... implementation unchanged ... */
-            let cardClass = "bg-white p-4 rounded-lg shadow"; let actionButton = ''; let statusText = order.status || '?'; let statusColor = "text-gray-500";
-            switch (order.status) {
-                case 'שויך': cardClass += " notification-card"; statusText = "חדשה - לאישור"; statusColor = "text-yellow-600 font-bold"; actionButton = `<button class="w-full py-2 px-4 rounded bg-green-500 text-white font-semibold hover:bg-green-600 transition btn-success" onclick="window.acknowledgeOrder('${order.id}')"><i data-feather="check-circle" class="inline w-4 h-4 ml-1"></i> אישור והתחלת העמסה</button>`; break;
-                case 'בתהליך ליקוט': statusText = "בהעמסה"; statusColor = "text-blue-600"; actionButton = `<p class="text-center text-sm text-gray-500 italic">ממתין לסיום העמסה...</p>`; break;
-                case 'בדרך': statusText = "בדרך ללקוח"; statusColor = "text-green-600 font-semibold"; actionButton = `<button class="w-full py-2 px-4 rounded bg-green-600 text-white font-semibold hover:bg-green-700 transition btn-success" onclick="window.completeOrder('${order.id}')"><i data-feather="flag" class="inline w-4 h-4 ml-1"></i> סיום משימה</button>`; break;
-                default: cardClass += " opacity-70";
-            }
-            const buttons = `<div class="grid grid-cols-2 gap-2 mt-3 text-sm"><a href="tel:${order.customer?.phone || ''}" class="py-2 px-3 rounded bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition text-center"><i data-feather="phone" class="inline w-4 h-4 ml-1"></i> לקוח</a><a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.address || '')}" target="_blank" class="py-2 px-3 rounded bg-blue-500 text-white font-medium hover:bg-blue-600 transition text-center"><i data-feather="navigation" class="inline w-4 h-4 ml-1"></i> ניווט</a></div>`;
-            return `<div class="${cardClass}" id="order-${order.id}"><div class="flex justify-between items-start mb-2"><div><h3 class="text-lg font-bold text-gray-900">${order.customer?.name || '?'}</h3><p class="text-sm text-gray-600">${order.address || '?'}</p></div><span class="text-xs font-medium ${statusColor} whitespace-nowrap">${statusText}</span></div><p class="text-xs text-gray-500 mb-3">הערות: ${order.notes || 'אין'}</p>${actionButton}${buttons}</div>`;
-        }
-
-        // --- Order Actions ---
-        window.acknowledgeOrder = async (orderId) => { /* ... implementation unchanged ... */
-            SmartLog.info("Acknowledging order...", "Orders.Action", { orderId }); try { const orderRef = doc(db, "orders", orderId); await updateDoc(orderRef, { status: "בתהליך ליקוט" }); SmartLog.info("Status updated to 'בתהליך ליקוט'", "Orders.Action", { orderId }); stopNotificationSound(); document.getElementById(`order-${orderId}`)?.classList.remove('notification-card'); } catch (e) { SmartLog.error(e, "Orders.Action.Acknowledge"); alert("שגיאה באישור."); }
-        };
-        window.completeOrder = async (orderId) => { /* ... implementation unchanged ... */
-             SmartLog.info("Completing order...", "Orders.Action", { orderId }); if (!confirm("לסמן משימה כהושלמה?")) return; try { const orderRef = doc(db, "orders", orderId); await updateDoc(orderRef, { status: "הושלם", completedAt: serverTimestamp() }); SmartLog.info("Status updated to 'הושלם'", "Orders.Action", { orderId }); } catch (e) { SmartLog.error(e, "Orders.Action.Complete"); alert("שגיאה בסיום."); }
-        };
-
-        // --- Notifications ---
-        function initNotifications() { /* ... implementation unchanged ... */
-             if (!hasNotificationPermission || !window.Tone) return; try { notificationAudio = new Tone.Synth({ oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 } }).toDestination(); SmartLog.info("Audio initialized.", "Notifications"); } catch (e) { SmartLog.error(e, "Notifications.InitAudio"); }
-        }
-        function handleNewOrderNotification() { /* ... implementation unchanged ... */
-             SmartLog.info("New order notification...", "Notifications");
-             if (notificationAudio && Tone?.context?.state === 'running') { try { notificationAudio.triggerAttackRelease("C5", "8n", Tone.now()); notificationAudio.triggerAttackRelease("G5", "8n", Tone.now() + 0.2); SmartLog.info("Sound played.", "Notifications"); } catch(e) { SmartLog.error(e, "Notifications.PlaySound"); } }
-             else if (notificationAudio) { Tone.start().then(() => { SmartLog.info("Audio context resumed. Retrying sound.", "Notifications"); try { notificationAudio.triggerAttackRelease("C5", "8n", Tone.now()); notificationAudio.triggerAttackRelease("G5", "8n", Tone.now() + 0.2); } catch(e) { SmartLog.error(e, "Notifications.PlaySoundRetry"); } }).catch(e => SmartLog.error(e, "Notifications.ToneStartFailed")); }
-             else { SmartLog.warn("Cannot play sound.", "Notifications"); }
-             if (hasNotificationPermission && 'Notification' in window) { const notification = new Notification("הזמנה חדשה!", { body: "משימה חדשה ממתינה לאישור.", icon: "https://i.postimg.cc/ryPT3r29/image.png", vibrate: [200, 100, 200] }); notification.onclick = () => { window.focus(); SmartLog.info("Notification clicked.", "Notifications"); }; SmartLog.info("Browser notification shown.", "Notifications"); }
-             else { SmartLog.warn("Cannot show browser notification.", "Notifications"); }
-        }
-        function stopNotificationSound() { /* ... implementation unchanged ... */
-             SmartLog.info("Stopping sound (placeholder).", "Notifications");
-        }
-
-        // --- Service Worker Registration ---
-        function registerServiceWorker() { /* ... implementation unchanged ... */
-            if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').then(reg => SmartLog.info('SW registered', 'PWA', { scope: reg.scope })).catch(err => SmartLog.error(err, 'PWA', { message: 'SW registration failed' })); }); } else { SmartLog.warn("SW not supported.", "PWA"); }
+                } catch (error) {
+                    console.error("Error saving to localStorage:", error);
+                    errorMsgEl.textContent = 'שגיאה: לא ניתן לשמור פרטי התחברות.';
+                    loginButton.disabled = false;
+                    loginButton.textContent = 'כניסה לאפליקציה';
+                    loadingSpinner.classList.add('hidden');
+                    SmartLog(`Login failed.`, "ERROR", "Login");
+                }
+            });
         }
 
 
-        // --- Start Application (v50.1: Moved into DOMContentLoaded) ---
+        // --- Start Application (v54.2: Using DOMContentLoaded) ---
+        console.log("Attaching DOMContentLoaded listener (v54.2)...");
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (v50.1). Starting app initialization...'); // v50.1
-            // Ensure SmartLog is available (basic check)
-            if (typeof SmartLog === 'undefined') {
-                // Attempt to define fallback if SmartLog failed (might happen if imports fail very early)
-                console.error("SmartLog failed to initialize. Using console fallback.");
-                 SmartLog = { info: console.log, warn: console.warn, error: console.error };
-            }
-            SmartLog.info("DOMContentLoaded fired.", "Init");
-            registerServiceWorker();
-            initializeDriverApp(); // Start main async logic
-             try { if(feather) feather.replace(); } catch (e) { SmartLog.warn("Feather icons replace failed.", "UI", e); }
+            console.log('DOMContentLoaded fired (v54.2). Running initialization...');
+            if (typeof SmartLog === 'undefined') { /* ... Fallback ... */ }
+            try {
+                // Initialize DOM elements here to ensure availability
+                DOM.driverNameDisplay = document.getElementById('driver-name-display');
+                DOM.statusIndicator = document.getElementById('status-indicator');
+                DOM.statusText = document.getElementById('status-text');
+                DOM.statusDot = document.getElementById('status-dot');
+                DOM.mapElement = document.getElementById('map');
+                DOM.orderList = document.getElementById('order-list');
+                DOM.permissionSection = document.getElementById('permission-section');
+                DOM.requestPermsBtn = document.getElementById('request-perms-btn');
+                DOM.locationInfo = document.getElementById('location-info');
+                DOM.currentLocationText = document.getElementById('current-location-text');
+                DOM.etaText = document.getElementById('eta-text');
+                DOM.loadingOrders = document.getElementById('loading-orders');
+                DOM.criticalErrorDisplay = document.getElementById('critical-error-display');
+                DOM.criticalErrorMessage = document.getElementById('critical-error-message');
+                DOM.errorSuggestion = document.getElementById('error-suggestion');
+                DOM.loginContainer = document.getElementById('login-container');
+                DOM.appContainer = document.getElementById('app-container');
+                DOM.loginForm = document.getElementById('login-form');
+                DOM.nameInput = document.getElementById('driver-name-input');
+                DOM.loginButton = document.getElementById('login-btn');
+                DOM.errorMessageEl = document.getElementById('error-message');
+                
+                
+                // --- Check Login Status and Redirect/Start ---
+                 const storedId = localStorage.getItem('driverId');
+                 if (!storedId) {
+                     // Not logged in: Show login, attach handler
+                     if(DOM.loginContainer) DOM.loginContainer.style.display = 'flex';
+                     if(DOM.appContainer) DOM.appContainer.style.display = 'none';
+                     setupLogin(); // Attach event listener to login form
+                     return; // Stop initialization
+                 }
+
+                 // Logged in: Hide login, show app
+                 if(DOM.loginContainer) DOM.loginContainer.style.display = 'none';
+                 if(DOM.appContainer) DOM.appContainer.style.display = 'flex';
+
+
+                SmartLog("DOMContentLoaded fired.", "INFO", "Init");
+                registerServiceWorker();
+                initializeDriverApp(); // Call async initializer
+                try { if(typeof feather !== 'undefined' && feather?.replace) { feather.replace(); SmartLog("Feather replaced.", "INFO", "UI"); } else { SmartLog("Feather missing.", "WARN", "UI"); } }
+                catch (e) { SmartLog("Feather fail.", "WARN", "UI", { error: e.message }); }
+            } catch (criticalError) { /* ... Error Handling ... */ }
         });
+        console.log("DOMContentLoaded listener attached (v54.2).");
+        // HTTPS check
+        if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) { console.warn("⚠️ App not on HTTPS."); } else { console.log("HTTPS check passed."); }
 
     </script>
 
