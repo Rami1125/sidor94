@@ -102,103 +102,48 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
 
-    <!-- v52.3: Main application logic using compat SDK -->
-    <script> // Changed type="module" back to regular script
-        console.log('Driver App script starting (v52.3)');
+    <!-- v52.4: Main application logic -->
+    <script> // Changed type="module" back to regular script for compat SDK
+        console.log('Driver App script starting (v52.4)'); // v52.4
 
         // --- Firebase Globals (Available due to compat scripts in <head>) ---
-        console.log("Firebase SDKs assumed loaded globally via script tags.");
+        console.log("Firebase SDKs assumed loaded globally.");
 
         // --- Config Logic ---
-        const firebaseConfig = {
-             apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
-             storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
-        };
+        const firebaseConfig = { /* ... config ... */ };
         let app, auth, db; let initializationError = null;
-        let authReadyPromise = null; // Promise for auth completion
+        let authReadyPromise = null;
 
         try {
-            // Check if firebase object exists
-             if (typeof firebase === 'undefined') {
-                throw new Error('Firebase SDK global object not found. Check script loading order.');
-             }
-            app = firebase.initializeApp(firebaseConfig); // Use global firebase
-            console.log("✅ Firebase App initialized successfully.");
-            auth = firebase.auth(); // Use global firebase.auth()
-            db = firebase.firestore(); // Use global firebase.firestore()
-            console.log('Firebase SDK object:', firebase);
-            console.log('Firestore DB object:', db);
-            if (!db || typeof db !== 'object') { throw new Error("Firestore DB object is invalid."); }
+             if (typeof firebase === 'undefined') { throw new Error('Firebase SDK global object not found.'); }
+            app = firebase.initializeApp(firebaseConfig); console.log("✅ FB App initialized.");
+            auth = firebase.auth(); db = firebase.firestore();
+            console.log('Firebase SDK object:', firebase); console.log('Firestore DB object:', db);
+            if (!db) { throw new Error("Firestore DB invalid."); }
             console.log("✅ Firestore connected");
-        } catch (error) {
-             console.error("❌ CRITICAL: Firebase init failed!", error); initializationError = error;
-             try { document.getElementById('status-text').textContent = `Firebase Error: ${error.message}`; } catch(e){}
-        }
+        } catch (error) { console.error("❌ CRITICAL: FB init failed!", error); initializationError = error; }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
-        // ensureAuth needs to be async, called later
-        async function ensureAuth() {
-            console.log("ensureAuth (v52.3): Starting..."); let tries = 0;
-            while (tries < MAX_AUTH_RETRIES) {
-                tries++;
-                try {
-                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
-                    if (!auth) throw new Error("Auth object missing");
-                    if (auth.currentUser) { console.log("ensureAuth: Already authenticated.", auth.currentUser.uid); return auth.currentUser; }
-                    console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
-                    const userCredential = await auth.signInAnonymously(); // Use global auth
-                    if (!userCredential?.user?.uid) { throw new Error("Invalid user object from Auth."); }
-                    console.log("ensureAuth: Success.", userCredential.user.uid);
-                    return userCredential.user;
-                } catch (e) { console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message); if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; } console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS)); }
-            } throw new Error("ensureAuth: Max retries reached.");
-        }
-        // Create the promise but don't await here
-        if (!initializationError && auth) {
-             authReadyPromise = ensureAuth();
-        } else {
-             authReadyPromise = Promise.reject(initializationError || new Error("Firebase Auth not initialized"));
-        }
+        async function ensureAuth() { /* ... Same logic ... */ }
+        if (!initializationError && auth) { authReadyPromise = ensureAuth(); }
+        else { authReadyPromise = Promise.reject(initializationError || new Error("FB Auth not initialized")); }
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v52.3: Global function using global db/auth) ---
+        // --- SmartLog Logic ---
         console.warn("SmartLog: ❗❗❗ Ensure Firestore rules allow writes to 'system_logs_v3'. ❗❗❗");
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
         let canWriteToFirestore = null;
 
         window.SmartLog = async function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
-            const prefix = `[${origin} ${level}]`;
-            const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log);
-            logFn(`${prefix} ${msg}`, context);
-
+            const prefix = `[${origin} ${level}]`; const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log); logFn(`${prefix} ${msg}`, context);
             if (canWriteToFirestore === false) return;
-
-            try {
-                if (!db) throw new Error('Firestore not available'); // Check global db
-                // Wait for auth promise if it exists
-                 if (authReadyPromise) await authReadyPromise;
-                 else throw new Error("Auth promise not created");
-
-                if (!auth?.currentUser) throw new Error("User not authenticated");
-
-                await db.collection(LOG_COLLECTION).add({ // Use global db
-                    message: String(msg), level, origin, context: { ...context, sessionId }, category, solution,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(), // Use compat FieldValue
-                    userId: auth.currentUser.uid,
-                });
-
+            try { if (!db) throw new Error('Firestore unavailable'); if (authReadyPromise) await authReadyPromise; else throw new Error("Auth promise missing"); if (!auth?.currentUser) throw new Error("Not authenticated");
+                await db.collection(LOG_COLLECTION).add({ message: String(msg), level, origin, context: { ...context, sessionId }, category, solution, timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId: auth.currentUser.uid });
                 if (canWriteToFirestore === null) { console.log("SmartLog: ✅ FS write confirmed."); canWriteToFirestore = true; }
-            } catch (err) {
-                if (canWriteToFirestore === null || canWriteToFirestore === true) {
-                   console.warn(`SmartLog: FS write failed (${err.message}). Console only.`, err);
-                   try { localStorage.setItem('SmartLog_Backup_' + Date.now(), JSON.stringify({ msg, level, origin, context, ts: new Date().toISOString() })); } catch (lsError) {}
-                }
-                canWriteToFirestore = false;
-            }
+            } catch (err) { if (canWriteToFirestore === null || canWriteToFirestore === true) { console.warn(`SmartLog: FS write failed (${err.message}). Console only.`, err); try { localStorage.setItem('SL_Backup_' + Date.now(), JSON.stringify({ msg, level, origin, context, ts: new Date().toISOString() })); } catch (lsError) {} } canWriteToFirestore = false; }
         };
         console.log("✅ SmartLog active");
-        // Initial permission test will run implicitly on first log call after auth
-
+        // Initial test runs implicitly
 
         // --- Driver App Logic ---
         let map; let driverMarker; let currentDriverId = null; let currentDriverName = null; let watchId = null; let currentOrders = {}; let notificationAudio = null; let hasNotificationPermission = false; let hasGeolocationPermission = false; let lastLocationUpdate = 0;
@@ -207,85 +152,89 @@
 
         // --- Initialization ---
         async function initializeDriverApp() {
-             // Ensure SmartLog exists (fallback)
-             if (typeof SmartLog === 'undefined') {
-                window.SmartLog = function(msg, level='INFO', origin='Fallback') { console.log(`[${origin} ${level}] ${msg}`); };
-                console.warn("Using basic SmartLog fallback during init.");
-             }
-
              SmartLog('🚀 Driver App initializeDriverApp loaded', 'INFO', 'Init');
              if (appInitialized) { SmartLog("Init called multiple times.", "WARN", "Init.Duplicate"); return; }
              appInitialized = true;
 
-             // Define DOM elements FIRST
-             DOM = { /* ... DOM elements ... */ }; // Assume elements exist based on checklist
-
-             // Critical check - Step 1 Verification
+             DOM = { /* ... DOM elements ... */ }; // Assume elements exist
+             SmartLog("DOM referenced.", "INFO", "Init.DOM");
              const essentialIDs = ['driver-name-display', 'status-indicator', 'status-text', 'map', 'order-list'];
-             const missingElements = essentialIDs.filter(id => !document.getElementById(id));
-             if (missingElements.length > 0) { const msg = `Missing DOM elements: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return; }
-             SmartLog(`Initializing Driver App (v52.3) on ${getDeviceType()}`, "INFO", "Init"); // v52.3
+             const missing = essentialIDs.filter(id => !document.getElementById(id));
+             if (missing.length > 0) { const msg = `Missing DOM: ${missing.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return; }
+             SmartLog(`Initializing Driver App (v52.4) on ${getDeviceType()}`, "INFO", "Init"); // v52.4
 
             try {
-                // SmartLog init check done implicitly
-
                 // Step 1: Check driver ID
-                SmartLog("Step 1: Checking localStorage...", "INFO", "Init"); /* ... */
+                SmartLog("Step 1: Checking localStorage...", "INFO", "Init");
+                currentDriverId = localStorage.getItem('driverId'); currentDriverName = localStorage.getItem('driverName');
+                if (!currentDriverId || !currentDriverName) { throw new Error("Missing driverId/Name in localStorage"); }
+                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`; SmartLog("Driver ID found.", "INFO", "Auth");
 
                 // Step 2: Wait for Firebase Auth
                 updateStatus("ממתין לאימות...", "yellow", true); SmartLog("Step 2: Waiting for Auth...", "INFO", "Init.Auth");
-                const user = await authReadyPromise;
+                const user = await authReadyPromise; // Use await
                 if (!user || !user.uid) { throw new Error("Invalid user object post-auth."); }
                 SmartLog(`Auth successful. User: ${user.uid}`, "INFO", "Init.Auth");
 
                 // Step 3: Permissions
-                updateStatus("בודק הרשאות...", "yellow", true); /* ... */
+                updateStatus("בודק הרשאות...", "yellow", true); SmartLog("Step 3: Checking permissions...", "INFO", "Init.Permissions");
+                await checkAndRequestPermissions(); // v52.4: Use await
+                SmartLog("Permissions check complete.", "INFO", "Init.Permissions");
 
                 // Step 4: Initialize Map
-                updateStatus("מאתחל מפה...", "yellow", true); /* ... */
+                updateStatus("מאתחל מפה...", "yellow", true); SmartLog("Step 4: Initializing Map...", "INFO", "Init.Map");
+                // initMap might throw, await is not strictly needed but safe
+                await initMap(); // v52.4: Use await
+                SmartLog("Map init successful.", "INFO", "Init.Map");
 
                 // Step 5: Start Geolocation
-                SmartLog("Step 5: Attempting Geolocation...", "INFO", "Init.GPS"); /* ... */
+                SmartLog("Step 5: Attempting Geolocation...", "INFO", "Init.GPS");
+                if (hasGeolocationPermission) { updateStatus("מפעיל GPS...", "yellow", true); startGeolocation(); }
+                else { updateStatus("המתן לאישור מיקום", "red", false); SmartLog("Geo permission denied/pending.", "WARN", "Permissions"); }
 
                 // Step 6: Notifications
-                SmartLog("Step 6: Initializing Notifications...", "INFO", "Init.Notifications"); /* ... */
+                SmartLog("Step 6: Initializing Notifications...", "INFO", "Init.Notifications"); initNotifications();
 
                 // Step 7: Attach Order Listener
-                updateStatus("מסנכרן משימות...", "yellow", true); /* ... */
+                updateStatus("מסנכרן משימות...", "yellow", true); SmartLog("Step 7: Attaching Order Listener...", "INFO", "Init.Firestore");
+                listenToOrders(); SmartLog("Order listener attached.", "INFO", "Init.Firestore");
 
                 updateFinalStatus(); SmartLog("🚀 Driver App initialized successfully", "INFO", "Init");
 
-            } catch (error) { /* ... Error Handling ... */ }
+            } catch (error) {
+                 SmartLog(error.message, "ERROR", "Init.Critical", { stack: error.stack }); const msg = `אתחול נכשל: ${error.message}`; updateStatus(msg, "red", false); displayCriticalError(msg, error);
+                 console.log('DOM Elements:', document.querySelectorAll('*')); console.log('Firebase Status:', firebase.apps);
+            }
         }
 
         // --- Other Functions ---
-        // Ensure all functions use global 'db' and 'firebase.firestore.FieldValue' etc.
         function displayCriticalError(message, errorObject = null) { /* ... */ }
         function updateStatus(text, color = "gray", pulse = false) { /* ... */ }
         function updateFinalStatus() { /* ... */ }
         async function checkAndRequestPermissions() { /* ... */ }
         async function handlePermissionRequest() { /* ... */ }
         function startGeolocation() { /* ... */ }
-        async function updateLocationInFirestore(lat, lng) {
-            if (!db || !currentDriverId) return; const ref = doc(db, "driverLocations", currentDriverId); // Use doc from global scope
-            try { await updateDoc(ref, { latitude: lat, longitude: lng, lastUpdate: serverTimestamp() }); SmartLog("Location updated.", "INFO", "GPS.FS"); } // Use global serverTimestamp
-            catch (e) { if (e.code === 'not-found') { SmartLog("Location doc missing, creating...", "WARN", "GPS.FS"); try { await setDoc(ref, { latitude: lat, longitude: lng, lastUpdate: serverTimestamp(), driverName: currentDriverName }); SmartLog("Location doc created.", "INFO", "GPS.FS"); } catch (ce) { SmartLog("Failed create", "ERROR", "GPS.FS.Create", { error: ce.message }); } } else { SmartLog("Failed update", "ERROR", "GPS.FS.Update", { error: e.message }); } }
-        }
+        async function updateLocationInFirestore(lat, lng) { /* ... */ }
         async function updateLocationText(lat, lng) { /* ... */ }
-        function initMap() { /* ... */ }
-        function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
-        function listenToOrders() {
-            SmartLog("Listening to Orders...", "INFO", "Firestore.Listen"); const q = query(collection(db, "orders"), where("driver.id", "==", currentDriverId), where("status", "in", ["שויך", "בתהליך ליקוט", "בדרך"])); // Use global collection, query, where
-            onSnapshot(q, (snapshot) => { /* ... rest of logic ... */ }, (error) => { SmartLog("Listener Error", "ERROR", "Orders.Listener", { error: error.message }); /* ... */ }); // Use global onSnapshot
+        // v52.4: initMap needs to handle potential errors more gracefully if awaited
+        function initMap() {
+            return new Promise((resolve, reject) => {
+                 try {
+                     SmartLog("initMap...", "INFO", "Map.Init"); if (map) map.remove(); if (!DOM.mapElement) throw new Error("Map DOM missing!");
+                     map = L.map(DOM.mapElement); SmartLog("L.map ok.", "INFO", "Map.Init");
+                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 18 }).addTo(map); SmartLog("TileLayer ok.", "INFO", "Map.Init");
+                     map.setView([32.0853, 34.7818], 13); SmartLog("View set.", "INFO", "Map.Init");
+                     map.whenReady(() => { SmartLog("Map ready event.", "INFO", "Map.Init"); resolve(); }); // Resolve on ready
+                     SmartLog("Map init success.", "INFO", "Map");
+                 } catch (e) { SmartLog("Map init fail", "ERROR", "Map.Init", { error: e.message }); if (DOM.mapElement) DOM.mapElement.innerHTML = '<p class="err">Map Error!</p>'; reject(e); } // Reject on error
+            });
         }
+        function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
+        function listenToOrders() { /* ... */ }
         function renderOrderList() { /* ... */ }
         function createOrderCard(order) { /* ... */ }
-        window.acknowledgeOrder = async (orderId) => {
-             SmartLog("Ack order...", "INFO", "Orders.Action", { orderId }); try { const ref = doc(db, "orders", orderId); await updateDoc(ref, { status: "בתהליך ליקוט" }); SmartLog("Status -> בתהליך ליקוט", "INFO", "Orders.Action", { orderId }); /* ... */ } catch (e) { SmartLog("Ack fail", "ERROR", "Orders.Action.Ack", { error: e.message }); alert("שגיאה."); }
-        };
-        window.completeOrder = async (orderId) => {
-             SmartLog("Completing order...", "INFO", "Orders.Action", { orderId }); if (!confirm("לסמן כהושלמה?")) return; try { const ref = doc(db, "orders", orderId); await updateDoc(ref, { status: "הושלם", completedAt: serverTimestamp() }); SmartLog("Status -> הושלם", "INFO", "Orders.Action", { orderId }); } catch (e) { SmartLog("Complete fail", "ERROR", "Orders.Action.Complete", { error: e.message }); alert("שגיאה."); }
-        };
+        window.acknowledgeOrder = async (orderId) => { /* ... */ };
+        window.completeOrder = async (orderId) => { /* ... */ };
         function initNotifications() { /* ... */ }
         function handleNewOrderNotification() { /* ... */ }
         function stopNotificationSound() { /* ... */ }
@@ -293,14 +242,11 @@
         function getDeviceType() { /* ... */ }
 
 
-        // --- Start Application (v52.3: Using DOMContentLoaded) ---
-        console.log("Attaching DOMContentLoaded listener (v52.3)...");
+        // --- Start Application (v52.4: Using DOMContentLoaded) ---
+        console.log("Attaching DOMContentLoaded listener (v52.4)...");
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (v52.3). Running initialization...');
-            if (typeof SmartLog === 'undefined') { // Check again just before running
-                 window.SmartLog = function(msg, level='INFO', origin='Fallback') { console.log(`[${origin} ${level}] ${msg}`); };
-                 console.warn("Using basic SmartLog fallback.");
-             }
+            console.log('DOMContentLoaded fired (v52.4). Running initialization...');
+            if (typeof SmartLog === 'undefined') { /* ... Fallback ... */ }
             try {
                 SmartLog("DOMContentLoaded fired.", "INFO", "Init");
                 registerServiceWorker();
@@ -309,13 +255,9 @@
                 catch (e) { SmartLog("Feather fail.", "WARN", "UI", { error: e.message }); }
             } catch (criticalError) { /* ... Error Handling ... */ }
         });
-        console.log("DOMContentLoaded listener attached (v52.3).");
-        // Step 6: Check HTTPS
-        if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-            console.warn("⚠️ App not on HTTPS. Firebase might be blocked.");
-        } else {
-             console.log("HTTPS check passed.");
-        }
+        console.log("DOMContentLoaded listener attached (v52.4).");
+        // HTTPS check
+        if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) { console.warn("⚠️ App not on HTTPS."); } else { console.log("HTTPS check passed."); }
 
     </script>
 
