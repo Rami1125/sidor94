@@ -59,6 +59,31 @@
             z-index: 1000;
             background-color: #f3f4f6; /* bg-gray-100 */
         }
+        /* v54.2: Custom Marker for Order Pin */
+        .order-pin {
+            background-color: #ef4444; /* Red */
+            width: 25px;
+            height: 25px;
+            display: block;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            /* Center the pin */
+            margin-top: -12.5px;
+            margin-left: -12.5px;
+        }
+        .order-pin::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background-color: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -146,8 +171,7 @@
 
     <!-- v54.0: Main application logic using compat SDK and window.onload -->
     <script>
-        // v54.0: Removed type="module" from the script tag
-        console.log('Driver App script started (v54.0)');
+        console.log('Driver App script started (v54.2)'); // v54.2
 
         // --- Config Logic ---
         const firebaseConfig = {
@@ -326,7 +350,37 @@
         function startGeolocation() { /* ... */ }
         async function updateLocationInFirestore(lat, lng) { /* ... */ }
         async function updateLocationText(lat, lng) { /* ... */ }
-        async function initMap() { /* ... */ } // Changed to async to match await in initializeDriverApp
+        async function initMap() {
+             SmartLog("initMap: Starting...", "INFO", "Map.Init");
+             try {
+                 if (map) map.remove();
+
+                 // v54.2 FIX: Use reliable OSM tile server
+                 const osmTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                 });
+
+                 // v54.2 FIX: Center map on Israel's center
+                 map = L.map(DOM.mapElement).setView([32.0853, 34.7818], 13);
+                 osmTileLayer.addTo(map);
+
+                 SmartLog("Map init successful.", "INFO", "Map");
+
+                 // Return promise that resolves when map is ready
+                 return new Promise(resolve => {
+                     map.whenReady(() => {
+                         SmartLog("Map ready event fired.", "INFO", "Map.Init");
+                         resolve();
+                     });
+                 });
+
+             } catch (e) {
+                 SmartLog(e.message, "ERROR", "Map.Init");
+                 if (DOM.mapElement) DOM.mapElement.innerHTML = '<p class="text-red-500 p-4 text-center">שגיאה קריטית בטעינת המפה!</p>';
+                 throw e;
+             }
+        }
         function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
         function listenToOrders() { /* ... */ }
         function renderOrderList() { /* ... */ }
@@ -341,52 +395,7 @@
 
 
         // --- Setup Login ---
-        function setupLogin() {
-            const loginForm = DOM.loginForm;
-            const nameInput = DOM.nameInput;
-            const loginButton = DOM.loginButton;
-            const errorMsgEl = DOM.errorMessageEl;
-            const loadingSpinner = document.getElementById('loading-spinner');
-
-            if (!loginForm) {
-                 SmartLog("Login form element missing!", "ERROR", "Login");
-                 return;
-            }
-
-            loginForm.addEventListener('submit', (event) => {
-                event.preventDefault();
-                errorMsgEl.textContent = '';
-                const driverName = nameInput.value.trim();
-
-                if (!driverName) {
-                    errorMsgEl.textContent = 'אנא הזן שם נהג.';
-                    return;
-                }
-
-                loginButton.disabled = true;
-                loadingSpinner.classList.remove('hidden');
-
-                try {
-                    localStorage.setItem('driverId', driverName);
-                    localStorage.setItem('driverName', driverName);
-                    SmartLog(`Login success. Name=${driverName}. Starting app.`, "INFO", "Login");
-                    
-                    // Hide login, show app, and call the initializer function
-                    loginButton.textContent = 'מתחבר...';
-                    DOM.loginContainer.style.display = 'none';
-                    DOM.appContainer.style.display = 'flex';
-                    initializeDriverApp();
-
-                } catch (error) {
-                    console.error("Error saving to localStorage:", error);
-                    errorMsgEl.textContent = 'שגיאה: לא ניתן לשמור פרטי התחברות.';
-                    loginButton.disabled = false;
-                    loginButton.textContent = 'כניסה לאפליקציה';
-                    loadingSpinner.classList.add('hidden');
-                    SmartLog(`Login failed.`, "ERROR", "Login");
-                }
-            });
-        }
+        function setupLogin() { /* ... */ }
 
 
         // --- Start Application (v54.2: Using DOMContentLoaded) ---
