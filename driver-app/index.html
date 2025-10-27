@@ -104,7 +104,7 @@
 
     <!-- v52.4: Main application logic using compat SDK -->
     <script>
-        console.log('Driver App script started (v53.2)'); // v53.2
+        console.log('Driver App script started (v53.3)'); // v53.3
 
         // --- Config Logic ---
         const firebaseConfig = {
@@ -136,7 +136,7 @@
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
         async function ensureAuth() {
-            console.log("ensureAuth (v53.2): Starting..."); let tries = 0;
+            console.log("ensureAuth (v53.3): Starting..."); let tries = 0;
             while (tries < MAX_AUTH_RETRIES) {
                 tries++;
                 try {
@@ -148,7 +148,7 @@
                     if (!userCredential?.user?.uid) { throw new Error("Invalid user object from Auth."); }
                     console.log("ensureAuth: Success.", userCredential.user.uid);
                     return userCredential.user;
-                } catch (e) { console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message); if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; } console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS)); }
+                } catch (e) { console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message); if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; } console.log(`Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS)); }
             } throw new Error("ensureAuth: Max retries reached.");
         }
         if (!initializationError && auth) {
@@ -158,7 +158,7 @@
         }
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v53.2: Global function) ---
+        // --- SmartLog Logic (v53.3: Global function) ---
         console.warn("SmartLog: ❗❗❗ ודא שחוקי האבטחה מאפשרים כתיבה ל־'system_logs_v3'. ❗❗❗");
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
         let canWriteToFirestore = null;
@@ -170,7 +170,6 @@
                 if (!db) throw new Error('Firestore unavailable');
                 await authReadyPromise;
                 if (!auth?.currentUser) throw new Error("Not authenticated");
-                // Use compat firestore collection/add
                 await db.collection(LOG_COLLECTION).add({ message: String(msg), level, origin, context: { ...context, sessionId }, category, solution, timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId: auth.currentUser.uid });
                 if (canWriteToFirestore === null) { console.log("SmartLog: ✅ FS write confirmed."); canWriteToFirestore = true; }
             } catch (err) {
@@ -189,14 +188,12 @@
 
         // --- Initialization ---
         async function initializeDriverApp() {
-             // --- Logic before try/catch to ensure SmartLog is available for logging errors ---
-
-             // 1. Check/Redirect Logic (v53.1)
+             // 1. Check/Redirect Logic (v53.3: FIXING URL)
              const storedId = localStorage.getItem('driverId');
              const storedName = localStorage.getItem('driverName');
              if (!storedId || !storedName) {
                  console.warn("Driver ID not found. Redirecting to login.html.");
-                 window.location.href = 'login.html';
+                 window.location.href = './login.html'; // FIX: Use ./login.html for robust path
                  return;
              }
              currentDriverId = storedId; currentDriverName = storedName;
@@ -232,7 +229,7 @@
 
                 // Step 2: Wait for Firebase Auth
                 updateStatus("ממתין לאימות...", "yellow", true); SmartLog("Step 2: Waiting for Auth...", "INFO", "Init.Auth");
-                const user = await authReadyPromise; // Auth success!
+                const user = await authReadyPromise;
                 if (!user || !user.uid) { throw new Error("Invalid user object post-auth."); }
                 SmartLog(`Auth successful. User: ${user.uid}`, "INFO", "Init.Auth");
 
@@ -275,7 +272,7 @@
         async function updateLocationText(lat, lng) { /* ... */ }
         function initMap() { /* ... */ }
         function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
-        function listenToOrders() { /* ... */ }
+        function listenToOrders() { /* ... */ */ }
         function renderOrderList() { /* ... */ }
         function createOrderCard(order) { /* ... */ }
         window.acknowledgeOrder = async (orderId) => { /* ... */ };
@@ -284,7 +281,7 @@
         function handleNewOrderNotification() { /* ... */ }
         function stopNotificationSound() { /* ... */ }
         function registerServiceWorker() { /* ... */ }
-        function getDeviceType() { /* ... */ }
+        function getDeviceType() { const ua=navigator.userAgent; if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return "tablet"; if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) return "mobile"; return "desktop"; }
 
 
         // --- Start Application (v53.2: Using DOMContentLoaded) ---
