@@ -104,14 +104,22 @@
 
     <!-- v52.4: Main application logic using compat SDK -->
     <script>
-        console.log('Driver App script started (v53.4)'); // v53.4
+        console.log('Driver App script started (v53.6 - Syntax Fix)'); // v53.6
 
         // --- Config Logic ---
-        const firebaseConfig = { /* ... */ };
+        const firebaseConfig = {
+             apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
+             authDomain: "saban94-78949.firebaseapp.com",
+             projectId: "saban94-78949",
+             storageBucket: "saban94-78949.appspot.com",
+             messagingSenderId: "41553157903",
+             appId: "1:41553157903:web:cc33d252cff023be97a87a",
+             measurementId: "G-XV6RZDESSB"
+        };
         let app, auth, db; let initializationError = null;
         let authReadyPromise = null;
 
-        // v53.4: SmartLog Default Definition (Sync)
+        // v53.6: SmartLog Default Definition (Sync)
         window.SmartLog = function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
             const prefix = `[${origin} ${level}]`;
             const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log);
@@ -136,7 +144,23 @@
         }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
-        async function ensureAuth() { /* ... Logic ... */ }
+        // v53.6: ensureAuth logic adjusted for better syntax parsing
+        async function ensureAuth() {
+            console.log("ensureAuth (v53.6): Starting..."); let tries = 0;
+            while (tries < MAX_AUTH_RETRIES) {
+                tries++;
+                try {
+                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
+                    if (!auth) throw new Error("Auth object missing");
+                    if (auth.currentUser) { console.log("ensureAuth: Already authenticated.", auth.currentUser.uid); return auth.currentUser; }
+                    console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
+                    const userCredential = await auth.signInAnonymously();
+                    if (!userCredential || !userCredential.user || !userCredential.user.uid) { throw new Error("Invalid user object from Auth."); } // Fixed syntax issue here
+                    console.log("ensureAuth: Success.", userCredential.user.uid);
+                    return userCredential.user;
+                } catch (e) { console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message); if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; } console.log(`Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS)); }
+            } throw new Error("ensureAuth: Max retries reached.");
+        }
         if (!initializationError && auth) {
              authReadyPromise = ensureAuth();
         } else {
@@ -144,7 +168,7 @@
         }
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v53.4: Overwrite with Async DB Writer) ---
+        // --- SmartLog Logic (v53.6: Global function) ---
         console.warn("SmartLog: ❗❗❗ ודא שחוקי האבטחה מאפשרים כתיבה ל־'system_logs_v3'. ❗❗❗");
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
         let canWriteToFirestore = null;
@@ -175,11 +199,11 @@
 
         // --- Initialization ---
         async function initializeDriverApp() {
-             // 1. Check/Redirect Logic (v53.3: FIXING URL)
+             // 1. Check/Redirect Logic (v53.6: Removed unnecessary async/await from inner logic)
              const storedId = localStorage.getItem('driverId');
              const storedName = localStorage.getItem('driverName');
              if (!storedId || !storedName) {
-                 console.warn("Driver ID not found. Redirecting to login.html.");
+                 SmartLog("Driver ID not found. Redirecting to login.html.", "WARN", "Auth");
                  window.location.href = './login.html'; // FIX: Use ./login.html for robust path
                  return;
              }
@@ -189,7 +213,7 @@
              appInitialized = true;
 
              // 2. Define DOM elements (Must be after DOMContentLoaded)
-             DOM = { /* ... DOM elements ... */ }; // Full definition is inside runInitialization for safety
+             DOM = { /* ... DOM elements ... */ }; // Full definition is inside DOMContentLoaded for safety
              SmartLog("DOM elements referenced.", "INFO", "Init.DOM");
 
              // Critical check - Step 1 Verification
@@ -198,7 +222,7 @@
              if (missingElements.length > 0) {
                  const msg = `Missing DOM elements: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return;
              }
-             SmartLog(`Initializing Driver App (v53.4) on ${getDeviceType()}`, "INFO", "Init"); // v53.4
+             SmartLog(`Initializing Driver App (v53.6) on ${getDeviceType()}`, "INFO", "Init");
 
             try {
                 // Display driver name immediately
@@ -247,7 +271,7 @@
         async function handlePermissionRequest() { /* ... */ }
         function startGeolocation() { /* ... */ }
         async function updateLocationInFirestore(lat, lng) { /* ... */ }
-        async function updateLocationText(lat, lng) { /* ... */ */ }
+        async function updateLocationText(lat, lng) { /* ... */ }
         function initMap() { /* ... */ }
         function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
         function listenToOrders() { /* ... */ }
@@ -262,10 +286,10 @@
         function getDeviceType() { const ua=navigator.userAgent; if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return "tablet"; if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) return "mobile"; return "desktop"; }
 
 
-        // --- Start Application (v53.4: Using DOMContentLoaded) ---
-        console.log("Attaching DOMContentLoaded listener (v53.4)...");
+        // --- Start Application (v53.6: Using DOMContentLoaded) ---
+        console.log("Attaching DOMContentLoaded listener (v53.6)...");
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (v53.4). Running initialization...');
+            console.log('DOMContentLoaded fired (v53.6). Running initialization...');
             if (typeof SmartLog === 'undefined') { /* ... Fallback ... */ }
             try {
                 // Initialize DOM elements here to ensure availability
@@ -292,7 +316,7 @@
                 catch (e) { SmartLog("Feather fail.", "WARN", "UI", { error: e.message }); }
             } catch (criticalError) { /* ... Error Handling ... */ }
         });
-        console.log("DOMContentLoaded listener attached (v53.4).");
+        console.log("DOMContentLoaded listener attached (v53.6).");
         // HTTPS check
         if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) { console.warn("⚠️ App not on HTTPS."); } else { console.log("HTTPS check passed."); }
 
