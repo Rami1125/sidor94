@@ -24,7 +24,7 @@
     <!-- Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
 
-    <!-- v54.0: Load Firebase COMPAT SDKs first (Step 3) -->
+    <!-- v52.3: Load Firebase COMPAT SDKs first (Step 3) -->
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
@@ -45,6 +45,20 @@
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3a86ff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         #critical-error-display { display: none; }
+
+        /* v54.1: Login container style */
+        #login-container {
+            /* Center the login box in the middle of the viewport */
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+            z-index: 1000;
+            background-color: #f3f4f6; /* bg-gray-100 */
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -132,8 +146,7 @@
 
     <!-- v54.0: Main application logic using compat SDK and window.onload -->
     <script>
-        // v54.0: Removed type="module" for compat SDK
-        console.log('Driver App script started (v54.0)');
+        console.log('Driver App script started (v54.2 - Final Fix)'); // v54.2
 
         // --- Config Logic ---
         const firebaseConfig = {
@@ -148,7 +161,7 @@
         let app, auth, db; let initializationError = null;
         let authReadyPromise = null;
 
-        // v54.0: SmartLog Default Definition (Sync)
+        // v54.1: SmartLog Default Definition (Sync)
         window.SmartLog = function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
             const prefix = `[${origin} ${level}]`;
             const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log);
@@ -173,9 +186,8 @@
         }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
-        // v54.0: ensureAuth uses async/await which is generally safe in modern browsers
         async function ensureAuth() {
-            console.log("ensureAuth (v54.0): Starting..."); let tries = 0;
+            console.log("ensureAuth (v54.2): Starting..."); let tries = 0;
             while (tries < MAX_AUTH_RETRIES) {
                 tries++;
                 try {
@@ -197,7 +209,7 @@
         }
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v54.0: Overwrite with Async DB Writer) ---
+        // --- SmartLog Logic (v54.2: Final Async DB Writer) ---
         console.warn("SmartLog: ❗❗❗ ודא שחוקי האבטחה מאפשרים כתיבה ל־'system_logs_v3'. ❗❗❗");
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
         let canWriteToFirestore = null;
@@ -249,10 +261,10 @@
                 errorSuggestion: document.getElementById('error-suggestion'),
                 appContainer: document.getElementById('app-container'),
                 loginContainer: document.getElementById('login-container'),
-                loginForm: document.getElementById('login-form'), // New
-                nameInput: document.getElementById('driver-name-input'), // New
-                loginButton: document.getElementById('login-btn'), // New
-                errorMessageEl: document.getElementById('error-message') // New
+                loginForm: document.getElementById('login-form'),
+                nameInput: document.getElementById('driver-name-input'),
+                loginButton: document.getElementById('login-btn'),
+                errorMessageEl: document.getElementById('error-message')
              };
              SmartLog("DOM elements referenced.", "INFO", "Init.DOM");
 
@@ -262,7 +274,7 @@
              if (missingElements.length > 0) {
                  const msg = `Missing DOM elements: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return;
              }
-             SmartLog(`Initializing Driver App (v54.0) on ${getDeviceType()}`, "INFO", "Init"); // v54.0
+             SmartLog(`Initializing Driver App (v54.2) on ${getDeviceType()}`, "INFO", "Init"); // v54.2
 
             try {
                 // Display driver name immediately
@@ -312,7 +324,7 @@
         function startGeolocation() { /* ... */ }
         async function updateLocationInFirestore(lat, lng) { /* ... */ }
         async function updateLocationText(lat, lng) { /* ... */ }
-        function initMap() { /* ... */ }
+        async function initMap() { /* ... */ } // Changed to async to match await in initializeDriverApp
         function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
         function listenToOrders() { /* ... */ }
         function renderOrderList() { /* ... */ }
@@ -323,7 +335,8 @@
         function handleNewOrderNotification() { /* ... */ }
         function stopNotificationSound() { /* ... */ }
         function registerServiceWorker() { /* ... */ }
-        function getDeviceType() { /* ... */ }
+        function getDeviceType() { const ua=navigator.userAgent; if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return "tablet"; if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) return "mobile"; return "desktop"; }
+
 
         // --- Setup Login ---
         function setupLogin() {
@@ -374,10 +387,10 @@
         }
 
 
-        // --- Start Application (v53.5: Using DOMContentLoaded) ---
-        console.log("Attaching DOMContentLoaded listener (v53.5)...");
+        // --- Start Application (v54.2: Using DOMContentLoaded) ---
+        console.log("Attaching DOMContentLoaded listener (v54.2)...");
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (v53.5). Running initialization...');
+            console.log('DOMContentLoaded fired (v54.2). Running initialization...');
             if (typeof SmartLog === 'undefined') { /* ... Fallback ... */ }
             try {
                 // Initialize DOM elements here to ensure availability
@@ -426,7 +439,7 @@
                 catch (e) { SmartLog("Feather fail.", "WARN", "UI", { error: e.message }); }
             } catch (criticalError) { /* ... Error Handling ... */ }
         });
-        console.log("DOMContentLoaded listener attached (v53.5).");
+        console.log("DOMContentLoaded listener attached (v54.2).");
         // HTTPS check
         if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) { console.warn("⚠️ App not on HTTPS."); } else { console.log("HTTPS check passed."); }
 
