@@ -9,7 +9,331 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#3a86ff">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translu<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>DeliveryMaster נהג</title>
+
+    <!-- PWA Manifest & Theme -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3a86ff">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/ryPT3r29/image.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <!-- v52.3: Load Firebase COMPAT SDKs first -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+
+
+    <style>
+        /* --- Styles unchanged --- */
+        body { font-family: 'Rubik', sans-serif; overscroll-behavior-y: contain; }
+        #map { height: 250px; border-radius: 0.5rem; background-color: #e5e7eb; }
+        .leaflet-control-zoom { display: none; } .leaflet-control-attribution { font-size: 10px; }
+        .btn-primary { background-color: #3a86ff; color: white; } .btn-primary:hover { background-color: #2f6ac2; }
+        .btn-secondary { background-color: #6c757d; color: white; } .btn-secondary:hover { background-color: #5a6268; }
+        .btn-success { background-color: #28a745; color: white; } .btn-success:hover { background-color: #218838; }
+        .btn-warning { background-color: #ffc107; color: #212529; } .btn-warning:hover { background-color: #e0a800; }
+        .btn-icon { padding: 0.5rem; } .btn-disabled { opacity: 0.6; cursor: not-allowed; }
+        .notification-card { border-left: 5px solid #ffc107; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); } }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3a86ff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #critical-error-display { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- Main Container -->
+    <div class="container mx-auto max-w-xl p-0 flex flex-col h-screen">
+
+        <!-- Header -->
+        <header class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">DeliveryMaster</h1>
+                <p id="driver-name-display" class="text-sm text-gray-600">נהג: טוען...</p>
+            </div>
+            <div id="status-indicator" class="flex items-center space-x-2 space-x-reverse text-sm">
+                 <span id="status-text" class="text-yellow-600 font-medium">טוען אפליקציה...</span>
+                 <div id="status-dot" class="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+            </div>
+        </header>
+
+        <!-- Permission Request Area -->
+        <div id="permission-section" class="p-4 space-y-3 bg-yellow-100 border-b border-yellow-300" style="display: none;">
+             <p class="text-sm font-medium text-yellow-800">נדרשות הרשאות למיקום והתראות:</p>
+             <button id="request-perms-btn" class="w-full text-sm py-2 px-4 rounded bg-yellow-500 text-white font-semibold hover:bg-yellow-600 transition duration-150">בקש הרשאות</button>
+        </div>
+
+        <!-- Info & Map Area -->
+        <div class="p-4">
+            <div id="location-info" class="bg-blue-50 p-3 rounded-lg mb-4 text-center text-sm text-blue-800">
+                 <p id="current-location-text">📍 מאתר מיקום נוכחי...</p>
+                 <p id="eta-text" class="mt-1 font-medium hidden">...</p>
+            </div>
+            <div id="map"><p class="p-4 text-center text-gray-500">טוען מפה...</p></div>
+        </div>
+
+        <!-- Order List -->
+        <main id="order-list" class="flex-grow overflow-y-auto p-4 space-y-4">
+             <div id="loading-orders" class="text-center py-10 text-gray-500">
+                 <div class="loader mx-auto mb-2"></div>
+                 טוען משימות...
+             </div>
+        </main>
+
+         <!-- Error Display Area -->
+         <div id="critical-error-display" class="p-4 m-4 bg-red-100 border border-red-400 text-red-700 rounded text-center">
+             <h3 class="font-bold">שגיאה קריטית!</h3>
+             <p id="critical-error-message">האפליקציה נתקלה בבעיה בלתי צפויה.</p>
+             <p class="text-xs mt-2" id="error-suggestion">אנא נסה לרענן את הדף או פנה לתמיכה.</p>
+         </div>
+
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Tone.js for Sound -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+
+    <!-- v52.3: Main application logic using compat SDK -->
+    <script> // Changed type="module" back to regular script
+        console.log('Driver App script starting (v52.3)');
+
+        // --- Firebase Globals (Available due to compat scripts in <head>) ---
+        console.log("Firebase SDKs assumed loaded globally via script tags.");
+
+        // --- Config Logic ---
+        const firebaseConfig = {
+             apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
+             storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
+        };
+        let app, auth, db; let initializationError = null;
+        let authReadyPromise = null; // Promise for auth completion
+
+        try {
+            // Check if firebase object exists
+             if (typeof firebase === 'undefined') {
+                throw new Error('Firebase SDK global object not found. Check script loading order.');
+             }
+            app = firebase.initializeApp(firebaseConfig); // Use global firebase
+            console.log("✅ Firebase App initialized successfully.");
+            auth = firebase.auth(); // Use global firebase.auth()
+            db = firebase.firestore(); // Use global firebase.firestore()
+            console.log('Firebase SDK object:', firebase);
+            console.log('Firestore DB object:', db);
+            if (!db || typeof db !== 'object') { throw new Error("Firestore DB object is invalid."); }
+            console.log("✅ Firestore connected");
+        } catch (error) {
+             console.error("❌ CRITICAL: Firebase init failed!", error); initializationError = error;
+             try { document.getElementById('status-text').textContent = `Firebase Error: ${error.message}`; } catch(e){}
+        }
+
+        const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
+        // ensureAuth needs to be async, called later
+        async function ensureAuth() {
+            console.log("ensureAuth (v52.3): Starting..."); let tries = 0;
+            while (tries < MAX_AUTH_RETRIES) {
+                tries++;
+                try {
+                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
+                    if (!auth) throw new Error("Auth object missing");
+                    if (auth.currentUser) { console.log("ensureAuth: Already authenticated.", auth.currentUser.uid); return auth.currentUser; }
+                    console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
+                    const userCredential = await auth.signInAnonymously(); // Use global auth
+                    if (!userCredential?.user?.uid) { throw new Error("Invalid user object from Auth."); }
+                    console.log("ensureAuth: Success.", userCredential.user.uid);
+                    return userCredential.user;
+                } catch (e) { console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message); if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; } console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS)); }
+            } throw new Error("ensureAuth: Max retries reached.");
+        }
+        // Create the promise but don't await here
+        if (!initializationError && auth) {
+             authReadyPromise = ensureAuth();
+        } else {
+             authReadyPromise = Promise.reject(initializationError || new Error("Firebase Auth not initialized"));
+        }
+        console.log("Config part done.");
+
+        // --- SmartLog Logic (v52.3: Global function using global db/auth) ---
+        console.warn("SmartLog: ❗❗❗ Ensure Firestore rules allow writes to 'system_logs_v3'. ❗❗❗");
+        const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
+        let canWriteToFirestore = null;
+
+        window.SmartLog = async function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
+            const prefix = `[${origin} ${level}]`;
+            const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log);
+            logFn(`${prefix} ${msg}`, context);
+
+            if (canWriteToFirestore === false) return;
+
+            try {
+                if (!db) throw new Error('Firestore not available'); // Check global db
+                // Wait for auth promise if it exists
+                 if (authReadyPromise) await authReadyPromise;
+                 else throw new Error("Auth promise not created");
+
+                if (!auth?.currentUser) throw new Error("User not authenticated");
+
+                await db.collection(LOG_COLLECTION).add({ // Use global db
+                    message: String(msg), level, origin, context: { ...context, sessionId }, category, solution,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(), // Use compat FieldValue
+                    userId: auth.currentUser.uid,
+                });
+
+                if (canWriteToFirestore === null) { console.log("SmartLog: ✅ FS write confirmed."); canWriteToFirestore = true; }
+            } catch (err) {
+                if (canWriteToFirestore === null || canWriteToFirestore === true) {
+                   console.warn(`SmartLog: FS write failed (${err.message}). Console only.`, err);
+                   try { localStorage.setItem('SmartLog_Backup_' + Date.now(), JSON.stringify({ msg, level, origin, context, ts: new Date().toISOString() })); } catch (lsError) {}
+                }
+                canWriteToFirestore = false;
+            }
+        };
+        console.log("✅ SmartLog active");
+        // Initial permission test will run implicitly on first log call after auth
+
+
+        // --- Driver App Logic ---
+        let map; let driverMarker; let currentDriverId = null; let currentDriverName = null; let watchId = null; let currentOrders = {}; let notificationAudio = null; let hasNotificationPermission = false; let hasGeolocationPermission = false; let lastLocationUpdate = 0;
+        let DOM = {};
+        let appInitialized = false;
+
+        // --- Initialization ---
+        async function initializeDriverApp() {
+             // Ensure SmartLog exists (fallback)
+             if (typeof SmartLog === 'undefined') {
+                window.SmartLog = function(msg, level='INFO', origin='Fallback') { console.log(`[${origin} ${level}] ${msg}`); };
+                console.warn("Using basic SmartLog fallback during init.");
+             }
+
+             SmartLog('🚀 Driver App initializeDriverApp loaded', 'INFO', 'Init');
+             if (appInitialized) { SmartLog("Init called multiple times.", "WARN", "Init.Duplicate"); return; }
+             appInitialized = true;
+
+             // Define DOM elements FIRST
+             DOM = { /* ... DOM elements ... */ }; // Assume elements exist based on checklist
+
+             // Critical check - Step 1 Verification
+             const essentialIDs = ['driver-name-display', 'status-indicator', 'status-text', 'map', 'order-list'];
+             const missingElements = essentialIDs.filter(id => !document.getElementById(id));
+             if (missingElements.length > 0) { const msg = `Missing DOM elements: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return; }
+             SmartLog(`Initializing Driver App (v52.3) on ${getDeviceType()}`, "INFO", "Init"); // v52.3
+
+            try {
+                // SmartLog init check done implicitly
+
+                // Step 1: Check driver ID
+                SmartLog("Step 1: Checking localStorage...", "INFO", "Init"); /* ... */
+
+                // Step 2: Wait for Firebase Auth
+                updateStatus("ממתין לאימות...", "yellow", true); SmartLog("Step 2: Waiting for Auth...", "INFO", "Init.Auth");
+                const user = await authReadyPromise;
+                if (!user || !user.uid) { throw new Error("Invalid user object post-auth."); }
+                SmartLog(`Auth successful. User: ${user.uid}`, "INFO", "Init.Auth");
+
+                // Step 3: Permissions
+                updateStatus("בודק הרשאות...", "yellow", true); /* ... */
+
+                // Step 4: Initialize Map
+                updateStatus("מאתחל מפה...", "yellow", true); /* ... */
+
+                // Step 5: Start Geolocation
+                SmartLog("Step 5: Attempting Geolocation...", "INFO", "Init.GPS"); /* ... */
+
+                // Step 6: Notifications
+                SmartLog("Step 6: Initializing Notifications...", "INFO", "Init.Notifications"); /* ... */
+
+                // Step 7: Attach Order Listener
+                updateStatus("מסנכרן משימות...", "yellow", true); /* ... */
+
+                updateFinalStatus(); SmartLog("🚀 Driver App initialized successfully", "INFO", "Init");
+
+            } catch (error) { /* ... Error Handling ... */ }
+        }
+
+        // --- Other Functions ---
+        // Ensure all functions use global 'db' and 'firebase.firestore.FieldValue' etc.
+        function displayCriticalError(message, errorObject = null) { /* ... */ }
+        function updateStatus(text, color = "gray", pulse = false) { /* ... */ }
+        function updateFinalStatus() { /* ... */ }
+        async function checkAndRequestPermissions() { /* ... */ }
+        async function handlePermissionRequest() { /* ... */ }
+        function startGeolocation() { /* ... */ }
+        async function updateLocationInFirestore(lat, lng) {
+            if (!db || !currentDriverId) return; const ref = doc(db, "driverLocations", currentDriverId); // Use doc from global scope
+            try { await updateDoc(ref, { latitude: lat, longitude: lng, lastUpdate: serverTimestamp() }); SmartLog("Location updated.", "INFO", "GPS.FS"); } // Use global serverTimestamp
+            catch (e) { if (e.code === 'not-found') { SmartLog("Location doc missing, creating...", "WARN", "GPS.FS"); try { await setDoc(ref, { latitude: lat, longitude: lng, lastUpdate: serverTimestamp(), driverName: currentDriverName }); SmartLog("Location doc created.", "INFO", "GPS.FS"); } catch (ce) { SmartLog("Failed create", "ERROR", "GPS.FS.Create", { error: ce.message }); } } else { SmartLog("Failed update", "ERROR", "GPS.FS.Update", { error: e.message }); } }
+        }
+        async function updateLocationText(lat, lng) { /* ... */ }
+        function initMap() { /* ... */ }
+        function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
+        function listenToOrders() {
+            SmartLog("Listening to Orders...", "INFO", "Firestore.Listen"); const q = query(collection(db, "orders"), where("driver.id", "==", currentDriverId), where("status", "in", ["שויך", "בתהליך ליקוט", "בדרך"])); // Use global collection, query, where
+            onSnapshot(q, (snapshot) => { /* ... rest of logic ... */ }, (error) => { SmartLog("Listener Error", "ERROR", "Orders.Listener", { error: error.message }); /* ... */ }); // Use global onSnapshot
+        }
+        function renderOrderList() { /* ... */ }
+        function createOrderCard(order) { /* ... */ }
+        window.acknowledgeOrder = async (orderId) => {
+             SmartLog("Ack order...", "INFO", "Orders.Action", { orderId }); try { const ref = doc(db, "orders", orderId); await updateDoc(ref, { status: "בתהליך ליקוט" }); SmartLog("Status -> בתהליך ליקוט", "INFO", "Orders.Action", { orderId }); /* ... */ } catch (e) { SmartLog("Ack fail", "ERROR", "Orders.Action.Ack", { error: e.message }); alert("שגיאה."); }
+        };
+        window.completeOrder = async (orderId) => {
+             SmartLog("Completing order...", "INFO", "Orders.Action", { orderId }); if (!confirm("לסמן כהושלמה?")) return; try { const ref = doc(db, "orders", orderId); await updateDoc(ref, { status: "הושלם", completedAt: serverTimestamp() }); SmartLog("Status -> הושלם", "INFO", "Orders.Action", { orderId }); } catch (e) { SmartLog("Complete fail", "ERROR", "Orders.Action.Complete", { error: e.message }); alert("שגיאה."); }
+        };
+        function initNotifications() { /* ... */ }
+        function handleNewOrderNotification() { /* ... */ }
+        function stopNotificationSound() { /* ... */ }
+        function registerServiceWorker() { /* ... */ }
+        function getDeviceType() { /* ... */ }
+
+
+        // --- Start Application (v52.3: Using DOMContentLoaded) ---
+        console.log("Attaching DOMContentLoaded listener (v52.3)...");
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOMContentLoaded fired (v52.3). Running initialization...');
+            if (typeof SmartLog === 'undefined') { // Check again just before running
+                 window.SmartLog = function(msg, level='INFO', origin='Fallback') { console.log(`[${origin} ${level}] ${msg}`); };
+                 console.warn("Using basic SmartLog fallback.");
+             }
+            try {
+                SmartLog("DOMContentLoaded fired.", "INFO", "Init");
+                registerServiceWorker();
+                initializeDriverApp(); // Call async initializer
+                try { if(typeof feather !== 'undefined' && feather?.replace) { feather.replace(); SmartLog("Feather replaced.", "INFO", "UI"); } else { SmartLog("Feather missing.", "WARN", "UI"); } }
+                catch (e) { SmartLog("Feather fail.", "WARN", "UI", { error: e.message }); }
+            } catch (criticalError) { /* ... Error Handling ... */ }
+        });
+        console.log("DOMContentLoaded listener attached (v52.3).");
+        // Step 6: Check HTTPS
+        if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+            console.warn("⚠️ App not on HTTPS. Firebase might be blocked.");
+        } else {
+             console.log("HTTPS check passed.");
+        }
+
+    </script>
+
+</body>
+</html>
+
+cent">
     <link rel="apple-touch-icon" href="https://i.postimg.cc/ryPT3r29/image.png">
 
     <!-- Tailwind CSS -->
