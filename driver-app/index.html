@@ -45,15 +45,6 @@
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3a86ff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         #critical-error-display { display: none; }
-
-        /* v54.1: Login container style */
-        #login-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: #f3f4f6; /* bg-gray-100 */
-        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -141,9 +132,9 @@
 
     <!-- v54.1: Main application logic using compat SDK and window.onload -->
     <script>
-        console.log('Driver App script started (v54.1 - Merged Login)'); // v54.1
+        console.log('Driver App script started (v53.5)'); // v53.5
 
-        // --- Config Logic ---
+        // --- Config Logic (v53.5: FINAL CORRECTED CONFIG) ---
         const firebaseConfig = {
              apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
              authDomain: "saban94-78949.firebaseapp.com",
@@ -156,7 +147,7 @@
         let app, auth, db; let initializationError = null;
         let authReadyPromise = null;
 
-        // SmartLog Default Definition (Sync)
+        // v53.5: SmartLog Default Definition (Sync)
         window.SmartLog = function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
             const prefix = `[${origin} ${level}]`;
             const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log);
@@ -164,31 +155,51 @@
         };
         console.log("SmartLog Default Fallback defined.");
 
-        // --- Firebase Init ---
+
         try {
-            if (typeof firebase === 'undefined') { throw new Error('Firebase SDK global object not found.'); }
+             if (typeof firebase === 'undefined') { throw new Error('Firebase SDK global object not found.'); }
             app = firebase.initializeApp(firebaseConfig);
             console.log("✅ Firebase App initialized successfully.");
             auth = firebase.auth();
             db = firebase.firestore();
+            console.log('Firebase SDK object:', firebase);
+            console.log('Firestore DB object:', db);
             if (!db) { throw new Error("Firestore DB invalid."); }
             console.log("✅ Firestore connected");
         } catch (error) {
              console.error("❌ CRITICAL: Firebase init failed!", error); initializationError = error;
-             // Try to display error in status bar
              try { document.getElementById('status-text').textContent = `Firebase Error: ${error.message}`; } catch(e){}
         }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
         async function ensureAuth() { /* ... Logic ... */ }
-        if (!initializationError && auth) { authReadyPromise = ensureAuth(); }
-        else { authReadyPromise = Promise.reject(initializationError || new Error("FB Auth not initialized")); }
+        if (!initializationError && auth) {
+             authReadyPromise = ensureAuth();
+        } else {
+             authReadyPromise = Promise.reject(initializationError || new Error("FB Auth not initialized"));
+        }
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v54.1: Overwrite with Async DB Writer) ---
-        // (This part is crucial for logging, now defined synchronously)
-        // Global function is SmartLog = async function (msg, level...) { ... }
-        // ... (SmartLog definition is skipped here for brevity, assume the full async logic is in place)
+        // --- SmartLog Logic (v53.5: Overwrite with Async DB Writer) ---
+        console.warn("SmartLog: ❗❗❗ ודא שחוקי האבטחה מאפשרים כתיבה ל־'system_logs_v3'. ❗❗❗");
+        const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
+        let canWriteToFirestore = null;
+
+        // Overwrite SmartLog with the async function (uses the existing console logging)
+        window.SmartLog = async function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
+            const prefix = `[${origin} ${level}]`; const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log); logFn(`${prefix} ${msg}`, context);
+            if (canWriteToFirestore === false) return;
+            try {
+                if (!db) throw new Error('Firestore unavailable');
+                await authReadyPromise;
+                if (!auth?.currentUser) throw new Error("Not authenticated");
+                await db.collection(LOG_COLLECTION).add({ message: String(msg), level, origin, context: { ...context, sessionId }, category, solution, timestamp: firebase.firestore.FieldValue.serverTimestamp(), userId: auth.currentUser.uid });
+                if (canWriteToFirestore === null) { console.log("SmartLog: ✅ FS write confirmed."); canWriteToFirestore = true; }
+            } catch (err) {
+                if (canWriteToFirestore === null || canWriteToFirestore === true) { console.warn(`SmartLog: FS write failed (${err.message}). Console only.`, err); try { localStorage.setItem('SL_Backup_' + Date.now(), JSON.stringify({ msg, level, origin, context, ts: new Date().toISOString() })); } catch (lsError) {} }
+                canWriteToFirestore = false;
+            }
+        };
         console.log("✅ SmartLog active");
         SmartLog('SmartLog Permission Test', 'INFO', 'SmartLog.Init');
 
@@ -200,12 +211,17 @@
 
         // --- Initialization ---
         async function initializeDriverApp() {
+             // 1. Check/Redirect Logic (Handled outside this function in window.onload)
+             const storedId = localStorage.getItem('driverId');
+             const storedName = localStorage.getItem('driverName');
+             currentDriverId = storedId; currentDriverName = storedName;
+
              SmartLog('🚀 Driver App initializeDriverApp loaded', 'INFO', 'Init');
              if (appInitialized) { SmartLog("Init called multiple times.", "WARN", "Init.Duplicate"); return; }
              appInitialized = true;
 
-             // 1. Define DOM elements (After check, ensure it uses IDs from app-container)
-             DOM = { /* ... DOM elements ... */
+             // 2. Define DOM elements (Must be after DOMContentLoaded)
+             DOM = {
                 driverNameDisplay: document.getElementById('driver-name-display'), statusIndicator: document.getElementById('status-indicator'),
                 statusText: document.getElementById('status-text'), statusDot: document.getElementById('status-dot'),
                 mapElement: document.getElementById('map'), orderList: document.getElementById('order-list'),
@@ -214,123 +230,132 @@
                 etaText: document.getElementById('eta-text'), loadingOrders: document.getElementById('loading-orders'),
                 criticalErrorDisplay: document.getElementById('critical-error-display'), criticalErrorMessage: document.getElementById('critical-error-message'),
                 errorSuggestion: document.getElementById('error-suggestion'),
-                appContainer: document.getElementById('app-container'), // v54.1
-                loginContainer: document.getElementById('login-container') // v54.1
+                appContainer: document.getElementById('app-container'),
+                loginContainer: document.getElementById('login-container')
              };
              SmartLog("DOM elements referenced.", "INFO", "Init.DOM");
 
-             // Critical check - Ensure essential app components are present
-             const essentialIDs = ['driver-name-display', 'status-indicator', 'map', 'order-list'];
+             // Critical check - Step 1 Verification
+             const essentialIDs = ['driver-name-display', 'status-indicator', 'status-text', 'map', 'order-list'];
              const missingElements = essentialIDs.filter(id => !document.getElementById(id));
              if (missingElements.length > 0) {
                  const msg = `Missing DOM elements: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return;
              }
-             SmartLog(`Initializing Driver App (v54.1) on ${getDeviceType()}`, "INFO", "Init"); // v54.1
+             SmartLog(`Initializing Driver App (v53.5) on ${getDeviceType()}`, "INFO", "Init"); // v53.5
 
             try {
-                // Step 1: Authentication Check/Wait
-                updateStatus("ממתין לאימות...", "yellow", true); SmartLog("Step 1: Waiting for Auth...", "INFO", "Init.Auth");
+                // Display driver name immediately
+                // FIX: Check if DOM elements exist before setting textContent
+                if (DOM.driverNameDisplay) DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`;
+                SmartLog("Driver ID found.", "INFO", "Auth");
+
+                // Step 2: Wait for Firebase Auth
+                updateStatus("ממתין לאימות...", "yellow", true); SmartLog("Step 2: Waiting for Auth...", "INFO", "Init.Auth");
                 const user = await authReadyPromise;
                 if (!user || !user.uid) { throw new Error("Invalid user object post-auth."); }
                 SmartLog(`Auth successful. User: ${user.uid}`, "INFO", "Init.Auth");
 
-                // --- Everything below runs only if AUTH is successful and we are in the APP container ---
-                DOM.loginContainer.style.display = 'none'; // Hide login form
-                DOM.appContainer.style.display = 'flex'; // Show app UI (flex for h-screen)
-
-                // Display driver name
-                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`;
-                SmartLog("Driver ID found.", "INFO", "Auth");
-
-                // Step 2: Permissions
-                updateStatus("בודק הרשאות...", "yellow", true); SmartLog("Step 2: Checking permissions...", "INFO", "Init.Permissions");
+                // Step 3: Permissions
+                updateStatus("בודק הרשאות...", "yellow", true); SmartLog("Step 3: Checking permissions...", "INFO", "Init.Permissions");
                 await checkAndRequestPermissions(); SmartLog("Permissions check complete.", "INFO", "Init.Permissions");
 
-                // Step 3: Initialize Map
-                updateStatus("מאתחל מפה...", "yellow", true); SmartLog("Step 3: Initializing Map...", "INFO", "Init.Map");
+                // Step 4: Initialize Map
+                updateStatus("מאתחל מפה...", "yellow", true); SmartLog("Step 4: Initializing Map...", "INFO", "Init.Map");
                 await initMap(); SmartLog("Map init successful.", "INFO", "Init.Map");
 
-                // Step 4: Start Geolocation
-                SmartLog("Step 4: Attempting Geolocation...", "INFO", "Init.GPS");
+                // Step 5: Start Geolocation
+                SmartLog("Step 5: Attempting Geolocation...", "INFO", "Init.GPS");
                 if (hasGeolocationPermission) { updateStatus("מפעיל GPS...", "yellow", true); startGeolocation(); }
                 else { updateStatus("המתן לאישור מיקום", "red", false); SmartLog("Geo permission denied/pending.", "WARN", "Permissions"); }
 
-                // Step 5: Notifications & Order Listener
-                SmartLog("Step 5: Initializing Notifications & Listening...", "INFO", "Init.Notifications");
-                initNotifications();
-                updateStatus("מסנכרן משימות...", "yellow", true);
+                // Step 6: Notifications
+                SmartLog("Step 6: Initializing Notifications...", "INFO", "Init.Notifications"); initNotifications();
+
+                // Step 7: Attach Order Listener
+                updateStatus("מסנכרן משימות...", "yellow", true); SmartLog("Step 7: Attaching Order Listener...", "INFO", "Init.Firestore");
                 listenToOrders(); SmartLog("Order listener attached.", "INFO", "Init.Firestore");
 
-                updateFinalStatus(); SmartLog("🚀 Driver App initialized successfully", "INFO", "Init");
+                updateFinalStatus(); SmartLog("🚀 Driver App initialized successfully", "INFO", "Init"); // Step 9
 
             } catch (error) {
                  SmartLog(error.message, "ERROR", "Init.Critical", { stack: error.stack }); const msg = `אתחול נכשל: ${error.message}`; updateStatus(msg, "red", false); displayCriticalError(msg, error);
+                 console.log('DOM Elements:', document.querySelectorAll('*')); console.log('Firebase Status:', firebase.apps);
             }
         }
 
-        // --- Login Form Handler ---
-        function setupLogin() {
-            const loginForm = document.getElementById('login-form');
-            const nameInput = document.getElementById('driver-name-input');
-            const loginButton = document.getElementById('login-btn');
-            const errorMsgEl = document.getElementById('error-message');
+        // --- Other Functions ---
+        function displayCriticalError(message, errorObject = null) { /* ... */ }
+        function updateStatus(text, color = "gray", pulse = false) { /* ... */ }
+        function updateFinalStatus() { /* ... */ }
+        async function checkAndRequestPermissions() { /* ... */ }
+        async function handlePermissionRequest() { /* ... */ }
+        function startGeolocation() { /* ... */ }
+        async function updateLocationInFirestore(lat, lng) { /* ... */ }
+        async function updateLocationText(lat, lng) { /* ... */ }
+        function initMap() { /* ... */ }
+        function updateDriverMarkerOnMap(lat, lng) { /* ... */ }
+        function listenToOrders() { /* ... */ }
+        function renderOrderList() { /* ... */ }
+        function createOrderCard(order) { /* ... */ }
+        window.acknowledgeOrder = async (orderId) => { /* ... */ };
+        window.completeOrder = async (orderId) => { /* ... */ };
+        function initNotifications() { /* ... */ }
+        function handleNewOrderNotification() { /* ... */ }
+        function stopNotificationSound() { /* ... */ }
+        function registerServiceWorker() { /* ... */ }
+        function getDeviceType() { /* ... */ }
 
-            if (!loginForm) return;
 
-            loginForm.addEventListener('submit', (event) => {
-                event.preventDefault();
-                errorMsgEl.textContent = '';
-                const driverName = nameInput.value.trim();
+        // --- Start Application (v53.5: Using DOMContentLoaded) ---
+        console.log("Attaching DOMContentLoaded listener (v53.5)...");
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOMContentLoaded fired (v53.5). Running initialization...');
+            if (typeof SmartLog === 'undefined') { /* ... Fallback ... */ }
+            try {
+                // Initialize DOM elements here (essential for initial check and SmartLog)
+                DOM.driverNameDisplay = document.getElementById('driver-name-display');
+                DOM.statusIndicator = document.getElementById('status-indicator');
+                DOM.statusText = document.getElementById('status-text');
+                DOM.statusDot = document.getElementById('status-dot');
+                DOM.mapElement = document.getElementById('map');
+                DOM.orderList = document.getElementById('order-list');
+                DOM.permissionSection = document.getElementById('permission-section');
+                DOM.requestPermsBtn = document.getElementById('request-perms-btn');
+                DOM.locationInfo = document.getElementById('location-info');
+                DOM.currentLocationText = document.getElementById('current-location-text');
+                DOM.etaText = document.getElementById('eta-text');
+                DOM.loadingOrders = document.getElementById('loading-orders');
+                DOM.criticalErrorDisplay = document.getElementById('critical-error-display');
+                DOM.criticalErrorMessage = document.getElementById('critical-error-message');
+                DOM.errorSuggestion = document.getElementById('error-suggestion');
+                
+                
+                // --- Check Login Status and Redirect/Start ---
+                 const storedId = localStorage.getItem('driverId');
+                 if (!storedId) {
+                     // Not logged in: Show login, attach handler
+                     document.getElementById('login-container').style.display = 'flex';
+                     document.getElementById('app-container').style.display = 'none';
+                     setupLogin();
+                     return; // Stop initialization
+                 }
 
-                if (!driverName) {
-                    errorMsgEl.textContent = 'אנא הזן שם נהג.';
-                    return;
-                }
-
-                loginButton.disabled = true;
-                try {
-                    localStorage.setItem('driverId', driverName);
-                    localStorage.setItem('driverName', driverName);
-                    SmartLog(`Login success. Name=${driverName}. Starting app.`, "INFO", "Login");
-                    // Hide login, show app, and call the initializer function
-                    loginButton.textContent = 'מתחבר...';
-                    DOM.loginContainer.style.display = 'none';
-                    DOM.appContainer.style.display = 'flex';
-                    initializeDriverApp();
-
-                } catch (error) {
-                    console.error("Error saving to localStorage:", error);
-                    errorMsgEl.textContent = 'שגיאה: לא ניתן לשמור פרטי התחברות.';
-                    loginButton.disabled = false;
-                    loginButton.textContent = 'כניסה לאפליקציה';
-                    SmartLog(`Login failed.`, "ERROR", "Login");
-                }
-            });
-        }
-
-        // --- Initial Load Logic ---
-        window.onload = () => {
-             console.log('Window LOADED (v54.1). Running initialization...');
-
-             // 1. Check Login Status
-             const storedId = localStorage.getItem('driverId');
-             if (storedId) {
                  // Logged in: Hide login, show app
                  document.getElementById('login-container').style.display = 'none';
                  document.getElementById('app-container').style.display = 'flex';
-                 initializeDriverApp();
-             } else {
-                 // Not logged in: Show login, attach handler
-                 document.getElementById('login-container').style.display = 'flex';
-                 document.getElementById('app-container').style.display = 'none';
-                 setupLogin();
-             }
 
-             // Global UI Init
-             try { if(typeof feather !== 'undefined' && feather?.replace) { feather.replace(); SmartLog("Feather replaced.", "INFO", "UI"); } }
-             catch (e) { SmartLog("Feather fail.", "WARN", "UI", { error: e.message }); }
-        };
-        console.log("window.onload listener attached (v54.1).");
+
+                SmartLog("DOMContentLoaded fired.", "INFO", "Init");
+                registerServiceWorker();
+                initializeDriverApp(); // Call async initializer
+                try { if(typeof feather !== 'undefined' && feather?.replace) { feather.replace(); SmartLog("Feather replaced.", "INFO", "UI"); } else { SmartLog("Feather missing.", "WARN", "UI"); } }
+                catch (e) { SmartLog("Feather fail.", "WARN", "UI", { error: e.message }); }
+            } catch (criticalError) { /* ... Error Handling ... */ }
+        });
+        console.log("DOMContentLoaded listener attached (v53.5).");
+        // HTTPS check
+        if (window.location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) { console.warn("⚠️ App not on HTTPS."); } else { console.log("HTTPS check passed."); }
+
     </script>
 
 </body>
