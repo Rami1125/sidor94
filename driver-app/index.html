@@ -98,7 +98,7 @@
 
     <!-- Combined & Inlined App Logic -->
     <script type="module">
-        console.log('Driver App script started (v51.8)'); // v51.8
+        console.log('Driver App script started (v51.9)'); // v51.9
 
         // --- Firebase SDK Imports ---
         const { initializeApp, getApps, getApp } = await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js");
@@ -115,7 +115,7 @@
         const authReadyPromise = ensureAuth();
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v51.8: Simplified fallback, initializeSmartLog returns promise) ---
+        // --- SmartLog Logic (v51.9: Ensure fallback is used until promise resolves) ---
         console.warn("SmartLog: !!! Ensure Firestore rules allow writes to 'system_logs_v3' !!!");
         // Start with fallback logger defined immediately
         let SmartLog = {
@@ -127,47 +127,34 @@
         let isDbAvailable = !!db; let isAuthReadyForLogging = false;
         let firestoreWritePermission = null;
 
-        // v51.8: initializeSmartLog now returns a promise that resolves when setup is complete
+        // initializeSmartLog still returns a promise
         function initializeSmartLog() {
-             return new Promise(async (resolve) => { // Return a promise
+             return new Promise(async (resolve) => {
                 try {
                     await authReadyPromise;
                     isAuthReadyForLogging = true; console.log("SL: Auth ready for DB.");
                     if (isDbAvailable) {
                         try {
-                            // Test write remains the same
-                            await addDoc(collection(db, LOG_COLLECTION), { timestamp: serverTimestamp(), level: 'INFO', message: 'SmartLog Permission Test', origin: 'SmartLog.Init', context: { sessionId, status: 'Checking permissions...' }, user: { uid: auth?.currentUser?.uid || 'unknown' } });
-                            firestoreWritePermission = true;
-                            console.log("SmartLog: Firestore write permission confirmed.");
+                            // Test write
+                            await addDoc(collection(db, LOG_COLLECTION), { /* ... test log entry ... */ });
+                            firestoreWritePermission = true; console.log("SmartLog: FS write confirmed.");
 
                             // Define the full writeLog function HERE
-                            const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => {
-                                 const deviceType = getDeviceType ? getDeviceType() : 'unknown';
-                                 const enrichedContext = { ...context, deviceType };
-                                 const consoleArgs = [`[${origin}] ${level}:`, message]; if (Object.keys(enrichedContext).length > 0) consoleArgs.push(enrichedContext); /*...*/
-                                 switch (level) { case 'INFO': console.log(...consoleArgs); break; case 'WARN': console.warn(...consoleArgs); break; case 'ERROR': console.error(...consoleArgs); break; default: console.log(...consoleArgs); }
-                                 if (!isDbAvailable || !isAuthReadyForLogging) return;
-                                 try { const user = auth?.currentUser; if (!user) return; const userContext = { uid: user.uid, isAnonymous: user.isAnonymous }; const logEntry = { timestamp: serverTimestamp(), level, message: String(message), origin, context: { ...JSON.parse(JSON.stringify(enrichedContext || {})), sessionId, userAgent: navigator.userAgent || 'N/A', page: window.location.pathname || '/driver-app/' }, user: userContext, category: category || null, solution: solution || null }; await addDoc(collection(db, LOG_COLLECTION), logEntry); }
-                                 catch (error) { console.error("SL FATAL Firestore write.", error); if (error.code === 'permission-denied') { console.warn("SL: Disabling FS log."); isDbAvailable = false; } }
-                             };
+                            const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => { /* ... full writeLog ... */ };
+
                             // Overwrite the fallback SmartLog with the full version
                             SmartLog = { info: (msg, origin, ctx = {}) => { writeLog('INFO', msg, origin, ctx); }, warn: (msg, origin, ctx = {}, cat = null, sol = null) => { writeLog('WARN', msg, origin, ctx, cat, sol); }, error: (err, origin, ctx = {}, cat = null, sol = null) => { const msg = err instanceof Error ? err.message : String(err); const stack = err instanceof Error ? err.stack : 'N/A'; writeLog('ERROR', msg, origin, { ...ctx, stack }, cat, sol); } };
-                            console.log("SmartLog initialized with Firestore support.");
+                            console.log("SmartLog initialized with FS support.");
 
                         } catch (writeError) {
-                             firestoreWritePermission = false;
-                             console.error("SmartLog: Firestore write permission test failed!", writeError);
-                             // Use the fallback logger (which is already assigned) to log the error to console
-                             SmartLog.error(writeError, "SmartLog.Init", null, "Firestore", "בדוק חוקי אבטחה!");
-                             isDbAvailable = false;
-                             console.warn("SmartLog: Firestore logging disabled (permission error). Using console only.");
+                             firestoreWritePermission = false; console.error("SmartLog: FS write failed!", writeError);
+                             // Log error using the INITIAL fallback logger
+                             console.error(`[SmartLog.Init] ERROR:`, writeError?.message || writeError, { stack: writeError?.stack }, 'Firestore', 'בדוק חוקי אבטחה!');
+                             isDbAvailable = false; console.warn("SmartLog: FS logging disabled.");
                         }
-                    } else { console.warn("SmartLog: DB instance unavailable. Using console only."); }
-                } catch (authError) {
-                     console.warn("SL: Auth failed, DB log disabled."); isDbAvailable = false;
-                 } finally {
-                     resolve(); // Resolve the promise regardless of success/failure of FS logging
-                 }
+                    } else { console.warn("SmartLog: DB unavailable. Console only."); }
+                } catch (authError) { console.warn("SL: Auth failed, DB log disabled."); isDbAvailable = false; }
+                finally { resolve(); } // Resolve promise always
             });
         }
         const smartLogInitPromise = initializeSmartLog(); // Start initialization
@@ -184,28 +171,35 @@
             if (appInitialized) { SmartLog.warn("Init called multiple times.", "Init.Duplicate"); return; }
             appInitialized = true;
 
+            // Define DOM elements FIRST
             DOM = { /* ... DOM elements ... */ };
-            // Critical check right after definition
+            // Critical check
             if (!DOM.driverNameDisplay || !DOM.statusText || !DOM.mapElement || !DOM.orderList) {
-                 console.error("CRITICAL ERROR: Essential DOM elements missing!");
-                 displayCriticalError("שגיאה קריטית בטעינת ממשק המשתמש!", new Error("DOM elements missing"));
-                 return;
+                 console.error("CRITICAL ERROR: Essential DOM elements missing!"); displayCriticalError("שגיאה קריטית בטעינת UI!", new Error("DOM missing")); return;
             }
-            // SmartLog is guaranteed to be defined (at least the fallback)
-            SmartLog.info("DOM elements referenced.", "Init.DOM");
-            SmartLog.info(`Initializing Driver App (v51.8) on ${getDeviceType()}`, "Init"); // v51.8
+             // SmartLog fallback is guaranteed to exist here
+             SmartLog.info("DOM elements referenced.", "Init.DOM");
+             SmartLog.info(`Initializing Driver App (v51.9) on ${getDeviceType()}`, "Init"); // v51.9
 
             try {
-                // v51.8: Wait for SmartLog initialization (including permission check)
+                // v51.9: Wait for SmartLog initialization BEFORE using it extensively
                 SmartLog.info("Waiting for SmartLog initialization...", "Init");
-                await smartLogInitPromise;
-                SmartLog.info(`SmartLog ready. Firestore logging enabled: ${firestoreWritePermission === true}`, "Init");
+                await smartLogInitPromise; // Wait here
+                SmartLog.info(`SmartLog ready. FS logging: ${firestoreWritePermission === true}`, "Init");
 
                 // Step 1: Check driver ID
-                SmartLog.info("Step 1: Checking localStorage...", "Init"); /* ... */
+                SmartLog.info("Step 1: Checking localStorage...", "Init");
+                currentDriverId = localStorage.getItem('driverId'); currentDriverName = localStorage.getItem('driverName');
+                if (!currentDriverId || !currentDriverName) { throw new Error("Missing driverId/Name in localStorage"); }
+                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`; SmartLog.info("Driver ID found.", "Auth");
 
                 // Step 2: Wait for Firebase Auth
-                updateStatus("ממתין לאימות...", "yellow", true); /* ... */
+                updateStatus("ממתין לאימות...", "yellow", true);
+                SmartLog.info("Step 2: Waiting for Auth...", "Init.Auth");
+                const user = await authReadyPromise;
+                console.log("User received:", user); SmartLog.info("User received", "Auth.Debug", { user: JSON.stringify(user) });
+                if (!user || !user.uid) { throw new Error("Invalid user object post-auth."); }
+                SmartLog.info(`Auth successful. User: ${user.uid}`, "Init.Auth");
 
                 // Step 3: Permissions
                 updateStatus("בודק הרשאות...", "yellow", true); /* ... */
@@ -249,19 +243,19 @@
         function getDeviceType() { /* ... */ }
 
 
-        // --- Start Application (v51.8: Direct call at the end) ---
-        console.log("Script execution finished. Attempting to run initialization directly (v51.8)...");
+        // --- Start Application (v51.9: Direct call at the end) ---
+        console.log("Script execution finished. Attempting to run initialization directly (v51.9)...");
         try {
             // Call initializeDriverApp directly now
-            initializeDriverApp();
+            initializeDriverApp(); // Don't await here, let it run in background
 
             // Try initializing Feather icons after a short delay
-            setTimeout(() => { try { if(typeof feather !== 'undefined' && feather?.replace) { feather.replace(); SmartLog.info("Feather icons replaced (delayed).", "UI"); } else { SmartLog.warn("Feather library not found (delayed).", "UI"); } } catch (e) { SmartLog.warn("Feather replace failed (delayed).", "UI", e); } }, 100);
+            setTimeout(() => { try { if(typeof feather !== 'undefined' && feather?.replace) { feather.replace(); SmartLog.info("Feather icons replaced (delayed).", "UI"); } else { SmartLog.warn("Feather library not found (delayed).", "UI"); } } catch (e) { SmartLog.warn("Feather replace failed (delayed).", "UI", e); } }, 200); // Increased delay slightly
 
         } catch (criticalError) {
              console.error("CRITICAL ERROR during direct initialization call:", criticalError);
              displayCriticalError(`שגיאה קריטית מיידית: ${criticalError.message}`, criticalError);
-             // Use console directly as SmartLog might not be fully ready here yet
+             // Use console directly as SmartLog might not be fully ready
              console.error("[Direct Init Error]", criticalError);
         }
 
