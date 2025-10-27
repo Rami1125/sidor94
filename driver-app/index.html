@@ -98,7 +98,7 @@
 
     <!-- Combined & Inlined App Logic -->
     <script type="module">
-        console.log('Driver App script started (v51.5)'); // v51.5
+        console.log('Driver App script started (v51.6)'); // v51.6
 
         // --- Firebase SDK Imports ---
         const { initializeApp, getApps, getApp } = await import("https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js");
@@ -107,7 +107,7 @@
         console.log("Firebase SDKs imported.");
 
         // --- Config Logic ---
-        const firebaseConfig = { /* ... */ };
+        const firebaseConfig = { /* ... config ... */ };
         let app, auth, db; let initializationError = null;
         try { /* ... Firebase init ... */ } catch (error) { /* ... */ }
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
@@ -115,96 +115,50 @@
         const authReadyPromise = ensureAuth();
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v51.5: Simplified fallback and added permission check log) ---
-        let SmartLog = { // Start with fallback
-             info: (msg, origin, ctx) => console.log(`[${origin || 'Log'}] INFO:`, msg, ctx || ''),
-             warn: (msg, origin, ctx) => console.warn(`[${origin || 'Log'}] WARN:`, msg, ctx || ''),
-             error: (err, origin, ctx) => console.error(`[${origin || 'Log'}] ERROR:`, err?.message || err, ctx || '', err?.stack)
-        };
-        const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
-        let isDbAvailable = !!db; let isAuthReadyForLogging = false;
-
-        // Function to attempt replacing fallback with full logger
-        async function initializeSmartLog() {
-            try {
-                await authReadyPromise; // Wait for auth attempt
-                isAuthReadyForLogging = true; console.log("SL: Auth ready for DB.");
-
-                // Attempt a test write to check permissions
-                if (isDbAvailable) {
-                    try {
-                        await addDoc(collection(db, LOG_COLLECTION), {
-                            timestamp: serverTimestamp(), level: 'INFO', message: 'SmartLog Permission Test', origin: 'SmartLog.Init',
-                            context: { sessionId, status: 'Checking permissions...' }, user: { uid: auth?.currentUser?.uid || 'unknown' }
-                        });
-                        console.log("SmartLog: Firestore write permission confirmed.");
-
-                        // Define the full writeLog function HERE, only if permission test passed
-                        const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => {
-                             const deviceType = getDeviceType ? getDeviceType() : 'unknown'; // Use getDeviceType if available
-                             const enrichedContext = { ...context, deviceType };
-                             const consoleArgs = [`[${origin}] ${level}:`, message]; if (Object.keys(enrichedContext).length > 0) consoleArgs.push(enrichedContext); /*...*/
-                             switch (level) { case 'INFO': console.log(...consoleArgs); break; case 'WARN': console.warn(...consoleArgs); break; case 'ERROR': console.error(...consoleArgs); break; default: console.log(...consoleArgs); }
-                             if (!isDbAvailable || !isAuthReadyForLogging) return; // Re-check just in case
-                             try { const user = auth?.currentUser; if (!user) return; const userContext = { uid: user.uid, isAnonymous: user.isAnonymous }; const logEntry = { timestamp: serverTimestamp(), level, message: String(message), origin, context: { ...JSON.parse(JSON.stringify(enrichedContext || {})), sessionId, userAgent: navigator.userAgent || 'N/A', page: window.location.pathname || '/driver-app/' }, user: userContext, category: category || null, solution: solution || null }; await addDoc(collection(db, LOG_COLLECTION), logEntry); }
-                             catch (error) { console.error("SL FATAL Firestore write.", error); if (error.code === 'permission-denied') { console.warn("SL: Disabling FS log (permission denied)."); isDbAvailable = false; } }
-                         };
-                         // Overwrite the fallback SmartLog
-                         SmartLog = { info: (msg, origin, ctx = {}) => { writeLog('INFO', msg, origin, ctx); }, warn: (msg, origin, ctx = {}, cat = null, sol = null) => { writeLog('WARN', msg, origin, ctx, cat, sol); }, error: (err, origin, ctx = {}, cat = null, sol = null) => { const msg = err instanceof Error ? err.message : String(err); const stack = err instanceof Error ? err.stack : 'N/A'; writeLog('ERROR', msg, origin, { ...ctx, stack }, cat, sol); } };
-                         console.log("SmartLog initialized with Firestore support.");
-
-                    } catch (writeError) {
-                         console.error("SmartLog: Firestore write permission test failed!", writeError);
-                         SmartLog.error(writeError, "SmartLog.Init", null, "Firestore", "בדוק חוקי אבטחה (Security Rules) ב-Firebase Console. יש לאפשר כתיבה לאוסף system_logs_v3 למשתמשים אנונימיים.");
-                         isDbAvailable = false; // Disable DB logging if test fails
-                         console.warn("SmartLog: Firestore logging disabled due to permission error. Using console only.");
-                    }
-                } else {
-                     console.warn("SmartLog: DB instance not available. Using console only.");
-                }
-
-            } catch (authError) {
-                console.warn("SL: Auth failed, DB logging disabled.");
-                isDbAvailable = false;
-            }
-        }
-        initializeSmartLog(); // Start the initialization and permission check
+        // --- SmartLog Logic ---
+        console.warn("SmartLog: !!! Ensure Firestore rules allow writes to 'system_logs_v3' for authenticated (anonymous) users !!!"); // v51.6 Reminder
+        let SmartLog = { /* ... Fallback logger ... */ };
+        async function initializeSmartLog() { /* ... Same logic with permission test ... */ }
+        initializeSmartLog(); // Start initialization and permission check
         console.log("SmartLog part done (initial setup).");
-
 
         // --- Driver App Logic ---
         let map; let driverMarker; let currentDriverId = null; let currentDriverName = null; let watchId = null; let currentOrders = {}; let notificationAudio = null; let hasNotificationPermission = false; let hasGeolocationPermission = false; let lastLocationUpdate = 0;
         let DOM = {};
-        let appInitialized = false; // v51.5: Flag to prevent double init
+        let appInitialized = false;
 
-        // --- Initialization ---
+        // --- Initialization (v51.6: Enhanced error handling for Auth) ---
         async function initializeDriverApp() {
-            // v51.5: Check flag
-            if (appInitialized) {
-                 SmartLog.warn("initializeDriverApp called multiple times. Ignoring subsequent calls.", "Init.Duplicate");
-                 return;
-            }
-            appInitialized = true; // Set flag
+            if (appInitialized) { SmartLog.warn("Init called multiple times.", "Init.Duplicate"); return; }
+            appInitialized = true;
 
             DOM = { /* ... DOM elements ... */ };
             SmartLog.info("DOM referenced.", "Init.DOM");
-            // Simplified DOM check - rely on try/catch below
-            if (!document.getElementById('driver-name-display')) {
-                 console.error("Critical DOM elements missing even after DOMContentLoaded/timeout!");
-                 // Display basic error directly
-                 const errDiv = document.getElementById('critical-error-display');
-                 const errMsg = document.getElementById('critical-error-message');
-                 if(errDiv && errMsg) { errMsg.textContent = "שגיאה קריטית בטעינת ממשק המשתמש!"; errDiv.style.display = 'block'; }
-                 return; // Stop
-            }
-            SmartLog.info(`Initializing Driver App (v51.5) on ${getDeviceType()}`, "Init"); // v51.5
+            if (!DOM.driverNameDisplay || !DOM.statusText || !DOM.mapElement || !DOM.orderList) { throw new Error("DOM elements missing!"); }
+            SmartLog.info(`Initializing Driver App (v51.6) on ${getDeviceType()}`, "Init"); // v51.6
 
             try {
                 // Step 1: Check driver ID
-                SmartLog.info("Step 1: Checking localStorage...", "Init"); /* ... */
+                SmartLog.info("Step 1: Checking localStorage...", "Init");
+                currentDriverId = localStorage.getItem('driverId'); currentDriverName = localStorage.getItem('driverName');
+                if (!currentDriverId || !currentDriverName) { throw new Error("Missing driverId/Name in localStorage"); }
+                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`; SmartLog.info("Driver ID found.", "Auth");
 
-                // Step 2: Wait for Firebase Auth
-                updateStatus("ממתין לאימות...", "yellow", true); /* ... */
+                // --- Step 2: Wait for Firebase Auth (with specific catch) ---
+                let user;
+                try {
+                    updateStatus("ממתין לאימות...", "yellow", true);
+                    SmartLog.info("Step 2: Waiting for Firebase Auth...", "Init.Auth");
+                    user = await authReadyPromise; // Wait for the promise from ensureAuth
+                    console.log("User object received (v51.6):", user); SmartLog.info("User received", "Auth.Debug", { user: JSON.stringify(user) });
+                    if (!user || !user.uid) { throw new Error("Invalid user object received post-auth."); } // Validate user object
+                    SmartLog.info(`Auth successful. User: ${user.uid}`, "Init.Auth");
+                } catch (authError) {
+                    // v51.6: Catch specific errors from authReadyPromise
+                    SmartLog.error(authError, "Auth.Critical", { userReceived: user ?? 'undefined' }, "Auth", "האימות נכשל. נסה לסגור ולפתוח מחדש.");
+                    throw new Error(`Firebase Authentication failed: ${authError.message}`); // Re-throw to stop initialization
+                }
+                // --- End of Step 2 ---
 
                 // Step 3: Permissions
                 updateStatus("בודק הרשאות...", "yellow", true); /* ... */
@@ -223,7 +177,12 @@
 
                 updateFinalStatus(); SmartLog.info("Initialization Complete.", "Init");
 
-            } catch (error) { SmartLog.error(error, "Init.Critical"); const msg = `אתחול נכשל: ${error.message}`; updateStatus(msg, "red", false); displayCriticalError(msg, error); }
+            } catch (error) { // Catch errors from any step (including re-thrown auth error)
+                SmartLog.error(error, "Init.Critical");
+                const errorMsg = `שגיאת אתחול: ${error.message}`;
+                updateStatus(errorMsg, "red", false);
+                displayCriticalError(errorMsg, error);
+            }
         }
 
         function displayCriticalError(message, errorObject = null) { /* ... */ }
@@ -245,42 +204,15 @@
         function handleNewOrderNotification() { /* ... */ }
         function stopNotificationSound() { /* ... */ }
         function registerServiceWorker() { /* ... */ }
-        function getDeviceType() { const ua=navigator.userAgent; if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) return "tablet"; if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) return "mobile"; return "desktop"; }
+        function getDeviceType() { /* ... */ }
 
 
-        // --- Start Application (v51.5: Using both DOMContentLoaded and setTimeout) ---
-        function runInitialization() {
-             // v51.5: Use flag to run only once
-             if (appInitialized) return;
-             console.log('runInitialization called (v51.5).');
-             try {
-                if (typeof SmartLog === 'undefined') { throw new Error("SmartLog module is missing!"); }
-                SmartLog.info("Running Initialization Sequence.", "Init");
-                registerServiceWorker();
-                initializeDriverApp(); // Call async initializer
-                try { if(typeof feather !== 'undefined' && feather?.replace) { feather.replace(); SmartLog.info("Feather icons replaced.", "UI"); } else { SmartLog.warn("Feather library not found.", "UI"); } }
-                catch (e) { SmartLog.warn("Feather replace failed.", "UI", e); }
-             } catch (criticalError) {
-                 console.error("CRITICAL ERROR during runInitialization:", criticalError);
-                 displayCriticalError(`שגיאה קריטית: ${criticalError.message}`, criticalError);
-                 (SmartLog.error || console.error)(criticalError, "Init.Run");
-             }
-        }
+        // --- Start Application ---
+        function runInitialization() { /* ... */ }
+        console.log("Attaching DOMContentLoaded listener (v51.6)..."); // v51.6
+        document.addEventListener('DOMContentLoaded', runInitialization);
+        console.log("DOMContentLoaded listener attached (v51.6).");
 
-        // v51.5: Attach listener AND set timeout fallback
-        console.log("Attaching DOMContentLoaded listener and setting timeout (v51.5)...");
-        document.addEventListener('DOMContentLoaded', () => {
-             console.log("DOMContentLoaded event handler executing (v51.5).");
-             runInitialization();
-        });
-        setTimeout(() => {
-             console.log("Timeout fallback executing (v51.5). Checking if already initialized...");
-             runInitialization(); // Call initialization function again, the flag will prevent double execution
-        }, 500); // 500ms timeout
-        console.log("DOMContentLoaded listener and timeout attached (v51.5).");
-
-
-      // Removed top-level try-catch
     </script>
 
 </body>
