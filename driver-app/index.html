@@ -24,7 +24,8 @@
     <!-- Icons -->
     <script src="https://unpkg.com/feather-icons"></script>
 
-    <!-- v52.3: Load Firebase COMPAT SDKs first -->
+    <!-- v52.3: Load Firebase COMPAT SDKs first (Step 3) -->
+    <!-- שימוש ב-compat כדי לחשוף את האובייקט הגלובלי 'firebase' -->
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
@@ -102,9 +103,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
 
-    <!-- v52.3: Main application logic using compat SDK -->
+    <!-- v52.4: Main application logic using compat SDK -->
     <script>
-        console.log('Driver App script starting (v52.3)');
+        console.log('Driver App script starting (v52.4)');
 
         // --- Config Logic (Step 4) ---
         const firebaseConfig = {
@@ -136,7 +137,22 @@
         }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
-        async function ensureAuth() { /* ... Logic ... */ }
+        async function ensureAuth() {
+            console.log("ensureAuth (v52.4): Starting..."); let tries = 0;
+            while (tries < MAX_AUTH_RETRIES) {
+                tries++;
+                try {
+                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
+                    if (!auth) throw new Error("Auth object missing");
+                    if (auth.currentUser) { console.log("ensureAuth: Already authenticated.", auth.currentUser.uid); return auth.currentUser; }
+                    console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
+                    const userCredential = await auth.signInAnonymously();
+                    if (!userCredential?.user?.uid) { throw new Error("Invalid user object from Auth."); }
+                    console.log("ensureAuth: Success.", userCredential.user.uid);
+                    return userCredential.user;
+                } catch (e) { console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message); if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; } console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS)); }
+            } throw new Error("ensureAuth: Max retries reached.");
+        }
         if (!initializationError && auth) {
              authReadyPromise = ensureAuth();
         } else {
@@ -144,12 +160,12 @@
         }
         console.log("Config part done.");
 
-        // --- SmartLog Logic (v52.3: Global function using global db/auth) ---
-        // Step 8 & Step 9 Verification
+        // --- SmartLog Logic (v52.4: Global function using global db/auth) ---
         console.warn("SmartLog: ❗❗❗ ודא שחוקי האבטחה מאפשרים כתיבה ל־'system_logs_v3'. ❗❗❗");
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
         let canWriteToFirestore = null;
 
+        // Step 8: Define SmartLog globally
         window.SmartLog = async function (msg, level = 'INFO', origin = 'App', context = {}, category = null, solution = null) {
             const prefix = `[${origin} ${level}]`; const logFn = level === 'ERROR' ? console.error : (level === 'WARN' ? console.warn : console.log); logFn(`${prefix} ${msg}`, context);
             if (canWriteToFirestore === false) return;
@@ -175,7 +191,9 @@
 
         // --- Initialization ---
         async function initializeDriverApp() {
-             // Step 7 Verification
+             // Ensure SmartLog exists (fallback)
+             if (typeof SmartLog === 'undefined') { window.SmartLog = function(msg, level='INFO', origin='Fallback') { console.log(`[${origin} ${level}] ${msg}`); }; console.warn("Using basic SmartLog fallback."); }
+
              SmartLog('🚀 Driver App initializeDriverApp loaded', 'INFO', 'Init');
              if (appInitialized) { SmartLog("Init called multiple times.", "WARN", "Init.Duplicate"); return; }
              appInitialized = true;
@@ -199,11 +217,14 @@
              if (missingElements.length > 0) {
                  const msg = `Missing DOM: ${missingElements.join(', ')}`; SmartLog(msg, "ERROR", "Init.DOM"); displayCriticalError(`UI Error: ${msg}`, new Error(msg)); return;
              }
-             SmartLog(`Initializing Driver App (v52.3) on ${getDeviceType()}`, "INFO", "Init");
+             SmartLog(`Initializing Driver App (v52.4) on ${getDeviceType()}`, "INFO", "Init");
 
             try {
                 // Step 1: Check driver ID
-                SmartLog("Step 1: Checking localStorage...", "INFO", "Init"); /* ... */
+                SmartLog("Step 1: Checking localStorage...", "INFO", "Init");
+                currentDriverId = localStorage.getItem('driverId'); currentDriverName = localStorage.getItem('driverName');
+                if (!currentDriverId || !currentDriverName) { throw new Error("Missing driverId/Name in localStorage"); }
+                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`; SmartLog("Driver ID found.", "INFO", "Auth");
 
                 // Step 2: Wait for Firebase Auth
                 updateStatus("ממתין לאימות...", "yellow", true); SmartLog("Step 2: Waiting for Auth...", "INFO", "Init.Auth");
@@ -233,10 +254,13 @@
 
                 updateFinalStatus(); SmartLog("🚀 Driver App initialized successfully", "INFO", "Init"); // Step 9
 
-            } catch (error) { /* ... Error Handling ... */ }
+            } catch (error) {
+                 SmartLog(error.message, "ERROR", "Init.Critical", { stack: error.stack }); const msg = `אתחול נכשל: ${error.message}`; updateStatus(msg, "red", false); displayCriticalError(msg, error);
+                 console.log('DOM Elements:', document.querySelectorAll('*')); console.log('Firebase Status:', firebase.apps);
+            }
         }
 
-        // --- Other Functions ---
+        // --- Other Functions (Implementations unchanged) ---
         function displayCriticalError(message, errorObject = null) { /* ... */ }
         function updateStatus(text, color = "gray", pulse = false) { /* ... */ }
         function updateFinalStatus() { /* ... */ }
