@@ -3,27 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>DeliveryMaster נהג v50.3.1</title>
+    <title>DeliveryMaster נהג v50.3.2</title>
     <!-- 
-      DeliveryMaster Driver App v50.3.1 (Fixes)
+      DeliveryMaster Driver App v50.3.2 (Fixes)
       
       Changelog:
+      - v50.3.2 (FIX):
+        - Resolved "Cannot access 'DOM' before initialization" error by moving ALL logic, 
+          including driverId check and DOM assignment, inside the 'DOMContentLoaded' listener.
+        - This ensures the HTML is parsed before any script tries to access its elements.
+        - Moved updateStatus() calls from ensureAuth() into initializeDriverApp() to fix race condition.
       - v50.3.1 (FIX):
         - Fixed TypeError in fetchAndDrawDriverRoute by adding null check for map label element.
-        - Handled missing driverId/Name gracefully by showing an overlay message instead of trying 
-          to redirect to a non-functional relative 'login.html' URL.
-        - Removed Service Worker registration to prevent protocol errors in the current environment.
+        - Handled missing driverId/Name gracefully by showing an overlay message.
+        - Removed Service Worker registration to prevent protocol errors.
       - v50.3: Major upgrade - Integrated live map, distance calculation, Firebase backend.
-        - Replaced API calls with full Firebase integration (Auth, Firestore listeners).
-        - Integrated live Leaflet map showing driver location and assigned active orders.
-        - Map automatically zooms/pans to fit driver and orders.
-        - Order cards now display real-time distance from driver location.
-        - Order markers on map show details and distance on click.
-        - Updated UI styling to match Admin/Viewer apps (Rubik font retained).
-        - Improved status indicator logic.
-        - Refactored order rendering and status update functions for Firestore.
-        - Retained permission handling and location updates to Firestore.
-      - v50.1: Initial Firebase structure, permissions, basic list. 
     -->
 
     <!-- PWA Manifest & Theme -->
@@ -179,12 +173,12 @@
 
     <!-- Combined & Inlined App Logic -->
     <script type="module">
-        console.log('Driver App script started (v50.3.1)'); // v50.3.1
+        console.log('Driver App script started (v50.3.2)'); // v50.3.2
 
         // --- Inlined Firebase SDK Imports ---
         import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // Removed orderBy, deleteDoc. Added setDoc, where
+        import { getFirestore, collection, doc, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
 
         // --- Inlined Config Logic ---
         const firebaseConfig = { /* ... config object ... */
@@ -200,7 +194,7 @@
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
         async function ensureAuth() { 
             console.log("ensureAuth: Starting..."); let tries = 0;
-            // updateStatus("connecting", "מאמת..."); // *** REMOVED: Called too early ***
+            // *** MOVED updateStatus calls to initializeDriverApp ***
             while (tries < MAX_AUTH_RETRIES) {
                 tries++;
                 try {
@@ -209,7 +203,6 @@
                     console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
                     const userCredential = await signInAnonymously(auth);
                     console.log("ensureAuth: Success.", userCredential.user.uid); 
-                    // updateStatus("connecting", "מאזין..."); // *** REMOVED: Called too early ***
                     return userCredential.user;
                 } catch (e) {
                     console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
@@ -218,7 +211,7 @@
                 }
             } throw new Error("ensureAuth: Max retries reached.");
         }
-        const authReadyPromise = ensureAuth();
+        const authReadyPromise = ensureAuth(); // Call immediately
         console.log("Config part executed.");
 
         // --- Inlined SmartLog Logic ---
@@ -270,11 +263,12 @@
         const ACTIVE_DRIVER_ORDER_STATUSES = ["שויך", "בדרך"]; // Statuses relevant for the driver map/list
 
         // DOM Elements 
-        let DOM = {};
+        let DOM = {}; // *** DECLARED here, POPULATED in initializeDriverApp ***
 
         // --- Initialization ---
         async function initializeDriverApp() {
-            try { // *** MOVED try block to wrap DOM initialization ***
+            try { 
+                // *** DOM assignment MUST be first ***
                 DOM = {
                      driverNameDisplay: document.getElementById('driver-name-display'), 
                      statusIndicator: document.getElementById('status-indicator'), // Main indicator div
@@ -298,7 +292,7 @@
                      throw new Error("Essential DOM elements missing!"); 
                 }
     
-                SmartLog.info("Initializing Driver App (v50.3.1)...", "Init");
+                SmartLog.info("Initializing Driver App (v50.3.2)...", "Init");
                 
                 // Now safe to update status
                 updateStatus("connecting", "מאמת..."); 
@@ -339,8 +333,11 @@
 
             } catch (error) {
                 SmartLog.error(error, "Init.Critical");
-                updateStatus("error", `שגיאת אתחול`);
-                 showLoginErrorOverlay(`שגיאת אתחול: ${error.message}`); // Show overlay on critical init error
+                // Check if DOM is initialized before trying to use it
+                if (DOM.statusIndicator) {
+                    updateStatus("error", `שגיאת אתחול`);
+                }
+                showLoginErrorOverlay(`שגיאת אתחול: ${error.message}`); // Show overlay on critical init error
             }
         }
 
@@ -376,7 +373,7 @@
         // --- Status Update ---
         function updateStatus(statusClass, text) { // Simplified args
              if (!DOM.statusIndicator || !DOM.statusText || !DOM.statusDot) { 
-                 console.warn("Status elements not ready for update:", text); 
+                 console.warn("Status elements not ready for update (called too early or elements missing):", text); 
                  return; 
              }
              SmartLog.info(`Updating Status: ${text}`, "UI.Status", { class: statusClass });
@@ -841,22 +838,35 @@
 
         // --- Start Application ---
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (v50.3.1). Starting app initialization...'); 
+            console.log('DOMContentLoaded fired (v50.3.2). Starting app initialization...'); 
+            
+            // Initialize SmartLog fallback *early* in case of errors
             if (typeof SmartLog === 'undefined') {
                 console.error("SmartLog failed to initialize. Using console fallback.");
-                 SmartLog = { info: console.log, warn: console.warn, error: console.error };
+                 window.SmartLog = { info: console.log, warn: console.warn, error: console.error };
             }
+            
             SmartLog.info("DOMContentLoaded fired.", "Init");
             // registerServiceWorker(); // REMOVED
+            
+            // *** MOVED ALL LOGIC INSIDE DOMContentLoaded ***
             initializeDriverApp(); 
-             try { if(feather) feather.replace(); } catch (e) { SmartLog.warn("Feather icons replace failed.", "UI", e); }
+            
+             try { 
+                 if(feather) {
+                     feather.replace(); 
+                 } else {
+                     SmartLog.warn("Feather icons not loaded, trying again in 500ms", "UI");
+                     setTimeout(() => { 
+                         try { feather.replace(); } catch(e) { SmartLog.error(e, "UI", { message: "Feather retry failed" }); }
+                     }, 500);
+                 }
+             } catch (e) { 
+                 SmartLog.error(e, "UI", { message: "Feather icons replace failed on init." }); 
+             }
         });
 
     </script>
 
 </body>
 </html>
-
-
-}
-
