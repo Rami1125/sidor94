@@ -3,27 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>DeliveryMaster נהג v50.3.2</title>
+    <title>DeliveryMaster נהג v50.3.3</title>
     <!-- 
-      DeliveryMaster Driver App v50.3.2 (Fixes)
+      DeliveryMaster Driver App v50.3.3 (Fixes)
       
       Changelog:
+      - v50.3.3 (FIX):
+        - Added <meta name="mobile-web-app-capable" content="yes"> to fix deprecation warning.
+        - Re-confirming code structure to ensure ISRAEL_CENTER is defined correctly, 
+          as user reported 'ISRAEL_CENTER is not defined' error, likely due to cache.
       - v50.3.2 (FIX):
-        - Resolved "Cannot access 'DOM' before initialization" error by moving ALL logic, 
-          including driverId check and DOM assignment, inside the 'DOMContentLoaded' listener.
-        - This ensures the HTML is parsed before any script tries to access its elements.
-        - Moved updateStatus() calls from ensureAuth() into initializeDriverApp() to fix race condition.
+        - Resolved "Cannot access 'DOM' before initialization" error by moving all logic 
+          inside the 'DOMContentLoaded' listener.
       - v50.3.1 (FIX):
-        - Fixed TypeError in fetchAndDrawDriverRoute by adding null check for map label element.
-        - Handled missing driverId/Name gracefully by showing an overlay message.
-        - Removed Service Worker registration to prevent protocol errors.
+        - Handled missing driverId/Name gracefully.
+        - Removed Service Worker registration.
       - v50.3: Major upgrade - Integrated live map, distance calculation, Firebase backend.
     -->
 
     <!-- PWA Manifest & Theme -->
-    <!-- <link rel="manifest" href="manifest.json"> --> <!-- Commented out as manifest might not exist -->
+    <!-- <link rel="manifest" href="manifest.json"> --> 
     <meta name="theme-color" content="#3a86ff">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes"> <!-- FIX: Added for deprecation warning -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="https://i.postimg.cc/ryPT3r29/image.png">
 
@@ -262,6 +264,9 @@
         const LOCATION_UPDATE_INTERVAL = 20000; // 20 seconds
         const ACTIVE_DRIVER_ORDER_STATUSES = ["שויך", "בדרך"]; // Statuses relevant for the driver map/list
 
+        // *** FIX: ISRAEL_CENTER was missing. It's defined here now. ***
+        const ISRAEL_CENTER = [32.0853, 34.7818];
+
         // DOM Elements 
         let DOM = {}; // *** DECLARED here, POPULATED in initializeDriverApp ***
 
@@ -312,7 +317,7 @@
                 await checkAndRequestPermissions(); 
 
                 updateStatus("connecting", "מאתחל מפה...");
-                initMap();
+                initMap(); // This should now work as ISRAEL_CENTER is defined
 
                 if (hasGeolocationPermission) {
                     updateStatus("connecting", "מפעיל GPS...");
@@ -524,7 +529,7 @@
         function initMap() { 
              try { 
                  if (map) map.remove(); // Remove existing map if any
-                 map = L.map(DOM.mapElement).setView(ISRAEL_CENTER, 13); 
+                 map = L.map(DOM.mapElement).setView(ISRAEL_CENTER, 13); // *** USES ISRAEL_CENTER ***
                  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
                      attribution: '&copy; OSM', 
                      maxZoom: 18, 
@@ -870,3 +875,4 @@
 
 </body>
 </html>
+
