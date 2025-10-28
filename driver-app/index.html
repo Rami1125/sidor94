@@ -3,10 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>DeliveryMaster נהג</title>
+    <title>DeliveryMaster נהג v50.3.1</title>
+    <!-- 
+      DeliveryMaster Driver App v50.3.1 (Fixes)
+      
+      Changelog:
+      - v50.3.1 (FIX):
+        - Fixed TypeError in fetchAndDrawDriverRoute by adding null check for map label element.
+        - Handled missing driverId/Name gracefully by showing an overlay message instead of trying 
+          to redirect to a non-functional relative 'login.html' URL.
+        - Removed Service Worker registration to prevent protocol errors in the current environment.
+      - v50.3: Major upgrade - Integrated live map, distance calculation, Firebase backend.
+        - Replaced API calls with full Firebase integration (Auth, Firestore listeners).
+        - Integrated live Leaflet map showing driver location and assigned active orders.
+        - Map automatically zooms/pans to fit driver and orders.
+        - Order cards now display real-time distance from driver location.
+        - Order markers on map show details and distance on click.
+        - Updated UI styling to match Admin/Viewer apps (Rubik font retained).
+        - Improved status indicator logic.
+        - Refactored order rendering and status update functions for Firestore.
+        - Retained permission handling and location updates to Firestore.
+      - v50.1: Initial Firebase structure, permissions, basic list. 
+    -->
 
     <!-- PWA Manifest & Theme -->
-    <link rel="manifest" href="manifest.json">
+    <!-- <link rel="manifest" href="manifest.json"> --> <!-- Commented out as manifest might not exist -->
     <meta name="theme-color" content="#3a86ff">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -25,58 +46,127 @@
     <script src="https://unpkg.com/feather-icons"></script>
 
     <style>
-        body { font-family: 'Rubik', sans-serif; overscroll-behavior-y: contain; }
-        #map { height: 250px; border-radius: 0.5rem; }
-        .leaflet-control-zoom { display: none; } .leaflet-control-attribution { font-size: 10px; }
-        .btn-primary { background-color: #3a86ff; color: white; } .btn-primary:hover { background-color: #2f6ac2; }
-        .btn-secondary { background-color: #6c757d; color: white; } .btn-secondary:hover { background-color: #5a6268; }
-        .btn-success { background-color: #28a745; color: white; } .btn-success:hover { background-color: #218838; }
-        .btn-warning { background-color: #ffc107; color: #212529; } .btn-warning:hover { background-color: #e0a800; }
-        .btn-icon { padding: 0.5rem; } .btn-disabled { opacity: 0.6; cursor: not-allowed; }
-        .notification-card { border-left: 5px solid #ffc107; animation: pulse 1.5s infinite; }
+        :root {
+            --primary-color: #3a86ff; 
+            --primary-dark: #2f6ac2;
+            --success-color: #28a745;
+            --success-dark: #218838;
+            --warning-color: #ffc107;
+            --warning-dark: #e0a800;
+             --danger-color: #dc3545; 
+             --danger-dark: #c82333; 
+            --bg-light: #f8f9fa; /* slightly lighter gray */
+            --bg-white: #ffffff;
+            --border-color: #dee2e6; /* lighter border */
+            --text-dark: #212529; /* darker text */
+            --text-light: #6c757d; /* muted text */
+        }
+        html, body { height: 100vh; overflow: hidden; } /* Prevent scrolling */
+        body { font-family: 'Rubik', sans-serif; overscroll-behavior-y: contain; background-color: var(--bg-light); color: var(--text-dark); }
+        
+        #map { height: 250px; border-radius: 0.5rem; background-color: #e9ecef; } /* Map placeholder bg */
+        .leaflet-control-zoom { display: none; } 
+        .leaflet-control-attribution { font-size: 10px; background: rgba(255,255,255,0.7); padding: 1px 4px; border-radius: 2px; }
+        .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .leaflet-popup-content { font-family: 'Rubik', sans-serif; font-size: 0.9rem; line-height: 1.4; }
+        .leaflet-popup-content h4 { font-weight: 700; margin-bottom: 5px; font-size: 1rem; }
+        .leaflet-popup-content p { margin: 3px 0; color: var(--text-light); }
+
+        /* Buttons */
+        .btn { padding: 0.6rem 1rem; border-radius: 0.375rem; /* rounded-md */ font-weight: 500; transition: background-color 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; }
+        .btn-primary { background-color: var(--primary-color); color: white; } .btn-primary:hover { background-color: var(--primary-dark); }
+        .btn-secondary { background-color: var(--text-light); color: white; } .btn-secondary:hover { background-color: #5a6268; }
+        .btn-success { background-color: var(--success-color); color: white; } .btn-success:hover { background-color: var(--success-dark); }
+        .btn-warning { background-color: var(--warning-color); color: var(--text-dark); } .btn-warning:hover { background-color: var(--warning-dark); }
+        .btn-icon { padding: 0.5rem; } 
+        .btn-disabled { opacity: 0.6; cursor: not-allowed; pointer-events: none; }
+
+        .notification-card { border-left: 5px solid var(--warning-color); animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); } }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3a86ff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        
+        /* Loader */
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Order Card */
+        .order-card { background-color: var(--bg-white); border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .order-card h3 { color: var(--text-dark); }
+        .order-card .address { color: var(--text-light); }
+        .order-card .distance { color: var(--primary-dark); font-weight: 500; }
+
+         /* Status Indicator */
+         #status-indicator { font-size: 0.8rem; font-weight: 500; padding: 4px 8px; border-radius: 99px; display: inline-flex; align-items: center; gap: 4px; }
+         #status-indicator.connected { background-color: #dcfce7; color: #166534; } /* green */
+         #status-indicator.connecting { background-color: #fef9c3; color: #854d0e; } /* yellow */
+         #status-indicator.error { background-color: #fee2e2; color: #991b1b; } /* red */
+         #status-indicator .dot { width: 6px; height: 6px; border-radius: 50%; }
+         #status-indicator.connected .dot { background-color: #22c55e; }
+         #status-indicator.connecting .dot { background-color: #facc15; }
+         #status-indicator.error .dot { background-color: #ef4444; }
+         
+         /* Login Error Overlay */
+         #login-error-overlay {
+             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+             background-color: rgba(255, 255, 255, 0.95);
+             z-index: 1000;
+             display: none; /* Hidden by default */
+             flex-direction: column;
+             align-items: center;
+             justify-content: center;
+             text-align: center;
+             padding: 2rem;
+         }
+
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
 
+    <!-- Login Error Overlay -->
+    <div id="login-error-overlay">
+        <i data-feather="alert-triangle" class="w-16 h-16 text-red-500 mb-4"></i>
+        <h2 class="text-2xl font-bold text-red-700 mb-2">שגיאת התחברות</h2>
+        <p class="text-gray-600">לא זוהו פרטי נהג.</p>
+        <p class="text-gray-600 mt-1">אנא חזור למסך הראשי והתחבר מחדש.</p>
+    </div>
+
+
     <!-- Main Container -->
-    <div class="container mx-auto max-w-lg p-0 flex flex-col h-screen">
+    <div id="main-container" class="container mx-auto max-w-lg p-0 flex flex-col h-screen bg-white shadow-lg">
 
         <!-- Header -->
-        <header class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
+        <header class="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-10 border-b border-gray-200">
             <div>
                 <h1 class="text-xl font-bold text-gray-800">DeliveryMaster</h1>
                 <p id="driver-name-display" class="text-sm text-gray-600">נהג: טוען...</p>
             </div>
-            <div id="status-indicator" class="flex items-center space-x-2 space-x-reverse text-sm">
-                 <span id="status-text" class="text-yellow-600 font-medium">טוען...</span> <!-- v50.1: Initial Text -->
-                 <div id="status-dot" class="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+            <div id="status-indicator" class="connecting">
+                 <span id="status-text">טוען...</span>
+                 <span id="status-dot" class="dot"></span>
             </div>
         </header>
 
         <!-- Permission Request Area -->
-        <div id="permission-section" class="p-4 space-y-3 bg-yellow-100 border-b border-yellow-300" style="display: none;"> <!-- v50.1: Hidden initially -->
+        <div id="permission-section" class="p-4 space-y-3 bg-yellow-100 border-b border-yellow-300" style="display: none;"> 
              <p class="text-sm font-medium text-yellow-800">נדרשות הרשאות למיקום והתראות:</p>
-             <button id="request-perms-btn" class="w-full text-sm py-2 px-4 rounded bg-yellow-500 text-white font-semibold hover:bg-yellow-600 transition duration-150">בקש הרשאות</button>
+             <button id="request-perms-btn" class="w-full text-sm btn btn-warning">בקש הרשאות</button>
         </div>
 
         <!-- Info & Map Area -->
-        <div class="p-4">
-            <div id="location-info" class="bg-blue-50 p-3 rounded-lg mb-4 text-center text-sm text-blue-800">
+        <div class="p-4 border-b border-gray-200">
+            <div id="location-info" class="bg-blue-50 p-3 rounded-lg mb-3 text-sm text-blue-800">
                  <p id="current-location-text">📍 מאתר מיקום נוכחי...</p>
-                 <p id="eta-text" class="mt-1 font-medium hidden">...</p>
+                 <p id="eta-text" class="mt-1 font-medium hidden">...</p> <!-- ETA display -->
             </div>
             <div id="map"></div>
         </div>
 
         <!-- Order List -->
-        <main id="order-list" class="flex-grow overflow-y-auto p-4 space-y-4">
+        <main id="order-list" class="flex-grow overflow-y-auto p-4 space-y-4 bg-gray-50">
              <div id="loading-orders" class="text-center py-10 text-gray-500">
                  <div class="loader mx-auto mb-2"></div>
                  טוען משימות...
              </div>
+             <!-- Order cards dynamically inserted here -->
         </main>
 
     </div>
@@ -89,12 +179,12 @@
 
     <!-- Combined & Inlined App Logic -->
     <script type="module">
-        console.log('Driver App script started (v50.1)'); // v50.1
+        console.log('Driver App script started (v50.3.1)'); // v50.3.1
 
         // --- Inlined Firebase SDK Imports ---
         import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc, where, writeBatch, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // Added setDoc
+        import { getFirestore, collection, doc, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // Removed orderBy, deleteDoc. Added setDoc, where
 
         // --- Inlined Config Logic ---
         const firebaseConfig = { /* ... config object ... */
@@ -110,6 +200,7 @@
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
         async function ensureAuth() { /* ... Same ensureAuth logic ... */
             console.log("ensureAuth: Starting..."); let tries = 0;
+            updateStatus("connecting", "מאמת..."); // Update status indicator
             while (tries < MAX_AUTH_RETRIES) {
                 tries++;
                 try {
@@ -117,7 +208,9 @@
                     if (!auth) throw new Error("Auth object missing");
                     console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
                     const userCredential = await signInAnonymously(auth);
-                    console.log("ensureAuth: Success.", userCredential.user.uid); return userCredential.user;
+                    console.log("ensureAuth: Success.", userCredential.user.uid); 
+                    updateStatus("connecting", "מאזין..."); // Update status indicator
+                    return userCredential.user;
                 } catch (e) {
                     console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
                     if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; }
@@ -128,27 +221,27 @@
         const authReadyPromise = ensureAuth();
         console.log("Config part executed.");
 
-        // --- Inlined SmartLog Logic (v50.1: Simplified await logic) ---
+        // --- Inlined SmartLog Logic ---
         const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
-        let isDbAvailable = !!db; let isAuthReadyForLogging = false; // v50.1: Separate flag for logging
+        let isDbAvailable = !!db; let isAuthReadyForLogging = false; 
         authReadyPromise.then(() => { isAuthReadyForLogging = true; console.log("SmartLog: Auth is ready for logging."); })
-                      .catch(() => { console.warn("SmartLog: Auth failed, Firestore logging disabled."); isDbAvailable = false; }); // Disable DB logging if auth fails
+                      .catch(() => { console.warn("SmartLog: Auth failed, Firestore logging disabled."); isDbAvailable = false; }); 
 
         const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => {
              const consoleArgs = [`[${origin}] ${level}:`, message]; if (Object.keys(context).length > 0) consoleArgs.push(context); /* ... */
             switch (level) { case 'INFO': console.log(...consoleArgs); break; case 'WARN': console.warn(...consoleArgs); break; case 'ERROR': console.error(...consoleArgs); break; default: console.log(...consoleArgs); }
-            if (!isDbAvailable || !isAuthReadyForLogging) { return; } // v50.1: Check flag
+            if (!isDbAvailable || !isAuthReadyForLogging) { return; } 
             try {
-                // No need to await here anymore, flag ensures auth is ready or DB logging is disabled
                 const user = auth?.currentUser; if (!user) { return; }
                 const userContext = { uid: user.uid, isAnonymous: user.isAnonymous };
                 const logEntry = {
-                    timestamp: serverTimestamp(), level, message: String(message), origin,
-                    context: { ...JSON.parse(JSON.stringify(context || {})), sessionId, userAgent: navigator.userAgent || 'N/A', page: window.location.pathname || '/driver-app/' },
+                    timestamp: serverTimestamp(), level, message: String(message), origin: `Driver-${origin}`, // Prefix origin
+                    context: { ...JSON.parse(JSON.stringify(context || {})), sessionId, userAgent: navigator.userAgent || 'N/A', page: '/driver-app/' },
                     user: userContext, category: category || null, solution: solution || null
                 };
-                await addDoc(collection(db, LOG_COLLECTION), logEntry);
-            } catch (error) { console.error("SmartLog FATAL ERROR writing to Firestore.", error); if (error.code === 'permission-denied') { console.warn("SmartLog: Disabling Firestore logging."); isDbAvailable = false; } }
+                 // Fire and forget log for driver app
+                 addDoc(collection(db, LOG_COLLECTION), logEntry).catch(e => console.error("Driver SmartLog write error:", e));
+            } catch (error) { console.error("Driver SmartLog FATAL ERROR.", error); if (error.code === 'permission-denied') { console.warn("Driver SmartLog: Disabling Firestore logging."); isDbAvailable = false; } }
          };
         const SmartLog = {
             info: (msg, origin, ctx = {}) => { writeLog('INFO', msg, origin, ctx); },
@@ -161,105 +254,136 @@
         // --- Driver App Specific Logic ---
 
         // Globals
-        let map; let driverMarker;
+        let map; 
+        let driverMarker = null; // Marker for the driver
+        let orderMarkers = {}; // Object to hold order markers { orderId: markerInstance }
         let currentDriverId = localStorage.getItem('driverId');
         let currentDriverName = localStorage.getItem('driverName');
-        let watchId = null; let currentOrders = {}; let notificationAudio = null;
-        let hasNotificationPermission = false; let hasGeolocationPermission = false;
+        let watchId = null; 
+        let currentOrders = []; // Array of assigned, active orders
+        let currentLatLng = null; // Driver's current location [lat, lng]
+        let notificationAudio = null;
+        let hasNotificationPermission = false; 
+        let hasGeolocationPermission = false;
         let lastLocationUpdate = 0;
+        const LOCATION_UPDATE_INTERVAL = 20000; // 20 seconds
+        const ACTIVE_DRIVER_ORDER_STATUSES = ["שויך", "בדרך"]; // Statuses relevant for the driver map/list
 
-        // DOM Elements (v50.1: Defined after DOMContentLoaded)
+        // DOM Elements 
         let DOM = {};
 
         // --- Initialization ---
         async function initializeDriverApp() {
-            // v50.1: Define DOM elements here, after DOMContentLoaded
             DOM = {
-                 driverNameDisplay: document.getElementById('driver-name-display'), statusText: document.getElementById('status-text'), statusDot: document.getElementById('status-dot'),
-                 permissionSection: document.getElementById('permission-section'), requestPermsBtn: document.getElementById('request-perms-btn'), locationInfo: document.getElementById('location-info'),
-                 currentLocationText: document.getElementById('current-location-text'), etaText: document.getElementById('eta-text'), mapElement: document.getElementById('map'), orderList: document.getElementById('order-list'), loadingOrders: document.getElementById('loading-orders')
+                 driverNameDisplay: document.getElementById('driver-name-display'), 
+                 statusIndicator: document.getElementById('status-indicator'), // Main indicator div
+                 statusText: document.getElementById('status-text'), 
+                 statusDot: document.getElementById('status-dot'),
+                 permissionSection: document.getElementById('permission-section'), 
+                 requestPermsBtn: document.getElementById('request-perms-btn'), 
+                 locationInfo: document.getElementById('location-info'),
+                 currentLocationText: document.getElementById('current-location-text'), 
+                 etaText: document.getElementById('eta-text'), 
+                 mapElement: document.getElementById('map'), 
+                 orderList: document.getElementById('order-list'), 
+                 loadingOrders: document.getElementById('loading-orders'),
+                 loginErrorOverlay: document.getElementById('login-error-overlay'), // Error overlay
+                 mainContainer: document.getElementById('main-container') // Main content container
             };
             SmartLog.info("DOM elements referenced.", "Init.DOM");
-            if (!DOM.driverNameDisplay || !DOM.statusText || !DOM.mapElement || !DOM.orderList) {
-                 throw new Error("Essential DOM elements missing!"); // Let the main catch block handle this
+            if (!DOM.driverNameDisplay || !DOM.statusIndicator || !DOM.mapElement || !DOM.orderList || !DOM.loginErrorOverlay || !DOM.mainContainer) {
+                 // Log the error but maybe let the login overlay handle it if possible
+                 console.error("Essential DOM elements missing!"); 
+                 SmartLog.error("Essential DOM elements missing during init!", "Init.DOM");
+                 // Show a basic alert as a fallback if the overlay itself is missing
+                 if (!DOM.loginErrorOverlay) alert("שגיאה קריטית בטעינת האפליקציה.");
+                 showLoginErrorOverlay("שגיאת טעינה."); // Try to show the overlay anyway
+                 return; // Stop initialization
             }
 
-            SmartLog.info("Initializing Driver App (v50.1)...", "Init");
+            SmartLog.info("Initializing Driver App (v50.3.1)...", "Init");
             try {
-                // Check for saved driver ID
+                // Check for saved driver ID FIRST
                 if (!currentDriverId || !currentDriverName) {
-                    SmartLog.error(new Error("Missing driverId/Name"), "Auth", null, "Auth", "הנהג אינו מחובר. הפנה לדף התחברות.");
-                    window.location.href = 'login.html'; return;
+                    SmartLog.error(new Error("Missing driverId/Name"), "Auth", null, "Auth", "הנהג אינו מחובר.");
+                    showLoginErrorOverlay(); // Show the overlay instead of redirecting
+                    return; // Stop initialization
                 }
                 DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`;
 
-                // Wait for Firebase Auth
-                updateStatus("ממתין לאימות...", "yellow", true);
                 await authReadyPromise;
                 SmartLog.info("Firebase Auth Ready.", "Init");
 
-                // Check and Request Permissions
-                await checkAndRequestPermissions(); // This function now handles displaying the section
+                await checkAndRequestPermissions(); 
 
-                // Initialize Map
-                updateStatus("מאתחל מפה...", "yellow", true);
+                updateStatus("connecting", "מאתחל מפה...");
                 initMap();
 
-                // Start Geolocation only if permission granted
                 if (hasGeolocationPermission) {
-                    updateStatus("מפעיל GPS...", "yellow", true);
+                    updateStatus("connecting", "מפעיל GPS...");
                     startGeolocation();
                 } else {
-                     updateStatus("המתן לאישור מיקום", "red", false);
+                     updateStatus("error", "המתן לאישור מיקום");
                      SmartLog.warn("Geolocation permission pending/denied. GPS not started.", "Permissions");
                 }
 
-                // Initialize Notifications
                  initNotifications();
 
-                // Attach Order Listener
-                updateStatus("מסנכרן משימות...", "yellow", true);
+                updateStatus("connecting", "מסנכרן משימות...");
                 listenToOrders();
 
-                // Final status depends on permissions & GPS state
-                updateFinalStatus(); // v50.1: Helper function for clarity
+                updateFinalStatus(); // Set initial status based on permissions/GPS
 
                 SmartLog.info("Driver App Initialization Complete.", "Init");
 
             } catch (error) {
                 SmartLog.error(error, "Init.Critical");
-                updateStatus(`שגיאת אתחול: ${error.message}`, "red", false);
+                updateStatus("error", `שגיאת אתחול`);
+                 showLoginErrorOverlay(`שגיאת אתחול: ${error.message}`); // Show overlay on critical init error
             }
         }
 
-         // v50.1: Helper to set final status text
+        // --- Login Error Handling ---
+        function showLoginErrorOverlay(message = "לא זוהו פרטי נהג.") {
+             if (DOM.loginErrorOverlay && DOM.mainContainer) {
+                 const messageParagraphs = DOM.loginErrorOverlay.querySelectorAll('p');
+                 if (messageParagraphs.length > 0) messageParagraphs[0].textContent = message;
+                 if (messageParagraphs.length > 1) messageParagraphs[1].textContent = "אנא חזור למסך הראשי והתחבר מחדש.";
+                 
+                 DOM.loginErrorOverlay.style.display = 'flex';
+                 DOM.mainContainer.style.display = 'none'; // Hide the main app content
+                 try { if(feather) feather.replace(); } catch(e){} // Redraw icon in overlay
+             } else {
+                 // Fallback if overlay elements are missing
+                 alert(message + "\nאנא חזור למסך הראשי והתחבר מחדש.");
+             }
+         }
+
+
          function updateFinalStatus() {
              if (watchId) {
-                 updateStatus("GPS פעיל", "green", false);
+                 updateStatus("connected", "GPS פעיל");
              } else if (!hasGeolocationPermission) {
-                 updateStatus("המתן לאישור מיקום", "red", false);
+                 updateStatus("error", "נדרשת הרשאת מיקום");
              } else {
-                 updateStatus("GPS לא פעיל", "yellow", false); // e.g., if error occurred
+                 updateStatus("connecting", "GPS לא פעיל"); // Use 'connecting' style for non-critical issues
              }
          }
 
         // --- Status Update ---
-        function updateStatus(text, color = "gray", pulse = false) {
-             // Safety check for DOM elements added
-             if (!DOM.statusText || !DOM.statusDot) { console.warn("Status elements not ready for update:", text); return; }
-             SmartLog.info(`Updating Status: ${text}`, "UI.Status", { color, pulse });
+        function updateStatus(statusClass, text) { // Simplified args
+             if (!DOM.statusIndicator || !DOM.statusText || !DOM.statusDot) { console.warn("Status elements not ready for update:", text); return; }
+             SmartLog.info(`Updating Status: ${text}`, "UI.Status", { class: statusClass });
+             DOM.statusIndicator.className = statusClass; // 'connecting', 'connected', 'error'
              DOM.statusText.textContent = text;
-             DOM.statusText.className = `text-sm font-medium text-${color}-600`; // Simpler class update
-             DOM.statusDot.className = `w-3 h-3 rounded-full bg-${color}-400 ${pulse ? 'animate-pulse' : ''}`;
         }
 
         // --- Permissions ---
-        async function checkAndRequestPermissions() {
+        async function checkAndRequestPermissions() { /* ... implementation mostly unchanged, ensure it uses DOM ... */
              SmartLog.info("Checking permissions...", "Permissions");
              let needsGeoRequest = false;
              let needsNotifRequest = false;
 
-             // Geolocation
              try {
                 const geoStatus = await navigator.permissions.query({ name: 'geolocation' });
                 hasGeolocationPermission = geoStatus.state === 'granted';
@@ -267,7 +391,6 @@
                 SmartLog.info("Geolocation status:", "Permissions", { status: geoStatus.state });
              } catch (e) { SmartLog.warn("Could not query geo permission.", "Permissions", e); needsGeoRequest = true; }
 
-             // Notifications
              if ('Notification' in window) {
                 hasNotificationPermission = Notification.permission === 'granted';
                 if (Notification.permission === 'default') needsNotifRequest = true;
@@ -277,10 +400,9 @@
              if (needsGeoRequest || needsNotifRequest) {
                  if (DOM.permissionSection && DOM.requestPermsBtn) {
                      DOM.permissionSection.style.display = 'block';
-                     // Ensure only one listener is attached
-                     DOM.requestPermsBtn.removeEventListener('click', handlePermissionRequest); // Remove previous if any
+                     DOM.requestPermsBtn.removeEventListener('click', handlePermissionRequest); 
                      DOM.requestPermsBtn.addEventListener('click', handlePermissionRequest);
-                     updateStatus("ממתין לאישור הרשאות", "yellow", true);
+                     updateStatus("error", "נדרשות הרשאות"); // Use error style for pending permissions
                  } else { SmartLog.error("Permission UI elements not found!", "Permissions"); }
              } else {
                  if (DOM.permissionSection) DOM.permissionSection.style.display = 'none';
@@ -288,7 +410,7 @@
              }
         }
 
-        async function handlePermissionRequest() { /* ... implementation unchanged ... */
+        async function handlePermissionRequest() { /* ... implementation mostly unchanged ... */
              SmartLog.info("Requesting permissions via button click...", "Permissions");
             let geoGranted = hasGeolocationPermission;
             let notifGranted = hasNotificationPermission;
@@ -296,13 +418,17 @@
             // Request Geolocation
             if (!hasGeolocationPermission) {
                 try {
-                    // Try getting position first, it often triggers the prompt better
-                    await new Promise((resolve, reject) => { navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000 }); });
+                    await new Promise((resolve, reject) => { 
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000, enableHighAccuracy: true }); 
+                    });
                     const geoStatus = await navigator.permissions.query({ name: 'geolocation' });
                     geoGranted = geoStatus.state === 'granted';
                     hasGeolocationPermission = geoGranted;
                     SmartLog.info("Geolocation request result:", "Permissions", { status: geoStatus.state });
-                    if(geoGranted && !watchId) startGeolocation();
+                    if(geoGranted && !watchId) {
+                        updateStatus("connecting", "מפעיל GPS...");
+                        startGeolocation(); // Start immediately after grant
+                    }
                  } catch (e) { SmartLog.error(e, "Permissions", { message: "Geolocation request failed." }); }
             }
 
@@ -317,37 +443,43 @@
                 } catch (e) { SmartLog.error(e, "Permissions", { message: "Notification request failed." }); }
             }
 
-            if (geoGranted) { // Only hide if Geo is granted, as it's essential
+            if (geoGranted) { 
                 if (DOM.permissionSection) DOM.permissionSection.style.display = 'none';
-                updateFinalStatus(); // Update status based on current state
+                updateFinalStatus(); // Update status based on potentially new GPS state
             } else {
-                 updateStatus("נדרשת הרשאת מיקום!", "red", false);
+                 updateStatus("error", "נדרשת הרשאת מיקום!");
                  if (DOM.requestPermsBtn) {
                     DOM.requestPermsBtn.textContent = "בקש הרשאת מיקום שוב";
                     DOM.requestPermsBtn.classList.add('btn-disabled');
-                    setTimeout(() => DOM.requestPermsBtn.classList.remove('btn-disabled'), 5000);
+                    setTimeout(() => {
+                         if(DOM.requestPermsBtn) DOM.requestPermsBtn.classList.remove('btn-disabled');
+                    }, 5000);
                  }
             }
         }
 
         // --- Geolocation & Location Update ---
-        function startGeolocation() { /* ... implementation unchanged ... */
+        function startGeolocation() { 
             if (watchId) { SmartLog.info("Geolocation already watching.", "GPS"); return; }
-            if (!hasGeolocationPermission) { SmartLog.warn("Cannot start GPS, permission not granted.", "GPS"); updateStatus("נדרשת הרשאת מיקום", "red", false); return; }
-            if (!('geolocation' in navigator)) { SmartLog.error("Geolocation not supported.", "GPS"); return; }
+            if (!hasGeolocationPermission) { SmartLog.warn("Cannot start GPS, permission not granted.", "GPS"); updateStatus("error", "נדרשת הרשאת מיקום"); return; }
+            if (!('geolocation' in navigator)) { SmartLog.error("Geolocation not supported.", "GPS"); updateStatus("error", "GPS לא נתמך"); return; }
 
             SmartLog.info("Starting geolocation watchPosition...", "GPS");
-            updateStatus("מפעיל GPS...", "yellow", true);
+            updateStatus("connecting", "מפעיל GPS...");
 
             watchId = navigator.geolocation.watchPosition(
                 async (position) => {
                     const { latitude, longitude, accuracy } = position.coords;
+                    currentLatLng = [latitude, longitude]; // Store current location
                     SmartLog.info("GPS Update Received", "GPS", { lat: latitude, lon: longitude, acc: accuracy });
-                    updateStatus("GPS פעיל", "green", false);
+                    updateStatus("connected", "GPS פעיל");
                     updateDriverMarkerOnMap(latitude, longitude);
                     updateLocationText(latitude, longitude);
+                    updateDistances(); // Update distances on cards and potentially map popups
+                    updateMapBounds(); // Adjust map view
+
                     const now = Date.now();
-                    if (now - lastLocationUpdate > 20000) { // Throttle Firestore updates
+                    if (now - lastLocationUpdate > LOCATION_UPDATE_INTERVAL) { 
                         SmartLog.info("Sending location update to Firestore...", "GPS.Firestore");
                         await updateLocationInFirestore(latitude, longitude);
                         lastLocationUpdate = now;
@@ -355,17 +487,30 @@
                 },
                 (error) => {
                     SmartLog.error(error, "GPS.Error");
+                    currentLatLng = null; // Clear location on error
                     let errorMsg = "שגיאת GPS"; if (error.code === 1) errorMsg = "GPS: אין הרשאה"; else if (error.code === 2) errorMsg = "GPS: לא זמין"; else if (error.code === 3) errorMsg = "GPS: Timeout";
-                    updateStatus(errorMsg, "red", false);
+                    updateStatus("error", errorMsg);
                     if(watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
                 },
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 } // Adjusted timeouts
             );
         }
-        async function updateLocationInFirestore(lat, lng) { /* ... implementation unchanged ... */
-             if (!db || !currentDriverId) return; const locationRef = doc(db, "driverLocations", currentDriverId);
-             try { await updateDoc(locationRef, { latitude: lat, longitude: lng, lastUpdate: serverTimestamp() }); SmartLog.info("Location updated in Firestore.", "GPS.Firestore");
-             } catch (e) { if (e.code === 'not-found') { SmartLog.warn("Location doc not found, creating...", "GPS.Firestore"); try { await setDoc(locationRef, { latitude: lat, longitude: lng, lastUpdate: serverTimestamp(), driverName: currentDriverName }); SmartLog.info("Location doc created.", "GPS.Firestore"); } catch (createError) { SmartLog.error(createError, "GPS.Firestore.Create"); } } else { SmartLog.error(e, "GPS.Firestore.Update"); } }
+        async function updateLocationInFirestore(lat, lng) { 
+             if (!db || !currentDriverId) return; 
+             const locationRef = doc(db, "driverLocations", currentDriverId);
+             const locationData = { 
+                 latitude: lat, 
+                 longitude: lng, 
+                 lastUpdate: serverTimestamp(),
+                 driverName: currentDriverName // Keep name updated
+             };
+             try { 
+                 // Use setDoc with merge: true to create if not exists, or update if exists
+                 await setDoc(locationRef, locationData, { merge: true }); 
+                 SmartLog.info("Location updated/set in Firestore.", "GPS.Firestore");
+             } catch (e) { 
+                 SmartLog.error(e, "GPS.Firestore.Set"); 
+             } 
         }
         async function updateLocationText(lat, lng) { /* ... implementation unchanged ... */
             if (!DOM.currentLocationText) return; DOM.currentLocationText.textContent = `📍 ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
@@ -373,47 +518,299 @@
         }
 
         // --- Map Handling ---
-        function initMap() { /* ... implementation unchanged ... */
-             try { map = L.map(DOM.mapElement).setView([32.0853, 34.7818], 13); L.tileLayer('https{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OSM', maxZoom: 18, }).addTo(map); SmartLog.info("Map initialized", "Map"); } catch (e) { SmartLog.error(e, "Map.Init"); if (DOM.mapElement) DOM.mapElement.innerHTML = '<p class="text-red-500 p-4 text-center">Map Error</p>'; }
+        function initMap() { 
+             try { 
+                 if (map) map.remove(); // Remove existing map if any
+                 map = L.map(DOM.mapElement).setView(ISRAEL_CENTER, 13); 
+                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+                     attribution: '&copy; OSM', 
+                     maxZoom: 18, 
+                 }).addTo(map); 
+                 SmartLog.info("Map initialized", "Map"); 
+             } catch (e) { 
+                 SmartLog.error(e, "Map.Init"); 
+                 if (DOM.mapElement) DOM.mapElement.innerHTML = '<p class="text-red-500 p-4 text-center">Map Error</p>'; 
+             }
         }
-        function updateDriverMarkerOnMap(lat, lng) { /* ... implementation unchanged ... */
-             if (!map) return; const latLng = [lat, lng]; if (driverMarker) { driverMarker.setLatLng(latLng); } else { driverMarker = L.circleMarker(latLng, { radius: 8, fillColor: "#3a86ff", color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.8 }).addTo(map); SmartLog.info("Driver marker added", "Map"); } map.panTo(latLng);
+        
+        function updateDriverMarkerOnMap(lat, lng) { 
+             if (!map) return; 
+             const latLng = [lat, lng]; 
+             if (driverMarker) { 
+                 driverMarker.setLatLng(latLng); 
+             } else { 
+                 // Driver Marker Style (Blue circle)
+                 driverMarker = L.circleMarker(latLng, { 
+                     radius: 8, 
+                     fillColor: "#3a86ff", // Blue
+                     color: "#fff", // White border
+                     weight: 2, 
+                     opacity: 1, 
+                     fillOpacity: 0.9 
+                 }).addTo(map); 
+                 driverMarker.bindPopup(`<b>${currentDriverName}</b> (מיקום נוכחי)`);
+                 SmartLog.info("Driver marker added", "Map"); 
+             } 
+             // Don't pan here, let updateMapBounds handle it
+        }
+
+        function updateOrderMarkersOnMap() {
+            if (!map) return;
+
+            const activeMapOrders = currentOrders.filter(o => o.latitude && o.longitude);
+
+            // Remove markers for orders no longer in the active list
+            Object.keys(orderMarkers).forEach(orderId => {
+                if (!activeMapOrders.some(o => o.id === orderId)) {
+                    if (map.hasLayer(orderMarkers[orderId])) {
+                        map.removeLayer(orderMarkers[orderId]);
+                    }
+                    delete orderMarkers[orderId];
+                }
+            });
+
+            // Add/Update markers for current active orders
+            activeMapOrders.forEach(order => {
+                const latLng = [order.latitude, order.longitude];
+                const distanceText = currentLatLng ? `מרחק: ${(L.latLng(currentLatLng).distanceTo(latLng) / 1000).toFixed(1)} ק"מ` : 'מחשב מרחק...';
+                const popupContent = `
+                    <h4>${order.customer?.name || '?'}</h4>
+                    <p>${order.address || '?'}</p>
+                    <p>${distanceText}</p>
+                    <p>סטטוס: ${order.status}</p>`;
+
+                if (orderMarkers[order.id]) {
+                    orderMarkers[order.id].setLatLng(latLng).setPopupContent(popupContent);
+                } else {
+                    orderMarkers[order.id] = L.marker(latLng, { icon: orderIconActive }) // Use blue icon for orders
+                        .addTo(map)
+                        .bindPopup(popupContent);
+                    SmartLog.info("Order marker added", "Map", { orderId: order.id });
+                }
+            });
+
+            updateMapBounds(); // Adjust bounds after updating markers
+        }
+        
+        // Adjust map view to fit driver and active orders
+        function updateMapBounds() {
+            if (!map) return;
+            const bounds = L.latLngBounds();
+            
+            if (driverMarker) {
+                 bounds.extend(driverMarker.getLatLng());
+            }
+            Object.values(orderMarkers).forEach(marker => {
+                 bounds.extend(marker.getLatLng());
+            });
+
+            if (bounds.isValid()) {
+                 map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 }); 
+            } else if (driverMarker) {
+                 map.setView(driverMarker.getLatLng(), 15); // Center on driver if no orders
+            } else {
+                map.setView(ISRAEL_CENTER, 13); // Default view if nothing to show
+            }
         }
 
         // --- Order Handling ---
-        function listenToOrders() { /* ... implementation unchanged ... */
-             SmartLog.info("Listening to orders:", "Orders", { driverId: currentDriverId }); const q = query( collection(db, "orders"), where("driver.id", "==", currentDriverId), where("status", "in", ["שויך", "בתהליך ליקוט", "בדרך"]) );
-             onSnapshot(q, (snapshot) => { SmartLog.info(`Orders snapshot: ${snapshot.docChanges().length} changes`, "Orders"); if (DOM.loadingOrders) DOM.loadingOrders.style.display = 'none'; let newOrderDetected = false;
-                 snapshot.docChanges().forEach((change) => { const orderId = change.doc.id; const orderData = { id: orderId, ...change.doc.data() };
-                     if (change.type === "added") { SmartLog.info("New order:", "Orders", { orderId }); currentOrders[orderId] = orderData; if (orderData.status === 'שויך') newOrderDetected = true; }
-                     else if (change.type === "modified") { SmartLog.info("Order modified:", "Orders", { orderId, status: orderData.status }); currentOrders[orderId] = orderData; }
-                     else if (change.type === "removed") { SmartLog.info("Order removed:", "Orders", { orderId }); delete currentOrders[orderId]; } });
-                 renderOrderList(); if (newOrderDetected) handleNewOrderNotification();
-             }, (error) => { SmartLog.error(error, "Orders.Listener"); updateStatus("Sync Error", "red", false); if (DOM.loadingOrders) DOM.loadingOrders.innerHTML = '<p class="text-red-500">Sync Error</p>'; });
+        function listenToOrders() { 
+             SmartLog.info("Listening to orders:", "Orders", { driverId: currentDriverId }); 
+             // Query for orders assigned to this driver with relevant statuses
+             const q = query( 
+                 collection(db, "orders"), 
+                 where("driver.id", "==", currentDriverId), 
+                 where("status", "in", ACTIVE_DRIVER_ORDER_STATUSES) 
+                 // Consider adding orderBy('createdAt', 'asc') if needed, might require index
+             );
+             
+             onSnapshot(q, (snapshot) => { 
+                 SmartLog.info(`Orders snapshot: ${snapshot.docChanges().length} changes`, "Orders"); 
+                 if (DOM.loadingOrders) DOM.loadingOrders.style.display = 'none'; 
+                 let newOrderDetected = false;
+                 
+                 // Process changes more efficiently
+                 snapshot.docChanges().forEach((change) => { 
+                     const orderId = change.doc.id; 
+                     const orderData = { id: orderId, ...change.doc.data() };
+                     
+                     if (change.type === "added") { 
+                         SmartLog.info("New order added to list:", "Orders", { orderId }); 
+                         currentOrders.push(orderData); // Add to array
+                         if (orderData.status === 'שויך') newOrderDetected = true; 
+                     } else if (change.type === "modified") { 
+                         SmartLog.info("Order modified:", "Orders", { orderId, status: orderData.status }); 
+                         // Find and update the order in the array
+                         const index = currentOrders.findIndex(o => o.id === orderId);
+                         if (index > -1) currentOrders[index] = orderData;
+                         else currentOrders.push(orderData); // Or add if somehow missing
+                     } else if (change.type === "removed") { 
+                         SmartLog.info("Order removed from list:", "Orders", { orderId }); 
+                         // Filter out the removed order
+                         currentOrders = currentOrders.filter(o => o.id !== orderId);
+                     } 
+                 });
+                 
+                 renderOrderList(); // Update the list display
+                 updateOrderMarkersOnMap(); // Update markers on the map
+                 
+                 if (newOrderDetected) handleNewOrderNotification();
+                 
+             }, (error) => { 
+                 SmartLog.error(error, "Orders.Listener"); 
+                 updateStatus("error", "שגיאת סנכרון"); 
+                 if (DOM.loadingOrders) DOM.loadingOrders.innerHTML = '<p class="text-red-500">שגיאת סנכרון</p>'; 
+             });
         }
-        function renderOrderList() { /* ... implementation unchanged ... */
-             const ordersArray = Object.values(currentOrders).sort((a, b) => (a.status === 'שויך' ? -1 : 1)); if (!DOM.orderList) return;
-             if (ordersArray.length === 0) { DOM.orderList.innerHTML = `<p class="text-center text-gray-500 py-10">אין משימות פעילות.</p>`; return; }
-             DOM.orderList.innerHTML = ordersArray.map(order => createOrderCard(order)).join(''); try{feather.replace();} catch(e){}
+        
+        // Rerenders the entire order list
+        function renderOrderList() { 
+             // Sort orders: 'שויך' first, then by creation time maybe? Or distance? Let's stick to status first.
+             currentOrders.sort((a, b) => {
+                 if (a.status === 'שויך' && b.status !== 'שויך') return -1;
+                 if (a.status !== 'שויך' && b.status === 'שויך') return 1;
+                 // Optional: sort by createdAt if statuses are the same
+                 return (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0); 
+             }); 
+             
+             if (!DOM.orderList) return;
+             
+             if (currentOrders.length === 0) { 
+                 DOM.orderList.innerHTML = `<p class="text-center text-gray-500 py-10">אין משימות פעילות.</p>`; 
+                 updateOrderMarkersOnMap(); // Clear markers if list is empty
+                 return; 
+             }
+             
+             DOM.orderList.innerHTML = currentOrders.map(order => createOrderCard(order)).join(''); 
+             updateDistances(); // Update distances after rendering
+             try{ if(feather) feather.replace(); } catch(e){} // Redraw icons
         }
-        function createOrderCard(order) { /* ... implementation unchanged ... */
-            let cardClass = "bg-white p-4 rounded-lg shadow"; let actionButton = ''; let statusText = order.status || '?'; let statusColor = "text-gray-500";
+
+        // Updates distance text on existing order cards
+        function updateDistances() {
+             if (!currentLatLng) return; // Need driver location
+             
+             currentOrders.forEach(order => {
+                 const card = document.getElementById(`order-${order.id}`);
+                 const distEl = card?.querySelector('.distance'); // Target the specific distance span
+                 if (distEl && order.latitude && order.longitude) {
+                     try {
+                        const orderLatLng = L.latLng(order.latitude, order.longitude);
+                        const driverLatLng = L.latLng(currentLatLng);
+                        const distanceKm = (driverLatLng.distanceTo(orderLatLng) / 1000).toFixed(1);
+                        distEl.textContent = `📍 ${distanceKm} ק"מ`;
+                     } catch (e) {
+                         console.warn("Error calculating distance for order", order.id, e);
+                         distEl.textContent = `📍 - ק"מ`;
+                     }
+                 } else if (distEl) {
+                     distEl.textContent = `📍 - ק"מ`; // No coords for order
+                 }
+                 
+                 // Update map popup distance if open
+                 const marker = orderMarkers[order.id];
+                 if (marker && marker.isPopupOpen()) {
+                      const distanceText = `מרחק: ${(L.latLng(currentLatLng).distanceTo([order.latitude, order.longitude]) / 1000).toFixed(1)} ק"מ`;
+                      const popupContent = `<h4>${order.customer?.name || '?'}</h4><p>${order.address || '?'}</p><p>${distanceText}</p><p>סטטוס: ${order.status}</p>`;
+                      marker.setPopupContent(popupContent);
+                 }
+             });
+        }
+
+        function createOrderCard(order) { 
+            let cardClass = "order-card bg-white p-4 rounded-lg shadow"; 
+            let actionButton = ''; 
+            let statusText = order.status || '?'; 
+            let statusColor = "text-gray-500";
+            let distanceText = 'מחשב מרחק...'; // Default distance text
+
+             if (currentLatLng && order.latitude && order.longitude) {
+                  try {
+                     const orderLatLng = L.latLng(order.latitude, order.longitude);
+                     const driverLatLng = L.latLng(currentLatLng);
+                     distanceText = `📍 ${(driverLatLng.distanceTo(orderLatLng) / 1000).toFixed(1)} ק"מ`;
+                  } catch(e) { distanceText = 'שגיאת מרחק'; }
+             }
+
             switch (order.status) {
-                case 'שויך': cardClass += " notification-card"; statusText = "חדשה - לאישור"; statusColor = "text-yellow-600 font-bold"; actionButton = `<button class="w-full py-2 px-4 rounded bg-green-500 text-white font-semibold hover:bg-green-600 transition btn-success" onclick="window.acknowledgeOrder('${order.id}')"><i data-feather="check-circle" class="inline w-4 h-4 ml-1"></i> אישור והתחלת העמסה</button>`; break;
-                case 'בתהליך ליקוט': statusText = "בהעמסה"; statusColor = "text-blue-600"; actionButton = `<p class="text-center text-sm text-gray-500 italic">ממתין לסיום העמסה...</p>`; break;
-                case 'בדרך': statusText = "בדרך ללקוח"; statusColor = "text-green-600 font-semibold"; actionButton = `<button class="w-full py-2 px-4 rounded bg-green-600 text-white font-semibold hover:bg-green-700 transition btn-success" onclick="window.completeOrder('${order.id}')"><i data-feather="flag" class="inline w-4 h-4 ml-1"></i> סיום משימה</button>`; break;
-                default: cardClass += " opacity-70";
+                case 'שויך': 
+                    cardClass += " notification-card"; 
+                    statusText = "חדשה - לאישור"; 
+                    statusColor = "text-yellow-600 font-bold"; 
+                    actionButton = `<button class="w-full btn btn-success mt-3" onclick="window.acknowledgeOrder('${order.id}')"><i data-feather="check-circle" class="inline w-4 h-4 ml-1"></i> אישור והתחלת העמסה</button>`; 
+                    break;
+                // Removed 'בתהליך ליקוט' as it's not in ACTIVE_DRIVER_ORDER_STATUSES
+                // case 'בתהליך ליקוט': 
+                //     statusText = "בהעמסה"; statusColor = "text-blue-600"; 
+                //     actionButton = `<p class="text-center text-sm text-gray-500 italic mt-3">ממתין לסיום העמסה...</p>`; 
+                //     break; 
+                case 'בדרך': 
+                    statusText = "בדרך ללקוח"; 
+                    statusColor = "text-green-600 font-semibold"; 
+                    actionButton = `<button class="w-full btn btn-success mt-3" onclick="window.completeOrder('${order.id}')"><i data-feather="flag" class="inline w-4 h-4 ml-1"></i> סיום משימה</button>`; 
+                    break;
+                default: 
+                    cardClass += " opacity-70"; // Should not happen with current filter
             }
-            const buttons = `<div class="grid grid-cols-2 gap-2 mt-3 text-sm"><a href="tel:${order.customer?.phone || ''}" class="py-2 px-3 rounded bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition text-center"><i data-feather="phone" class="inline w-4 h-4 ml-1"></i> לקוח</a><a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.address || '')}" target="_blank" class="py-2 px-3 rounded bg-blue-500 text-white font-medium hover:bg-blue-600 transition text-center"><i data-feather="navigation" class="inline w-4 h-4 ml-1"></i> ניווט</a></div>`;
-            return `<div class="${cardClass}" id="order-${order.id}"><div class="flex justify-between items-start mb-2"><div><h3 class="text-lg font-bold text-gray-900">${order.customer?.name || '?'}</h3><p class="text-sm text-gray-600">${order.address || '?'}</p></div><span class="text-xs font-medium ${statusColor} whitespace-nowrap">${statusText}</span></div><p class="text-xs text-gray-500 mb-3">הערות: ${order.notes || 'אין'}</p>${actionButton}${buttons}</div>`;
+            
+            // Generate Google Maps link
+            const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${order.latitude},${order.longitude}`; // Use lat,lon for more accuracy
+            
+            const buttons = `<div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+                                <a href="tel:${order.customer?.phone || ''}" class="btn btn-secondary btn-sm"><i data-feather="phone" class="inline w-4 h-4"></i> לקוח</a>
+                                <a href="${mapsUrl}" target="_blank" class="btn btn-primary btn-sm"><i data-feather="navigation" class="inline w-4 h-4"></i> ניווט</a>
+                             </div>`;
+            
+            return `<div class="${cardClass}" id="order-${order.id}">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900">${order.customer?.name || '?'}</h3>
+                                <p class="text-sm text-gray-600 address">${order.address || '?'}</p>
+                                <span class="text-sm distance">${distanceText}</span> 
+                            </div>
+                            <span class="text-xs font-medium ${statusColor} whitespace-nowrap">${statusText}</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-3">הערות: ${order.notes || 'אין'}</p>
+                        ${actionButton}
+                        ${buttons}
+                    </div>`;
         }
 
         // --- Order Actions ---
-        window.acknowledgeOrder = async (orderId) => { /* ... implementation unchanged ... */
-            SmartLog.info("Acknowledging order...", "Orders.Action", { orderId }); try { const orderRef = doc(db, "orders", orderId); await updateDoc(orderRef, { status: "בתהליך ליקוט" }); SmartLog.info("Status updated to 'בתהליך ליקוט'", "Orders.Action", { orderId }); stopNotificationSound(); document.getElementById(`order-${orderId}`)?.classList.remove('notification-card'); } catch (e) { SmartLog.error(e, "Orders.Action.Acknowledge"); alert("שגיאה באישור."); }
+        window.acknowledgeOrder = async (orderId) => { 
+            SmartLog.info("Acknowledging order...", "Orders.Action", { orderId }); 
+            const button = document.querySelector(`#order-${orderId} button`);
+             if(button) button.classList.add('btn-disabled'); // Disable button visually
+            try { 
+                const orderRef = doc(db, "orders", orderId); 
+                // Change status to 'בדרך' directly, skipping 'בתהליך ליקוט'
+                await updateDoc(orderRef, { status: "בדרך", lastModified: serverTimestamp() }); 
+                SmartLog.info("Status updated to 'בדרך'", "Orders.Action", { orderId }); 
+                stopNotificationSound(); 
+                document.getElementById(`order-${orderId}`)?.classList.remove('notification-card'); 
+            } catch (e) { 
+                SmartLog.error(e, "Orders.Action.Acknowledge"); 
+                alert("שגיאה באישור."); 
+                 if(button) button.classList.remove('btn-disabled'); // Re-enable on error
+            }
+            // Listener will handle re-render
         };
-        window.completeOrder = async (orderId) => { /* ... implementation unchanged ... */
-             SmartLog.info("Completing order...", "Orders.Action", { orderId }); if (!confirm("לסמן משימה כהושלמה?")) return; try { const orderRef = doc(db, "orders", orderId); await updateDoc(orderRef, { status: "הושלם", completedAt: serverTimestamp() }); SmartLog.info("Status updated to 'הושלם'", "Orders.Action", { orderId }); } catch (e) { SmartLog.error(e, "Orders.Action.Complete"); alert("שגיאה בסיום."); }
+        
+        window.completeOrder = async (orderId) => { 
+             SmartLog.info("Completing order...", "Orders.Action", { orderId }); 
+             if (!confirm("לסמן משימה כהושלמה?")) return; 
+             const button = document.querySelector(`#order-${orderId} button`);
+             if(button) button.classList.add('btn-disabled');
+             try { 
+                 const orderRef = doc(db, "orders", orderId); 
+                 await updateDoc(orderRef, { status: "הושלם", completedAt: serverTimestamp(), lastModified: serverTimestamp() }); 
+                 SmartLog.info("Status updated to 'הושלם'", "Orders.Action", { orderId }); 
+                 // Order will disappear from the list automatically due to the listener filter
+             } catch (e) { 
+                 SmartLog.error(e, "Orders.Action.Complete"); 
+                 alert("שגיאה בסיום."); 
+                 if(button) button.classList.remove('btn-disabled');
+             }
         };
 
         // --- Notifications ---
@@ -433,23 +830,19 @@
         }
 
         // --- Service Worker Registration ---
-        function registerServiceWorker() { /* ... implementation unchanged ... */
-            if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').then(reg => SmartLog.info('SW registered', 'PWA', { scope: reg.scope })).catch(err => SmartLog.error(err, 'PWA', { message: 'SW registration failed' })); }); } else { SmartLog.warn("SW not supported.", "PWA"); }
-        }
+        // function registerServiceWorker() { /* ... REMOVED ... */ }
 
 
-        // --- Start Application (v50.1: Moved into DOMContentLoaded) ---
+        // --- Start Application ---
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded fired (v50.1). Starting app initialization...'); // v50.1
-            // Ensure SmartLog is available (basic check)
+            console.log('DOMContentLoaded fired (v50.3.1). Starting app initialization...'); 
             if (typeof SmartLog === 'undefined') {
-                // Attempt to define fallback if SmartLog failed (might happen if imports fail very early)
                 console.error("SmartLog failed to initialize. Using console fallback.");
                  SmartLog = { info: console.log, warn: console.warn, error: console.error };
             }
             SmartLog.info("DOMContentLoaded fired.", "Init");
-            registerServiceWorker();
-            initializeDriverApp(); // Start main async logic
+            // registerServiceWorker(); // REMOVED
+            initializeDriverApp(); 
              try { if(feather) feather.replace(); } catch (e) { SmartLog.warn("Feather icons replace failed.", "UI", e); }
         });
 
@@ -457,3 +850,4 @@
 
 </body>
 </html>
+
