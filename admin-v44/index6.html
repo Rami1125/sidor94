@@ -3,16 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v31.8 (Global Ping)</title>
+    <title>DeliveryMaster v31.9 (Global Ping)</title>
     <!-- 
-      DeliveryMaster Admin App v31.8 (Global Ping)
+      DeliveryMaster Admin App v31.9 (Global Ping)
       
       Changelog:
-      - v31.8: Added "Send Report Update" button and functionality.
-        - Added new nav link "שלח עדכון דוח" with "send" icon.
-        - Created new function `sendGlobalPing(type)` to write to `globalPings` collection.
-        - Wired button to send 'FUTURE_REPORT' ping to all listening apps.
-        - Added `copyToClipboard` utility.
+      - v31.9: Added Global Ping functionality.
+        - Added "Send Global Alert" button to main navigation.
+        - Added `sendGlobalPing` function:
+          - Prompts admin for a message.
+          - Creates a new document in `globalPings` collection.
+          - This ping can be heard by all other apps (Viewer, Driver, Warehouse).
+      - v31.8: Added "Copy Link for Customer" feature.
       - v31.7.2 (FIX): Fixed DOM access and form submission errors.
       - v31.7: Added functionality to update order status directly.
       - v31.6: Dynamically update active orders when customer default address changes.
@@ -20,6 +22,9 @@
       - v31.5: Address separation, Customer editing, Coordinate pasting, Driver History structure.
       - v31.4: Added optional, user-defined Order & Customer Numbers.
       - v31.3: Added History Page, Geocoding, and UI clean-up.
+      - v31.2: UI Refresh & Smart Details Panel.
+      - v31.1 (FIX): New orders get warehouse coordinates.
+      - v31.0 (Firebase Edition): Migrated to Firebase.
     -->
     
     <!-- TailwindCSS -->
@@ -128,6 +133,14 @@
             color: white;
             border-right: 3px solid #60a5fa; /* blue-400 */
         }
+         .nav-link-special { /* For ping button */
+             color: var(--text-dark-nav);
+             background-color: var(--bg-dark-nav-hover);
+         }
+         .nav-link-special:hover {
+             background-color: var(--primary-color);
+             color: white;
+         }
         #navbar .hidden.lg\\:block {
              color: white;
         }
@@ -449,15 +462,16 @@
                 <i data-feather="file-text" class="w-6 h-6"></i>
                 <span class="font-semibold text-lg hidden lg:block">לוגים</span>
             </a>
-            <!-- NEW PING BUTTON -->
-            <a href="#" class="nav-link flex items-center p-3 space-x-4 space-x-reverse rounded-lg" onclick="sendGlobalPing('FUTURE_REPORT')">
-                <i data-feather="send" class="w-6 h-6"></i>
-                <span class="font-semibold text-lg hidden lg:block">שלח עדכון דוח</span>
-            </a>
             
             <div class="flex-grow"></div> <!-- Spacer -->
             
-            <div class="hidden lg:block border-t border-gray-700 pt-4">
+            <!-- New Global Ping Button -->
+            <a href="#" class="nav-link nav-link-special flex items-center p-3 space-x-4 space-x-reverse rounded-lg" onclick="sendGlobalPing()">
+                <i data-feather="bell" class="w-6 h-6"></i>
+                <span class="font-semibold text-lg hidden lg:block">שלח התראה גלובלית</span>
+            </a>
+
+            <div class="hidden lg:block border-t border-gray-700 pt-4 mt-4">
                 <div class="text-sm">שלום, <span class="font-semibold">מנהל</span></div>
                 <div id="last-updated" class="text-xs">מתחבר...</div>
             </div>
@@ -855,14 +869,14 @@
 
         // --- CONFIG & STATE ---
         const ISRAEL_CENTER = [32.0853, 34.7818];
-        const WAREHOUSE_LOCATIONS = { "החרש": [32.13266165049073, 34.898196599998755], "התלמיד": [32.16303427408473, 34.894926705310006] };
+        const WAREHOUSE_LOCATIONS = { "החרש": [32.13266165049073, 34.898196599998755], "התלמיד": [32.16303427408473, 34.894926705310006] }; // Updated Coords
         const ALLOWED_STATUSES = ["חדש", "שויך", "בדרך", "הושלם", "בוטל"]; // Define statuses globally
 
         let state = {
-            orders: {}, // Changed to object for faster lookup
-            drivers: {}, // Changed to object
-            liveLocations: {}, // Changed to object
-            customers: {}, // Changed to object
+            orders: [],
+            drivers: [],
+            liveLocations: {},
+            customers: [],
         };
         
         let map;
@@ -900,7 +914,7 @@
         });
         
         async function initializeApplication() {
-            SmartLog.info("v31.8-FB: Initializing...", "Init"); // Version bump
+            SmartLog.info("v31.9-FB: Initializing...", "Init"); // Version bump
             try {
                 updateStatus("מפעיל מפות...");
                 initMap(); // Dashboard map
@@ -984,15 +998,8 @@
             SmartLog.info("Listening to Drivers...", "Firestore.Listen");
             const q = query(collection(db, "drivers"), orderBy("name"));
             onSnapshot(q, (snapshot) => {
-                SmartLog.info(`Drivers: ${snapshot.docChanges().length} changes.`, "Firestore.Snapshot");
-                snapshot.docChanges().forEach(change => {
-                    const id = change.doc.id;
-                    if (change.type === "removed") {
-                        delete state.drivers[id];
-                    } else {
-                        state.drivers[id] = { id: id, ...change.doc.data() };
-                    }
-                });
+                SmartLog.info(`Drivers: ${snapshot.docs.length} docs.`, "Firestore.Snapshot");
+                state.drivers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderDrivers();
                 renderMapMarkers();
                 populateDriverSelector(); // Populate history dropdown
@@ -1007,15 +1014,8 @@
             SmartLog.info("Listening to Orders...", "Firestore.Listen");
             const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
             onSnapshot(q, (snapshot) => {
-                SmartLog.info(`Orders: ${snapshot.docChanges().length} changes.`, "Firestore.Snapshot");
-                 snapshot.docChanges().forEach(change => {
-                    const id = change.doc.id;
-                    if (change.type === "removed") {
-                        delete state.orders[id];
-                    } else {
-                        state.orders[id] = { id: id, ...change.doc.data() };
-                    }
-                });
+                SmartLog.info(`Orders: ${snapshot.docs.length} docs.`, "Firestore.Snapshot");
+                state.orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderOrders(); // Renders sidebar
                 renderMapMarkers(); // Renders map
                 renderHistoryTable(); // Renders history page table
@@ -1030,15 +1030,12 @@
              SmartLog.info("Listening to Locations...", "Firestore.Listen");
              const q = query(collection(db, "driverLocations"));
              onSnapshot(q, (snapshot) => {
-                SmartLog.info(`Locations: ${snapshot.docChanges().length} changes.`, "Firestore.Snapshot");
-                snapshot.docChanges().forEach(change => {
-                    const id = change.doc.id;
-                    if (change.type === "removed") {
-                        delete state.liveLocations[id];
-                    } else {
-                        state.liveLocations[id] = { id: id, ...change.doc.data() };
-                    }
+                SmartLog.info(`Locations: ${snapshot.docs.length} changes.`, "Firestore.Snapshot");
+                const newLocations = {};
+                snapshot.forEach(doc => {
+                    newLocations[doc.id] = { id: doc.id, ...doc.data() };
                 });
+                state.liveLocations = newLocations;
                 // These changes affect driver list (status) and map
                 renderDrivers();
                 renderMapMarkers();
@@ -1052,15 +1049,8 @@
              SmartLog.info("Listening to Customers...", "Firestore.Listen");
              const q = query(collection(db, "customers"), orderBy("name"));
              onSnapshot(q, (snapshot) => {
-                SmartLog.info(`Customers: ${snapshot.docChanges().length} changes.`, "Firestore.Snapshot");
-                snapshot.docChanges().forEach(change => {
-                    const id = change.doc.id;
-                    if (change.type === "removed") {
-                        delete state.customers[id];
-                    } else {
-                        state.customers[id] = { id: id, ...change.doc.data() };
-                    }
-                });
+                SmartLog.info(`Customers: ${snapshot.docs.length} changes.`, "Firestore.Snapshot");
+                state.customers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 populateCustomerDatalist();
                 renderCustomerTable(); // Render customer management table
              }, e => { 
@@ -1077,15 +1067,14 @@
             if (!list) return; // Add guard clause
             list.innerHTML = ''; // Clear
             
-            const driverArray = Object.values(state.drivers);
-            if (driverArray.length === 0) {
+            if (state.drivers.length === 0) {
                 list.innerHTML = `<div class="p-4 text-center text-gray-500">לא נמצאו נהגים פעילים.</div>`;
                 return;
             }
             
-            driverArray.forEach(driver => {
+            state.drivers.forEach(driver => {
                 const location = state.liveLocations[driver.id]; // Use Firestore doc ID
-                const assignedOrders = Object.values(state.orders).filter(o => o.driver?.id === driver.id && o.status !== 'הושלם');
+                const assignedOrders = state.orders.filter(o => o.driver?.id === driver.id && o.status !== 'הושלם');
                 list.appendChild(createDriverCard(driver, location, assignedOrders.length));
             });
         }
@@ -1127,7 +1116,7 @@
             if (!list) return; // Add guard clause
             list.innerHTML = ''; // Clear
             
-            const unassignedOrders = Object.values(state.orders).filter(o => o.status === 'חדש');
+            const unassignedOrders = state.orders.filter(o => o.status === 'חדש');
             
             if (unassignedOrders.length === 0) {
                 list.innerHTML = `<div class="p-4 text-center text-gray-500">אין הזמנות חדשות לשיבוץ.</div>`;
@@ -1179,7 +1168,7 @@
             Object.values(state.liveLocations).forEach(driverLoc => {
                 if (!driverLoc.latitude || !driverLoc.longitude) return;
                 
-                const driverData = state.drivers[driverLoc.id]; // Get from state object
+                const driverData = state.drivers.find(d => d.id === driverLoc.id);
                 const name = driverData?.name || 'נהג לא ידוע';
                 
                 const latLng = [driverLoc.latitude, driverLoc.longitude];
@@ -1202,7 +1191,7 @@
             });
             
             // Render Unassigned Orders
-            const unassignedOrders = Object.values(state.orders).filter(o => o.status === 'חדש' && o.latitude && o.longitude);
+            const unassignedOrders = state.orders.filter(o => o.status === 'חדש' && o.latitude && o.longitude);
             
             // Clear old order markers
             Object.keys(orderMarkers).forEach(orderId => {
@@ -1258,7 +1247,7 @@
             const dateFrom = document.getElementById('history-date-from').value;
             const dateTo = document.getElementById('history-date-to').value;
 
-            let filteredOrders = Object.values(state.orders);
+            let filteredOrders = state.orders;
 
             // 1. Filter by Search
             if (search) {
@@ -1333,7 +1322,7 @@
             
             const search = document.getElementById('customer-search-input').value.toLowerCase();
             
-            let filteredCustomers = Object.values(state.customers);
+            let filteredCustomers = state.customers;
             
             if (search) {
                  filteredCustomers = filteredCustomers.filter(c => 
@@ -1373,6 +1362,7 @@
             // Hide all views
             document.querySelectorAll('.app-view').forEach(v => v.style.display = 'none');
             // Show the selected view
+            // const viewEl = document.getElementById(`view-${viewName.replace('-', '_')}`); // OLD - Incorrect for driver-history
              const viewId = `view-${viewName}`; // CORRECT ID
              const viewEl = document.getElementById(viewId); 
             if (viewEl) {
@@ -1490,11 +1480,11 @@
          * v31.0: New feature "Assign on Map"
          */
         function showAssignDriverModal(orderId) {
-            const order = state.orders[orderId]; // Get from state object
+            const order = state.orders.find(o => o.id == orderId);
             if (!order) return;
             
             // Find drivers who are active
-            const availableDrivers = Object.values(state.drivers).filter(d => state.liveLocations[d.id] && !state.liveLocations[d.id].isStuck);
+            const availableDrivers = state.drivers.filter(d => state.liveLocations[d.id] && !state.liveLocations[d.id].isStuck);
 
             if (availableDrivers.length === 0) {
                 showToast('אין נהגים זמינים כרגע', 'error');
@@ -1520,7 +1510,7 @@
             const btn = document.querySelector(`.leaflet-popup-content button[onclick="showAssignDriverModal('${orderId}')"]`);
             if (btn) btn.innerText = 'משייך...';
             
-            const driverData = state.drivers[driverId]; // Get from state object
+            const driverData = state.drivers.find(d => d.id == driverId);
             if (!driverData) {
                 showToast('Driver data not found in state.', 'error');
                 if (btn) btn.innerText = 'שייך נהג';
@@ -1528,7 +1518,7 @@
             }
             
             const orderRef = doc(db, "orders", orderId);
-            const orderData = state.orders[orderId];
+            const orderData = state.orders.find(o => o.id === orderId);
              const displayId = orderData?.orderNumber || `#${orderId.slice(-6)}`;
 
 
@@ -1559,13 +1549,13 @@
             let html = ''; // Start empty
             
             if (type === 'driver') {
-                const driver = state.drivers[id]; // Get from state object
+                const driver = state.drivers.find(d => d.id === id);
                 if (!driver) {
                     detailsEl.innerHTML = 'נהג לא נמצא';
                     return;
                 }
                 const location = state.liveLocations[id];
-                const assignedOrders = Object.values(state.orders).filter(o => o.driver?.id === id && o.status !== 'הושלם');
+                const assignedOrders = state.orders.filter(o => o.driver?.id === id && o.status !== 'הושלם');
                 
                 html += `
                     <div id="details-panel-header">
@@ -1591,7 +1581,7 @@
                 html += `</ul>`;
 
             } else if (type === 'order') {
-                const order = state.orders[id]; // Get from state object
+                const order = state.orders.find(o => o.id === id);
                 if (!order) {
                     detailsEl.innerHTML = 'הזמנה לא נמצאה';
                     return;
@@ -1635,7 +1625,7 @@
                     html += `</ul>`;
 
                     // 2. Available Driver Distances
-                    const activeDrivers = Object.values(state.drivers)
+                    const activeDrivers = state.drivers
                         .filter(d => state.liveLocations[d.id] && !state.liveLocations[d.id].isStuck)
                         .map(driver => {
                             const location = state.liveLocations[driver.id];
@@ -1703,7 +1693,7 @@
         // --- STATUS UPDATE FUNCTIONS ---
         
         function promptForStatusChange(orderId, currentStatus) {
-            const order = state.orders[orderId]; // Get from state
+            const order = state.orders.find(o => o.id === orderId);
             const displayId = order?.orderNumber || `#${orderId.slice(-6)}`;
             const promptMessage = `הזמנה ${displayId}\nסטטוס נוכחי: ${currentStatus}\n\nהזן סטטוס חדש מהרשימה:\n${ALLOWED_STATUSES.join(', ')}`;
             
@@ -1728,7 +1718,7 @@
 
         async function updateOrderStatus(orderId, newStatus) {
              const orderRef = doc(db, "orders", orderId);
-             const order = state.orders[orderId];
+             const order = state.orders.find(o => o.id === orderId);
              const displayId = order?.orderNumber || `#${orderId.slice(-6)}`;
              SmartLog.info(`Attempting to update status for order ${orderId} to ${newStatus}`, "CRUD.StatusUpdate");
              
@@ -1752,7 +1742,7 @@
             const datalist = document.getElementById('customer-list');
              if (!datalist) return; // Add guard clause
             datalist.innerHTML = '';
-            Object.values(state.customers).forEach(cust => { // Iterate object values
+            state.customers.forEach(cust => { // Iterate array
                 const option = document.createElement('option');
                 // Include customer number in datalist value if exists
                 const displayValue = cust.customerNumber ? `${cust.name} (${cust.customerNumber})` : `${cust.name} (#${cust.id.slice(-6)})`;
@@ -1796,7 +1786,7 @@
                 // Check if the input value exactly matches the option value
                 if (option.value === value) {
                     const customerId = option.dataset.customerId;
-                    const customer = state.customers[customerId]; // Get from state object
+                    const customer = state.customers.find(c => c.id == customerId); // Find in array
                     if (customer) {
                         // Show existing customer details
                         document.getElementById('existing-customer-display').style.display = 'block';
@@ -1887,7 +1877,7 @@
                     isNewCustomer = false;
                     // Use existing customer
                     customerRefId = document.getElementById('customer-id-existing').value;
-                    const customer = state.customers[customerRefId]; // Get from state object
+                    const customer = state.customers.find(c => c.id == customerRefId); // Find in array
                     if (!customer) throw new Error("Selected customer not found in state.");
                     
                     customerName = customer.name;
@@ -1968,7 +1958,7 @@
          // --- CUSTOMER EDIT MODAL ---
          
          function openCustomerEditModal(customerId) {
-             const customer = state.customers[customerId]; // Get from state object
+             const customer = state.customers.find(c => c.id === customerId); // Find in array
              if (!customer) {
                  showToast('שגיאה: לקוח לא נמצא', 'error');
                  return;
@@ -2030,7 +2020,7 @@
              
              const customerId = document.getElementById('customer-edit-id').value;
              const customerRef = doc(db, "customers", customerId);
-             const originalCustomerData = state.customers[customerId]; // Get from state object
+             const originalCustomerData = state.customers.find(c => c.id === customerId); // Find in array
               if (!originalCustomerData) {
                   showToast('שגיאה: לא ניתן למצוא נתוני לקוח מקוריים', 'error');
                   btn.disabled = false;
@@ -2189,7 +2179,7 @@
              const select = document.getElementById('driver-select');
              if (!select) return;
              select.innerHTML = '<option value="">בחר נהג...</option>'; // Reset
-             Object.values(state.drivers).forEach(driver => { // Iterate object values
+             state.drivers.forEach(driver => { // Iterate array
                  const option = document.createElement('option');
                  option.value = driver.id;
                  option.textContent = driver.name;
@@ -2213,7 +2203,7 @@
                  return;
              }
              
-             const selectedDriver = state.drivers[driverId]; // Get from state object
+             const selectedDriver = state.drivers.find(d => d.id === driverId); // Find in array
              const mapLabel = document.getElementById('driver-history-map-label'); // Get element
              if (mapLabel) { // Check if element exists before setting innerText
                  mapLabel.innerText = selectedDriver?.name || driverId.slice(-6);
@@ -2392,22 +2382,29 @@
         }
         window.copyCustomerLink = copyCustomerLink; // Make global
         
-        // --- NEW: Global Ping ---
-        async function sendGlobalPing(type) {
-            if (!type) return;
-            SmartLog.info(`Sending global ping: ${type}`, "Admin.Ping");
-            try {
-                const pingRef = doc(collection(db, "globalPings")); // New doc with auto-ID
-                await setDoc(pingRef, {
-                    type: type,
-                    sentAt: serverTimestamp(),
-                    sentBy: "admin"
-                });
-                showToast('התראת עדכון דוח נשלחה לכלל המשתמשים', 'success');
-            } catch (error) {
-                SmartLog.error(error, "Admin.Ping", { type });
-                showToast('שגיאה בשליחת התראה', 'error');
-            }
+        // --- Global Ping Function ---
+        async function sendGlobalPing() {
+             const message = prompt("הזן הודעה להתראה הגלובלית (למשל: 'דוח למחר מוכן'):");
+             if (!message || message.trim() === '') {
+                 showToast('שליחת התראה בוטלה', 'info');
+                 return;
+             }
+             
+             SmartLog.info("Sending global ping...", "CRUD.Ping", { message });
+             try {
+                 const pingRef = doc(collection(db, "globalPings")); // New collection
+                 await setDoc(pingRef, {
+                     type: "MANAGER_BROADCAST",
+                     message: message.trim(),
+                     sender: "Admin",
+                     createdAt: serverTimestamp()
+                 });
+                 showToast('התראה גלובלית נשלחה בהצלחה', 'success');
+                 SmartLog.info("Global ping sent successfully", "CRUD.Ping");
+             } catch (error) {
+                 SmartLog.error(error, "CRUD.Ping", { message });
+                 showToast('שגיאה בשליחת התראה גלובלית', 'error');
+             }
         }
         window.sendGlobalPing = sendGlobalPing; // Make global
 
@@ -2419,3 +2416,4 @@
     </script>
 </body>
 </html>
+
