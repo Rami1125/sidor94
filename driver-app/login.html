@@ -49,7 +49,55 @@
         </form>
     </div>
 
-    <script>
+    <script type="module">
+        // --- Firebase SDK Imports ---
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, query, where, getDocs, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+        // --- Firebase Config ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
+            storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
+        };
+        let app, auth, db; let initializationError = null;
+        try {
+            app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+            auth = getAuth(app); db = getFirestore(app);
+            console.log("Firebase initialized for Login");
+        } catch (error) {
+            console.error("CRITICAL: Firebase init failed!", error);
+            initializationError = error;
+            // Show error to user if Firebase fails to load
+            const errorMsgEl = document.getElementById('error-message');
+            if (errorMsgEl) errorMsgEl.textContent = 'שגיאת טעינה. נסה לרענן את הדף.';
+        }
+
+        // --- Auth Function ---
+        const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 2000;
+        async function ensureAuth() {
+            console.log("ensureAuth: Starting..."); let tries = 0;
+            while (tries < MAX_AUTH_RETRIES) {
+                tries++;
+                try {
+                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
+                    if (!auth) throw new Error("Auth object missing");
+                    if (auth.currentUser && !auth.currentUser.isAnonymous) {
+                         console.log("Already signed in non-anonymously, skipping anonymous sign-in.");
+                         return auth.currentUser; // Return existing user if not anonymous
+                    }
+                    console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
+                    const userCredential = await signInAnonymously(auth);
+                    console.log("ensureAuth: Success (Anonymous).", userCredential.user.uid); return userCredential.user;
+                } catch (e) {
+                    console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
+                    if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; }
+                    console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+                }
+            } throw new Error("ensureAuth: Max retries reached.");
+        }
+
+        // --- DOM Elements ---
         const loginForm = document.getElementById('login-form');
         const nameInput = document.getElementById('driver-name-input');
         const loginButton = document.getElementById('login-btn');
@@ -57,11 +105,12 @@
         const loadingSpinner = document.getElementById('loading-spinner');
         const errorMessage = document.getElementById('error-message');
 
-        loginForm.addEventListener('submit', (event) => {
+        // --- Login Logic ---
+        loginForm.addEventListener('submit', async (event) => {
             event.preventDefault(); // Prevent default form submission
             errorMessage.textContent = ''; // Clear previous errors
             loginButton.disabled = true; // Disable button during login
-            loginButtonText.textContent = 'מתחבר...';
+            loginButtonText.textContent = 'מאמת פרטים...';
             loadingSpinner.classList.remove('hidden');
 
             const driverName = nameInput.value.trim();
@@ -74,18 +123,47 @@
                 return;
             }
 
-            try {
-                // Save both ID and Name using the entered name
-                localStorage.setItem('driverId', driverName);
-                localStorage.setItem('driverName', driverName);
-                console.log(`Driver logged in: ID=${driverName}, Name=${driverName}`);
+            if (initializationError || !db) {
+                 errorMessage.textContent = 'שגיאה בהתחברות לשירות. נסה לרענן.';
+                 loginButton.disabled = false;
+                 loginButtonText.textContent = 'כניסה לאפליקציה';
+                 loadingSpinner.classList.add('hidden');
+                 return;
+            }
 
-                // Redirect to the main app page
-                window.location.href = 'index.html';
+            try {
+                // Ensure authenticated to perform Firestore query
+                await ensureAuth();
+
+                // Query Firestore for the driver name
+                const driversRef = collection(db, "drivers");
+                const q = query(driversRef, where("name", "==", driverName), limit(1));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    // No driver found with that name
+                    errorMessage.textContent = 'שם הנהג שהוזן אינו קיים במערכת.';
+                    loginButton.disabled = false;
+                    loginButtonText.textContent = 'כניסה לאפליקציה';
+                    loadingSpinner.classList.add('hidden');
+                    console.warn(`Login failed: Driver "${driverName}" not found.`);
+                } else {
+                    // Driver found, save ID and Name
+                    const driverDoc = querySnapshot.docs[0];
+                    const driverId = driverDoc.id;
+                    const foundDriverName = driverDoc.data().name; // Get name from Firestore doc
+
+                    localStorage.setItem('driverId', driverId);
+                    localStorage.setItem('driverName', foundDriverName); // Save the name from Firestore
+                    console.log(`Driver logged in: ID=${driverId}, Name=${foundDriverName}`);
+
+                    // Redirect to the main driver app page using a relative path starting with ./
+                    window.location.href = './index (53).html'; // *** THE FIX ***
+                }
 
             } catch (error) {
-                console.error("Error saving to localStorage:", error);
-                errorMessage.textContent = 'שגיאה בשמירת פרטי ההתחברות.';
+                console.error("Login process error:", error);
+                errorMessage.textContent = 'שגיאה בתהליך ההתחברות. נסה שוב.';
                 loginButton.disabled = false;
                 loginButtonText.textContent = 'כניסה לאפליקציה';
                 loadingSpinner.classList.add('hidden');
@@ -94,3 +172,4 @@
     </script>
 </body>
 </html>
+
