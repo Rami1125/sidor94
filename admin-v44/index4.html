@@ -3,20 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v31.7 (Status Update Button)</title>
+    <title>DeliveryMaster v31.7.2 (Fixes)</title>
     <!-- 
-      DeliveryMaster Admin App v31.7 (Status Update Button)
+      DeliveryMaster Admin App v31.7.2 (Fixes)
       
       Changelog:
+      - v31.7.2 (FIX): 
+        - Fixed TypeError in fetchAndDrawDriverRoute by adding null check for map label element.
+        - Fixed "invalid form control not focusable" error in New Order modal by removing 
+          `required` attribute from hidden new-customer fields and adding JS validation instead.
       - v31.7.1 (FIX): Corrected element ID targeting in showView function for driver-history page.
       - v31.7: Added functionality to update order status directly.
-        - Added "Change Status" button in the Order Details Panel on the dashboard.
-        - Added "Update Status" button in the Actions column of the Order History table.
-        - Both buttons trigger `promptForStatusChange(orderId, currentStatus)`.
-        - `promptForStatusChange`: Uses prompt() to get new status input from predefined list.
-        - `updateOrderStatus`: New async function to update Firestore document with new status 
-          and lastModified timestamp, includes error handling and logging.
-        - UI updates automatically via existing Firestore listeners.
       - v31.6: Dynamically update active orders when customer default address changes.
       - v31.5.1 (FIX): Corrected usage of timestamp in customer audit log for arrayUnion.
       - v31.5: Address separation, Customer editing, Coordinate pasting, Driver History structure.
@@ -652,12 +649,12 @@
                 <div id="new-customer-fields" class="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3" style="display: none;">
                     <p class="font-semibold text-blue-700">פרטי לקוח חדש</p>
                     <input type="hidden" id="customer-id-new"> <!-- This is not used, just for structure -->
-                    <input type="text" id="customer-name-new" placeholder="שם לקוח מלא" class="w-full p-2 border rounded-md" required>
-                    <input type="text" id="customer-phone-new" placeholder="טלפון" class="w-full p-2 border rounded-md" required>
+                    <input type="text" id="customer-name-new" placeholder="שם לקוח מלא" class="w-full p-2 border rounded-md"> <!-- Removed required -->
+                    <input type="text" id="customer-phone-new" placeholder="טלפון" class="w-full p-2 border rounded-md"> <!-- Removed required -->
                     <div class="form-grid"> <!-- Address Split -->
-                        <input type="text" id="customer-street-new" placeholder="רחוב" class="w-full p-2 border rounded-md" required>
-                        <input type="text" id="customer-streetnum-new" placeholder="מספר" class="w-full p-2 border rounded-md" required>
-                        <input type="text" id="customer-city-new" placeholder="עיר" class="w-full p-2 border rounded-md" required>
+                        <input type="text" id="customer-street-new" placeholder="רחוב" class="w-full p-2 border rounded-md"> <!-- Removed required -->
+                        <input type="text" id="customer-streetnum-new" placeholder="מספר" class="w-full p-2 border rounded-md"> <!-- Removed required -->
+                        <input type="text" id="customer-city-new" placeholder="עיר" class="w-full p-2 border rounded-md"> <!-- Removed required -->
                     </div>
                     <input type="text" id="customer-contact-new" placeholder="איש קשר" class="w-full p-2 border rounded-md">
                      <input type="text" id="customer-number-new" placeholder="מספר לקוח (אופציונלי)" class="w-full p-2 border rounded-md"> <!-- NEW FIELD -->
@@ -891,7 +888,7 @@
         });
         
         async function initializeApplication() {
-            SmartLog.info("v31.7.1-FB: Initializing...", "Init"); // Version bump for fix
+            SmartLog.info("v31.7.2-FB: Initializing...", "Init"); // Version bump for fix
             try {
                 updateStatus("מפעיל מפות...");
                 initMap(); // Dashboard map
@@ -1796,31 +1793,36 @@
             let customerDataForOrder = {}; // Object to hold customer details for the order
             let useCustomerCoords = false; // Flag to check if we should use custom coords
             let customerCustomCoords = null; // To hold [lat, lon] if available
+            let isNewCustomer = false; // Flag for validation
 
             try {
                 // Step 1: Handle Customer
                 if (document.getElementById('new-customer-fields').style.display === 'block') {
+                    isNewCustomer = true;
                     // Create new customer
-                    const street = document.getElementById('customer-street-new').value;
-                    const number = document.getElementById('customer-streetnum-new').value;
-                    const city = document.getElementById('customer-city-new').value;
+                    const street = document.getElementById('customer-street-new').value.trim();
+                    const number = document.getElementById('customer-streetnum-new').value.trim();
+                    const city = document.getElementById('customer-city-new').value.trim();
+                    const name = document.getElementById('customer-name-new').value.trim();
+                    const phone = document.getElementById('customer-phone-new').value.trim();
+
+                    // --- JS Validation for New Customer ---
+                    if (!name || !phone || !street || !number || !city) {
+                         throw new Error("שם, טלפון וכתובת מלאה (רחוב, מספר, עיר) הינם שדות חובה עבור לקוח חדש.");
+                    }
                     customerAddress = `${street} ${number}, ${city}`; // Compose full address
                     
                     const newCustomer = {
-                        name: document.getElementById('customer-name-new').value,
-                        phone: document.getElementById('customer-phone-new').value,
+                        name: name,
+                        phone: phone,
                         defaultAddress: customerAddress, // Save composed address
                         addressStreet: street,
                         addressNumber: number,
                         addressCity: city,
-                        contactPerson: document.getElementById('customer-contact-new').value,
-                        customerNumber: document.getElementById('customer-number-new').value || null,
+                        contactPerson: document.getElementById('customer-contact-new').value.trim(),
+                        customerNumber: document.getElementById('customer-number-new').value.trim() || null,
                         auditLog: [{ timestamp: new Date(), action: "Created" }] // Use JS Date for creation log
                     };
-                    
-                    if (!newCustomer.name || !newCustomer.phone || !street || !number || !city) {
-                         throw new Error("שם, טלפון וכתובת מלאה (רחוב, מספר, עיר) הינם שדות חובה עבור לקוח חדש.");
-                    }
                     
                     const customerDocRef = await addDoc(collection(db, "customers"), newCustomer);
                     customerRefId = customerDocRef.id;
@@ -1830,6 +1832,7 @@
                     SmartLog.info("Created new customer", "CRUD.Customer", { id: customerRefId });
                     
                 } else if (document.getElementById('existing-customer-display').style.display === 'block') {
+                    isNewCustomer = false;
                     // Use existing customer
                     customerRefId = document.getElementById('customer-id-existing').value;
                     const customer = state.customers.find(c => c.id == customerRefId);
@@ -1875,11 +1878,11 @@
                 const newOrder = {
                     customer: customerDataForOrder, // Use the prepared customer object
                     address: customerAddress, 
-                    orderNumber: document.getElementById('order-number').value || null, 
+                    orderNumber: document.getElementById('order-number').value.trim() || null, 
                     orderDate: document.getElementById('order-date').value,
                     deliveryType: document.getElementById('order-delivery-type').value,
                     warehouse: document.getElementById('order-warehouse').value,
-                    notes: document.getElementById('order-notes').value,
+                    notes: document.getElementById('order-notes').value.trim(),
                     latitude: finalCoords[0], 
                     longitude: finalCoords[1],
                     status: "חדש",
@@ -1887,6 +1890,11 @@
                     lastModified: serverTimestamp() // Use server timestamp for modification time
                 };
                 
+                 // Final basic validation before saving order
+                 if (!newOrder.orderDate || !newOrder.deliveryType || !newOrder.warehouse) {
+                     throw new Error("תאריך, סוג הובלה ומחסן הם שדות חובה בהזמנה.");
+                 }
+
                 const orderDocRef = await addDoc(collection(db, "orders"), newOrder);
                 const displayId = newOrder.orderNumber || `#${orderDocRef.id.slice(-6)}`;
                 showToast(`הזמנה ${displayId} נוצרה בהצלחה`, 'success');
@@ -1939,11 +1947,11 @@
             if (customer.auditLog && Array.isArray(customer.auditLog) && customer.auditLog.length > 0) {
                  logList.innerHTML = customer.auditLog
                     // Ensure timestamp exists and has toDate method (covers both JS Date and Firestore Timestamp)
-                    .filter(log => log.timestamp && typeof log.timestamp.toDate === 'function') 
-                    .sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()) // Newest first
+                    .filter(log => log.timestamp && (log.timestamp.toDate || log.timestamp instanceof Date)) // Check for both Firestore Timestamp and JS Date
+                    .sort((a, b) => (b.timestamp.toDate ? b.timestamp.toMillis() : b.timestamp.getTime()) - (a.timestamp.toDate ? a.timestamp.toMillis() : a.timestamp.getTime())) // Newest first, handle both types
                     .slice(0, 5) // Show last 5 changes
                     .map(log => {
-                        const time = log.timestamp.toDate().toLocaleString('he-IL');
+                        const time = (log.timestamp.toDate ? log.timestamp.toDate() : log.timestamp).toLocaleString('he-IL'); // Convert if needed
                         let changes = log.action === "Created" ? "נוצר" : Object.keys(log.changes || {}).join(', ');
                          if (changes.length > 50) changes = changes.substring(0, 50) + '...'; // Truncate long change lists
                         return `<li>${time}: ${changes}</li>`;
@@ -1985,6 +1993,11 @@
                  const city = document.getElementById('customer-edit-city').value;
                  const fullAddress = `${street} ${number}, ${city}`; // New full address
                  
+                  // Basic validation for required fields in edit mode
+                 if (!document.getElementById('customer-edit-name').value || !document.getElementById('customer-edit-phone').value || !street || !number || !city) {
+                      throw new Error("שם, טלפון וכתובת מלאה הם שדות חובה.");
+                 }
+
                  const coordsString = document.getElementById('customer-edit-coords').value.trim();
                  let customLat = null;
                  let customLon = null;
@@ -2149,7 +2162,12 @@
              }
              
              const selectedDriver = state.drivers.find(d => d.id === driverId);
-             document.getElementById('driver-history-map-label').innerText = selectedDriver?.name || driverId.slice(-6);
+             const mapLabel = document.getElementById('driver-history-map-label'); // Get element
+             if (mapLabel) { // Check if element exists before setting innerText
+                 mapLabel.innerText = selectedDriver?.name || driverId.slice(-6);
+             } else {
+                 console.warn("Element with ID 'driver-history-map-label' not found.");
+             }
 
              // **** Placeholder / Conceptual ****
              // This is where you would query the *actual* location history collection
@@ -2197,8 +2215,10 @@
                 WAREHOUSE_LOCATIONS['התלמיד'] // End at another
             ];
             drawRouteOnHistoryMap(dummyRoute);
-            document.getElementById('driver-last-status').innerText = 'דמו פעיל';
-            document.getElementById('driver-distance-traveled').innerText = (calculateRouteDistance(dummyRoute) / 1000).toFixed(1) ;
+             const lastStatusEl = document.getElementById('driver-last-status');
+             if (lastStatusEl) lastStatusEl.innerText = 'דמו פעיל';
+             const distanceEl = document.getElementById('driver-distance-traveled');
+             if (distanceEl) distanceEl.innerText = (calculateRouteDistance(dummyRoute) / 1000).toFixed(1) ;
 
          }
          window.fetchAndDrawDriverRoute = fetchAndDrawDriverRoute; // Make global
