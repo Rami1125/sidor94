@@ -25,11 +25,8 @@
 
     <div class="w-full max-w-sm bg-white p-8 rounded-xl shadow-lg">
         <div class="w-16 h-16 bg-blue-500 rounded-lg flex items-center justify-center mb-6 mx-auto">
-            <!-- Simple icon or logo placeholder -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+            <!-- Logo Placeholder -->
+             <img src="https://i.postimg.cc/ryPT3r29/image.png" alt="Logo" class="w-10 h-10">
         </div>
         <h1 class="text-2xl font-bold text-center mb-2 text-gray-800">DeliveryMaster</h1>
         <p class="text-center text-gray-600 mb-6">כניסת נהגים</p>
@@ -37,7 +34,7 @@
         <form id="login-form">
             <div class="mb-4">
                 <label for="driver-name-input" class="block text-sm font-medium text-gray-700 mb-1 text-right">שם הנהג</label>
-                <input type="text" id="driver-name-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-gray-50 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50" placeholder="לדוגמה: עלי, חכמת..." required>
+                <input type="text" id="driver-name-input" name="driverName" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-gray-50 focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50" placeholder="הקלד שם מלא כפי שמופיע במערכת" required autocomplete="name">
             </div>
 
             <button type="submit" id="login-btn" class="w-full bg-blue-500 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-600 transition duration-200 flex items-center justify-center">
@@ -45,57 +42,14 @@
                 <span id="loading-spinner" class="loader hidden"></span>
             </button>
 
-            <p id="error-message" class="text-red-500 text-center mt-3 text-sm"></p>
+            <p id="error-message" class="text-red-500 text-center mt-3 text-sm min-h-[1.25rem]"></p>
         </form>
     </div>
 
     <script type="module">
-        // --- Firebase SDK Imports ---
-        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, query, where, getDocs, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-
-        // --- Firebase Config ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
-            storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
-        };
-        let app, auth, db; let initializationError = null;
-        try {
-            app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-            auth = getAuth(app); db = getFirestore(app);
-            console.log("Firebase initialized for Login");
-        } catch (error) {
-            console.error("CRITICAL: Firebase init failed!", error);
-            initializationError = error;
-            // Show error to user if Firebase fails to load
-            const errorMsgEl = document.getElementById('error-message');
-            if (errorMsgEl) errorMsgEl.textContent = 'שגיאת טעינה. נסה לרענן את הדף.';
-        }
-
-        // --- Auth Function ---
-        const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 2000;
-        async function ensureAuth() {
-            console.log("ensureAuth: Starting..."); let tries = 0;
-            while (tries < MAX_AUTH_RETRIES) {
-                tries++;
-                try {
-                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
-                    if (!auth) throw new Error("Auth object missing");
-                    if (auth.currentUser && !auth.currentUser.isAnonymous) {
-                         console.log("Already signed in non-anonymously, skipping anonymous sign-in.");
-                         return auth.currentUser; // Return existing user if not anonymous
-                    }
-                    console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
-                    const userCredential = await signInAnonymously(auth);
-                    console.log("ensureAuth: Success (Anonymous).", userCredential.user.uid); return userCredential.user;
-                } catch (e) {
-                    console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
-                    if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; }
-                    console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-                }
-            } throw new Error("ensureAuth: Max retries reached.");
-        }
+        // --- Import Shared and Specific Firebase Functions ---
+        // Note: No need for SmartLog in the login page itself
+        import { db, authReadyPromise, collection, query, where, getDocs, limit } from '/ap/shared/firebase-init.js'; // *** FIXED PATH AGAIN *** Use absolute path including /ap/
 
         // --- DOM Elements ---
         const loginForm = document.getElementById('login-form');
@@ -105,71 +59,60 @@
         const loadingSpinner = document.getElementById('loading-spinner');
         const errorMessage = document.getElementById('error-message');
 
+        // --- Pre-check if already logged in ---
+        if (localStorage.getItem('driverId') && localStorage.getItem('driverName')) {
+             console.log("Driver already logged in, redirecting...");
+             window.location.href = './index.html'; // Relative to current dir
+        }
+
         // --- Login Logic ---
         loginForm.addEventListener('submit', async (event) => {
-            event.preventDefault(); // Prevent default form submission
-            errorMessage.textContent = ''; // Clear previous errors
-            loginButton.disabled = true; // Disable button during login
-            loginButtonText.textContent = 'מאמת פרטים...';
-            loadingSpinner.classList.remove('hidden');
+            event.preventDefault();
+            errorMessage.textContent = '';
+            loginButton.disabled = true;
+            if(loginButtonText) loginButtonText.textContent = 'מאמת פרטים...';
+            loadingSpinner?.classList.remove('hidden');
 
             const driverName = nameInput.value.trim();
 
             if (!driverName) {
                 errorMessage.textContent = 'אנא הזן שם נהג.';
                 loginButton.disabled = false;
-                loginButtonText.textContent = 'כניסה לאפליקציה';
-                loadingSpinner.classList.add('hidden');
+                if(loginButtonText) loginButtonText.textContent = 'כניסה לאפליקציה';
+                loadingSpinner?.classList.add('hidden');
                 return;
             }
 
-            if (initializationError || !db) {
-                 errorMessage.textContent = 'שגיאה בהתחברות לשירות. נסה לרענן.';
-                 loginButton.disabled = false;
-                 loginButtonText.textContent = 'כניסה לאפליקציה';
-                 loadingSpinner.classList.add('hidden');
-                 return;
-            }
-
             try {
-                // Ensure authenticated to perform Firestore query
-                await ensureAuth();
+                await authReadyPromise;
+                if (!db) throw new Error("Database connection not available.");
 
-                // Query Firestore for the driver name
                 const driversRef = collection(db, "drivers");
                 const q = query(driversRef, where("name", "==", driverName), limit(1));
                 const querySnapshot = await getDocs(q);
 
                 if (querySnapshot.empty) {
-                    // No driver found with that name
                     errorMessage.textContent = 'שם הנהג שהוזן אינו קיים במערכת.';
-                    loginButton.disabled = false;
-                    loginButtonText.textContent = 'כניסה לאפליקציה';
-                    loadingSpinner.classList.add('hidden');
                     console.warn(`Login failed: Driver "${driverName}" not found.`);
                 } else {
-                    // Driver found, save ID and Name
                     const driverDoc = querySnapshot.docs[0];
                     const driverId = driverDoc.id;
-                    const foundDriverName = driverDoc.data().name; // Get name from Firestore doc
+                    const foundDriverName = driverDoc.data().name;
 
                     localStorage.setItem('driverId', driverId);
-                    localStorage.setItem('driverName', foundDriverName); // Save the name from Firestore
+                    localStorage.setItem('driverName', foundDriverName);
                     console.log(`Driver logged in: ID=${driverId}, Name=${foundDriverName}`);
 
-                    localStorage.setItem('driverName', foundDriverName); // Save the name from Firestore
-                    console.log(`Driver logged in: ID=${driverId}, Name=${foundDriverName}`);
-
-                    // Redirect to the main driver app page using a relative path starting with ./
-                    window.location.href = './index.html'; // *** התיקון: שונה מ-'index (53).html' ***
+                    window.location.href = './index.html'; // Redirect
                 }
 
             } catch (error) {
                 console.error("Login process error:", error);
                 errorMessage.textContent = 'שגיאה בתהליך ההתחברות. נסה שוב.';
-                loginButton.disabled = false;
-                loginButtonText.textContent = 'כניסה לאפליקציה';
-                loadingSpinner.classList.add('hidden');
+            } finally {
+                 loginButton.disabled = false;
+                 if(loginButtonText) loginButtonText.textContent = 'כניסה לאפליקציה';
+                 loadingSpinner?.classList.add('hidden');
             }
         });
     </script>
