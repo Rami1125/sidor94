@@ -2,32 +2,31 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster Viewer v50.4 (Global Ping)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DeliveryMaster Viewer v50.6 (Mobile UI Fix)</title>
     <!-- 
-      DeliveryMaster Live Viewer App v50.4 (Global Ping)
+      DeliveryMaster Live Viewer App v50.6 (Mobile UI Fix)
       
       Changelog:
-      - v50.4:
-        - Added listener for `globalPings` collection to receive admin alerts.
-        - Added Tone.js library for audio alerts.
-        - Implemented `playNotificationSound` and `listenToGlobalPings`.
-        - Wrapped `feather.replace()` in a try...catch block for robustness.
-      - v50.3 (FIX):
-        - Fixed critical error "ISRAEL_CENTER is not defined" by adding the constant.
-        - Added PWA meta tags (`apple-mobile-web-app-capable`, `mobile-web-app-capable`).
-        - Linked to `manifest.json` file.
+      - v50.6 (FIX):
+        - Fixed "Blank Page" error by completely refactoring the layout.
+        - Removed separate mobile/desktop maps. Now uses ONE map container (`#viewer-map`).
+        - Implemented a mobile-first "app-like" layout using CSS Grid.
+        - On mobile: Map top, Tabbed content bottom.
+        - On desktop: Map left, Sidebar right.
+        - Simplified and corrected map initialization logic (`initViewerMap`).
+      - v50.5: (Faulty implementation of mobile UI)
+      - v50.4: Added listener for `globalPings` collection to receive admin alerts.
+      - v50.3 (FIX): Fixed "ISRAEL_CENTER is not defined" error.
       - v50.2: Added Header Counters, Future Orders Tab, and Order Type Styling.
-      - v50.1 (FIX): Resolved Firestore index error in `listenToActiveOrdersViewer`.
-      - v50.0: Rebuilt viewer app based on Admin App v31.7.2.
     -->
     
     <!-- PWA Manifest & Theme -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1a365d">
+    <meta name="theme-color" content="#ffffff">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="apple-touch-icon" href="https://i.postimg.cc/ryPT3r29/image.png">
     
     <!-- TailwindCSS -->
@@ -62,10 +61,10 @@
              --color-masait-bg: #dcfce7; /* green-100 */
              --color-isuf-bg: #f3f4f6;   /* gray-100 */
              --color-future-bg: #f9fafb; /* gray-50 */
-             --color-future-text: #9ca3af; /* gray-400 */
         }
         html, body {
-            height: 100%;
+            height: 100vh;
+            width: 100vw;
             overflow: hidden; /* Prevent body scroll */
         }
         body {
@@ -74,18 +73,26 @@
             color: var(--text-dark);
         }
         
+        /* Main Layout */
         .viewer-layout {
-            display: grid;
-            grid-template-rows: auto auto 1fr; /* Header, Counters, Main */
+            display: flex;
+            flex-direction: column;
             height: 100vh;
+            width: 100%;
         }
         
+        header {
+            flex-shrink: 0; /* Don't shrink header */
+        }
+
         #viewer-counters {
+            flex-shrink: 0; /* Don't shrink counters */
             background-color: #e5e7eb; /* gray-200 */
             padding: 0.5rem 1rem;
             display: flex;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
             justify-content: space-around;
-            gap: 1rem;
+            gap: 0.5rem;
             border-bottom: 1px solid var(--border-color);
         }
         .counter-item {
@@ -97,48 +104,119 @@
              background-color: var(--bg-white);
              padding: 0.25rem 0.75rem;
              border-radius: 99px; /* Pill shape */
-             font-size: 0.9rem;
+             font-size: 0.8rem; /* Smaller font */
         }
          .counter-item .count {
              font-weight: 700;
              color: var(--primary-dark);
-             min-width: 1.5rem; /* Ensure space for number */
+             min-width: 1.25rem; /* Ensure space for number */
              text-align: center;
          }
 
+        /* --- Main Content Layout --- */
+        /* Desktop: Map left, Sidebar right */
         #viewer-main-content {
             display: grid;
-            grid-template-columns: 1fr 350px; /* Map and Sidebar */
-            height: 100%; /* Take remaining height */
+            grid-template-columns: 1fr 350px; /* Map | Sidebar */
+            grid-template-rows: 1fr; /* Single row */
+            flex-grow: 1; /* Take remaining space */
             overflow: hidden;
         }
         
         #viewer-map-container {
             position: relative;
             background-color: #e0e0e0;
+            grid-row: 1;
+            grid-column: 1;
         }
         #viewer-map {
             height: 100%;
             width: 100%;
         }
+        
         #viewer-side-panel {
+            grid-row: 1;
+            grid-column: 2;
             background-color: var(--bg-white);
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
             height: 100%;
+            overflow: hidden;
         }
         
-        /* Side Panel */
+        /* Mobile: Map top, Tabs+Lists bottom */
+        @media (max-width: 768px) {
+            #viewer-main-content {
+                display: grid;
+                grid-template-columns: 1fr; /* Single column */
+                grid-template-rows: 45% 1fr; /* Map (45%) | Sidebar (remaining) */
+            }
+            #viewer-map-container {
+                grid-row: 1;
+                grid-column: 1;
+            }
+            #viewer-side-panel {
+                grid-row: 2;
+                grid-column: 1;
+                border-right: none;
+                border-top: 1px solid var(--border-color);
+            }
+        }
+        
+        /* Side Panel / Mobile Content Area */
+        #viewer-side-panel .tabs-container {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        #viewer-side-panel .tab-button {
+             flex: 1; 
+             padding: 0.75rem 0.5rem; 
+             font-weight: 500; 
+             text-align: center; 
+             border-bottom: 3px solid transparent; 
+             color: var(--text-light);
+             font-size: 0.9rem; 
+             cursor: pointer;
+             white-space: nowrap; 
+        }
+        @media (max-width: 768px) {
+             #viewer-side-panel .tab-button {
+                 font-size: 0.8rem;
+                 padding: 0.75rem 0.25rem;
+             }
+        }
+         #viewer-side-panel .tab-button.active {
+             border-bottom-color: var(--primary-color);
+             color: var(--primary-color);
+         }
+        
+        #viewer-side-panel .search-container {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        
         .panel-list-container {
             flex: 1;
             overflow-y: auto;
-            position: relative; /* For loader */
+            position: relative; /* For loader and for lists */
         }
         .panel-list {
+            /* Full height/width of parent, only visible one shown */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             overflow-y: auto;
-            position: relative; /* For loader */
+            display: none; /* Hidden by default */
         }
+        .panel-list.active {
+            display: block; /* Shown by JS */
+        }
+        
         .order-card, .driver-card {
             padding: 0.75rem 1rem; /* Slightly smaller padding */
             border-bottom: 1px solid var(--border-color);
@@ -161,7 +239,6 @@
         .order-card.type-isuf { background-color: var(--color-isuf-bg); }
          .order-card.future-order { 
              background-color: var(--color-future-bg); 
-             opacity: 0.8; /* Slightly faded */
          }
         .order-card.future-order .font-semibold { color: var(--text-light); } /* Dim text */
         .order-type-icon { margin-left: 0.5rem; font-size: 1.1em; } /* Emoji styling */
@@ -208,23 +285,6 @@
          #connection-status.connected .dot { background-color: #22c55e; }
          #connection-status.connecting .dot { background-color: #facc15; }
          #connection-status.error .dot { background-color: #ef4444; }
-
-         /* Side Panel Tabs */
-         #viewer-side-panel .tab-button {
-             flex: 1; 
-             padding: 0.75rem 0.5rem; /* Adjusted padding */
-             font-weight: 500; 
-             text-align: center; 
-             border-bottom: 3px solid transparent; 
-             color: var(--text-light);
-             font-size: 0.9rem; /* Smaller font */
-             cursor: pointer;
-             white-space: nowrap; /* Prevent wrapping */
-         }
-          #viewer-side-panel .tab-button.active {
-             border-bottom-color: var(--primary-color);
-             color: var(--primary-color);
-         }
          
         /* Toast Notification */
         #toast-container {
@@ -255,27 +315,6 @@
         .toast.error { background-color: #ef4444; }
         .toast.ping { background-color: var(--primary-color); } /* Style for pings */
 
-
-        /* Responsive */
-        @media (max-width: 768px) {
-             .viewer-layout { grid-template-rows: auto auto 1fr; } /* Header, Counters, Main */
-             #viewer-counters { flex-wrap: wrap; justify-content: center; } /* Wrap counters */
-            #viewer-main-content {
-                grid-template-columns: 1fr; /* Stack map and list */
-            }
-            #viewer-side-panel {
-                position: fixed; bottom: 0; left: 0; right: 0;
-                height: 50vh; /* Show panel at bottom */
-                z-index: 2000; border-right: none;
-                border-top: 1px solid var(--border-color);
-                transform: translateY(100%);
-                transition: transform 0.3s ease;
-            }
-             #viewer-side-panel.open { /* Class to toggle visibility */
-                 transform: translateY(0);
-             }
-            #viewer-side-panel .tab-button { font-size: 0.8rem; padding: 0.5rem; } /* Smaller tabs */
-        }
     </style>
 </head>
 <body class="antialiased">
@@ -313,7 +352,7 @@
 
         <!-- Main Content (Map + Side Panel) -->
         <main id="viewer-main-content">
-            <!-- Map Container -->
+            <!-- Map Container (Now singular) -->
             <div id="viewer-map-container">
                 <div id="viewer-map"></div>
                 <div id="viewer-map-loader" class="loader-container">
@@ -322,10 +361,10 @@
                 </div>
             </div>
 
-            <!-- Side Panel (Lists) -->
+            <!-- Side Panel (Lists) / Mobile Content Panel -->
             <aside id="viewer-side-panel">
                 <!-- Tabs -->
-                <div class="flex border-b border-gray-200">
+                <div class="tabs-container">
                     <button id="tab-orders-active" class="tab-button active" onclick="showViewerPanelTab('orders-active')">
                         הזמנות פעילות
                     </button>
@@ -338,24 +377,24 @@
                 </div>
                 
                 <!-- Search -->
-                <div class="p-3 border-b border-gray-200">
+                <div class="search-container">
                     <input type="text" id="viewer-search-input" placeholder="חפש הזמנה או נהג..." class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300" onkeyup="filterViewerLists()">
                 </div>
                 
                 <!-- Lists Container -->
                 <div class="panel-list-container">
                     <!-- Active Orders List -->
-                    <div id="viewer-orders-active-list" class="panel-list">
+                    <div id="viewer-orders-active-list" class="panel-list active">
                         <div class="loader-container"><div class="loader"></div></div>
                     </div>
                     
                      <!-- Future Orders List -->
-                    <div id="viewer-orders-future-list" class="panel-list" style="display: none;">
+                    <div id="viewer-orders-future-list" class="panel-list">
                         <div class="loader-container"><div class="loader"></div></div>
                     </div>
                     
                     <!-- Drivers List -->
-                    <div id="viewer-drivers-list" class="panel-list" style="display: none;">
+                    <div id="viewer-drivers-list" class="panel-list">
                         <div class="loader-container"><div class="loader"></div></div>
                     </div>
                 </div>
@@ -363,7 +402,6 @@
         </main>
     </div>
 
-    <!-- No Modals needed for viewer -->
      <!-- Toast Container -->
     <div id="toast-container"></div>
 
@@ -454,7 +492,7 @@
             liveLocations: {},
         };
         
-        let viewerMap;
+        let viewerMap; // The one and only map instance
         let viewerDriverMarkers = {};
         let viewerOrderMarkers = {}; // Will only hold markers for ACTIVE orders
         
@@ -482,7 +520,7 @@
         });
         
         async function initializeViewerApplication() {
-            SmartLog.info("v50.4 Viewer: Initializing...", "Init"); // Version bump
+            SmartLog.info("v50.6 Viewer: Initializing...", "Init"); // Version bump
             try {
                 updateConnectionStatus('connecting', 'מפעיל מפה...');
                 initViewerMap(); // This will now work
@@ -495,7 +533,7 @@
                 
                 // Auth is ready, now attach listeners
                 listenToDriversViewer();
-                listenToAllOrdersViewer(); // Changed to listen for ALL orders
+                listenToAllOrdersViewer(); 
                 listenToLocationsViewer();
                 listenToGlobalPings(); // Add listener for admin pings
                 
@@ -505,7 +543,8 @@
             } catch (error) {
                 SmartLog.error(error, "Init.Critical", { message: "Viewer initialization failed." });
                 updateConnectionStatus('error', `שגיאת אתחול: ${error.message}`);
-                document.getElementById('viewer-map-loader').innerHTML = `<span class="text-red-600">שגיאת אתחול קריטית.</span>`;
+                 const mapLoader = document.getElementById('viewer-map-loader');
+                 if(mapLoader) mapLoader.innerHTML = `<span class="text-red-600">שגיאת אתחול קריטית.</span>`;
                 showToast(`שגיאת אתחול: ${error.message}`, 'error');
             }
         }
@@ -677,10 +716,14 @@
              }).length;
              
              const futureCount = viewerState.futureOrders.length;
-
-             document.getElementById('count-active').innerText = activeCount;
-             document.getElementById('count-completed-today').innerText = completedTodayCount;
-             document.getElementById('count-future').innerText = futureCount;
+             
+             const countActiveEl = document.getElementById('count-active');
+             const countCompletedEl = document.getElementById('count-completed-today');
+             const countFutureEl = document.getElementById('count-future');
+             
+             if(countActiveEl) countActiveEl.innerText = activeCount;
+             if(countCompletedEl) countCompletedEl.innerText = completedTodayCount;
+             if(countFutureEl) countFutureEl.innerText = futureCount;
          }
 
         function renderViewerDriversList() {
@@ -916,10 +959,14 @@
              document.getElementById('viewer-orders-future-list').style.display = 'none';
              document.getElementById('viewer-drivers-list').style.display = 'none';
              
+             // Remove 'active' from all lists
+             document.querySelectorAll('.panel-list').forEach(list => list.classList.remove('active'));
+             
              // Show the selected list container
              const listToShow = document.getElementById(`viewer-${tabName}-list`);
              if (listToShow) {
                  listToShow.style.display = 'block';
+                 listToShow.classList.add('active'); // Add active class for filtering
              }
 
              // Update active tab style
@@ -927,31 +974,27 @@
                  button.classList.remove('active', 'border-blue-500', 'text-blue-500');
                  button.classList.add('border-transparent', 'text-gray-500');
              });
-             const activeButton = document.getElementById(`tab-${tabName}`); // Use the correct button IDs
+             // Note: The button IDs were changed to match the tabName logic
+             const activeButton = document.getElementById(`tab-${tabName}`); 
              if (activeButton) {
                  activeButton.classList.add('active', 'border-blue-500', 'text-blue-500');
                  activeButton.classList.remove('border-transparent', 'text-gray-500');
              }
+             
+             // Re-apply filter for the newly visible list
+             filterViewerLists();
          }
 
         window.showViewerPanelTab = showViewerPanelTab; // Make global
         
         function filterViewerLists() {
             const query = document.getElementById('viewer-search-input').value.toLowerCase();
-            const currentTab = document.querySelector('#viewer-side-panel .tab-button.active').id;
-
-            // Determine which list is currently visible based on the active tab
-            let listSelector = '';
-            if (currentTab === 'tab-orders-active') {
-                listSelector = '#viewer-orders-active-list .order-card';
-            } else if (currentTab === 'tab-orders-future') {
-                 listSelector = '#viewer-orders-future-list .order-card';
-            } else if (currentTab === 'tab-drivers') {
-                listSelector = '#viewer-drivers-list .driver-card';
-            }
-
-            if (listSelector) {
-                document.querySelectorAll(listSelector).forEach(card => {
+            // Find the *currently active* list to filter
+            const activeList = document.querySelector('.panel-list.active');
+            
+            if (activeList) {
+                const itemsToFilter = activeList.querySelectorAll('.order-card, .driver-card');
+                itemsToFilter.forEach(card => {
                     const search = card.getAttribute('data-search') || '';
                     card.style.display = search.includes(query) ? 'block' : 'none';
                 });
@@ -989,8 +1032,7 @@
                       listElement.scrollTop += (cardRect.top - containerRect.top) - 10; // Adjust scroll, -10 for padding
                   }
              }
-             // Optionally close sidebar on mobile after focusing
-             // document.getElementById('viewer-side-panel').classList.remove('open');
+             // On mobile, maybe switch to map view? (Future enhancement)
         }
         window.focusViewerMapItem = focusViewerMapItem; // Make global
 
@@ -999,9 +1041,16 @@
         
         async function playNotificationSound(note = "C5", duration = "8n") {
             try {
+                if (!window.Tone) {
+                    SmartLog.warn("Tone.js not loaded, cannot play sound.", "Notifications");
+                    return;
+                }
                 await Tone.start();
                 const synth = new Tone.Synth().toDestination();
-                synth.triggerAttackRelease(note, duration);
+                synth.triggerAttackRelease(note, duration, Tone.now());
+                 if (note !== "C5") { // Add a second tone for variety
+                     synth.triggerAttackRelease(note, duration, Tone.now() + 0.2);
+                 }
                 SmartLog.info("Notification sound played.", 'Notifications');
             } catch (e) {
                 SmartLog.error(e, "Notifications.Sound");
@@ -1040,15 +1089,14 @@
         function showToast(message, type = 'info') {
              // Simple console log for viewer, or implement toast if needed
              console.log(`[Toast-${type.toUpperCase()}]: ${message}`);
-            // If you want the visual toast: Add <div id="toast-container"></div> to HTML
             
             const container = document.getElementById('toast-container'); 
-            if (!container) { // Create container if it doesn't exist
+            if (!container) { 
                  console.error("Toast container not found!");
                  return;
             }
             const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
+            toast.className = `toast ${type}`; // type can be 'success', 'error', 'ping', or default
             toast.innerText = message;
             container.appendChild(toast);
             setTimeout(() => toast.classList.add('show'), 10);
