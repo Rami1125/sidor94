@@ -3,21 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DeliveryMaster - טרמינל מחסן v50.4.1</title>
+    <title>DeliveryMaster - טרמינל מחסן v50.5</title>
     <!-- 
-      Warehouse App v50.4.1 (Firebase + Live Map)
+      Warehouse App v50.5 (Firebase + Live Map + Driver Ping)
       
       Changelog:
-      - v50.4.1 (FIX): Renamed local `initializeApp` function to `initWarehouseApp` 
-        to resolve "Identifier has already been declared" conflict with Firebase SDK.
-      - v50.4: Migrated from API_URL (Apps Script) to full Firebase integration.
-      - Added live Leaflet map showing warehouse location and drivers.
-      - Map icons show driver status: "coming to load" (yellow) vs "available" (green).
-      - Replaced API polling with live Firestore listeners for Orders, Drivers, and Locations.
-      - Kept Tone.js for new order sound alerts, now triggered by Firestore snapshot 'added'.
-      - Replaced API update calls with Firestore `updateDoc` for order status changes.
-      - Retained simple sessionStorage login (OREN/TAMIR).
-      - Injected Firebase SDKs, ensureAuth, and SmartLog.
+      - v50.5:
+        - Updated warehouse coordinates (`warehouseCoords`) to new accurate locations in Hod Hasharon.
+        - Added "Call Driver for Loading" button (`.btn-call-driver`) to orders with 'באיסוף' status.
+        - Implemented `callDriverForLoading` function:
+          - Plays a local confirmation sound (beep).
+          - Creates a new document in `driverPings` collection in Firestore to alert the driver's app.
+      - v50.4.1 (FIX): Renamed `initializeApp` to `initWarehouseApp` to resolve conflict.
+      - v50.4: Migrated to Firebase, added live map, and real-time listeners.
     -->
     
     <link rel="manifest" href="manifest.json">
@@ -98,6 +96,7 @@
         .order-card button { width: 100%; padding: 12px; border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 1em; margin-top: 15px; }
         .btn-acknowledge { background-color: var(--success); }
         .btn-load { background-color: var(--warning); }
+        .btn-call-driver { background-color: var(--primary-color); margin-top: 8px; } /* New button style */
         button:disabled { background-color: #999; cursor: not-allowed; opacity: 0.7; }
 
         /* Loader */
@@ -201,7 +200,7 @@
         };
         // End SmartLog
 
-        // --- Original App Logic (Modified for Firebase v50.4) ---
+        // --- Original App Logic (Modified for Firebase v50.5) ---
         
         // DOM Elements
         const loginView = document.getElementById('loginView');
@@ -226,7 +225,11 @@
         // --- Map Variables ---
         let map;
         let driverMarkers = {};
-        const warehouseCoords = { "החרש": [32.0573, 34.7963], "התלמיד": [32.0853, 34.7818] };
+        // *** FIX: Updated Coordinates ***
+        const warehouseCoords = { 
+            "החרש": [32.13266165049073, 34.898196599998755], 
+            "התלמיד": [32.16303427408473, 34.894926705310006] 
+        };
         
         // Map Icons
         const driverIconAvailable = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41] });
@@ -316,7 +319,7 @@
                 document.getElementById('warehouse-map').innerHTML = "שגיאה: מיקום מחסן לא ידוע";
                 return;
             }
-            const center = warehouseCoords[currentManager.warehouse];
+            const center = warehouseCoords[currentManager.warehouse]; // Use updated coords
             map = L.map('warehouse-map').setView(center, 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap'
@@ -359,7 +362,7 @@
                 } else if (loc.isStuck) {
                      icon = driverIconInactive; // Use inactive (gray) for stuck
                      popupText = `<b>${driverData.name}</b><br>תקוע`;
-                } else if (!onOtherDelivery && loc.lastUpdate) { 
+                } else if (!onOtherDelivery && loc.lastUpdate?.toDate) { // Check lastUpdate exists
                     // Check if update is recent (e.g., last 15 mins)
                      const minutesAgo = (Date.now() - loc.lastUpdate.toDate().getTime()) / 60000;
                      if (minutesAgo < 15) {
@@ -440,6 +443,8 @@
                       const orderId = change.doc.id;
                       const orderData = { id: orderId, ...change.doc.data() };
                       
+                      const wasKnown = knownOrderIds.has(orderId);
+
                       if (change.type === "added") {
                            state.orders[orderId] = orderData;
                            if (orderData.status === 'חדש') {
@@ -449,7 +454,13 @@
                                knownOrderIds.add(orderId);
                            }
                       } else if (change.type === "modified") {
+                           // Check if it *became* 'חדש'
+                           const oldStatus = state.orders[orderId]?.status;
+                           if (orderData.status === 'חדש' && oldStatus !== 'חדש' && knownOrderIds.size > 0) {
+                                newOrderDetected = true;
+                           }
                            state.orders[orderId] = orderData;
+
                       } else if (change.type === "removed") {
                            delete state.orders[orderId];
                            knownOrderIds.delete(orderId);
@@ -458,7 +469,7 @@
                  
                  // On first load, populate knownOrderIds without beeping
                  if (knownOrderIds.size === 0 && Object.keys(state.orders).length > 0) {
-                      Object.values(state.orders).forEach(o => knownOrderIds.add(o.id));
+                      Object.values(state.orders).filter(o => o.status === 'חדש').forEach(o => knownOrderIds.add(o.id));
                  }
 
                  if (newOrderDetected) {
@@ -482,19 +493,22 @@
             const allWarehouseOrders = Object.values(state.orders);
             
             const newOrders = allWarehouseOrders.filter(o => o.status === 'חדש');
-            const inProgress = allWarehouseOrders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
+            const inProgress = allWarehouseOrders.filter(o => ['באיסוף', 'טעון', 'שויך'].includes(o.status)); // Add 'שויך' to in-progress
 
             if (newOrders.length === 0) newOrdersList.innerHTML = '<p>אין הזמנות חדשות.</p>';
             newOrders.forEach(order => newOrdersList.innerHTML += createOrderCard(order, 'acknowledge'));
 
             if (inProgress.length === 0) inProgressOrdersList.innerHTML = '<p>אין הזמנות בתהליך.</p>';
-            inProgress.forEach(order => inProgressOrdersList.innerHTML += createOrderCard(order, 'load'));
+            inProgress.sort((a,b) => (a.status === 'שויך' ? -1 : 1)) // Show 'שויך' first
+                      .forEach(order => inProgressOrdersList.innerHTML += createOrderCard(order, 'load'));
         }
 
         function createOrderCard(order, type) {
             let buttonHtml = '';
-            if (type === 'acknowledge') {
+            if (type === 'acknowledge') { // 'חדש' status
                 buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.id}', 'באיסוף')">אשר קבלת הזמנה</button>`;
+            } else if (order.status === 'שויך') {
+                buttonHtml = `<button class="btn-call-driver" onclick="callDriverForLoading(event, '${order.id}')">קריאה לנהג להעמסה <i class="fas fa-bullhorn"></i></button>`;
             } else if (order.status === 'באיסוף') {
                 buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.id}', 'טעון')">סמן כטעון</button>`;
             } else { // 'טעון'
@@ -502,15 +516,59 @@
             }
             
             const displayId = order.orderNumber || order.id.slice(-6);
+            const driverName = order.driver?.name ? `(נהג: ${order.driver.name})` : '';
 
             return `
                 <div class="order-card glass-card" data-order-id="${order.id}">
                     <h4>${order.customer?.name || '?'} (${displayId})</h4>
                     <p><strong>כתובת:</strong> ${order.address || '?'}</p>
-                    <p><strong>סוג:</strong> ${order.deliveryType || 'לא צוין'}</p>
+                    <p><strong>סוג:</strong> ${order.deliveryType || 'לא צוין'} ${driverName}</p>
                     ${buttonHtml}
                 </div>`;
         }
+        
+        // --- New Function: Call Driver ---
+        async function callDriverForLoading(event, orderId) {
+            const btn = event.target;
+            const order = state.orders[orderId];
+            if (!order || !order.driver?.id) {
+                alert("שגיאה: לא נמצא נהג משויך להזמנה זו.");
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שולח קריאה...';
+            
+            try {
+                // 1. Play local sound
+                playNotificationSound('G5', '8n'); // Play a slightly different note
+                
+                // 2. Send ping to Firestore
+                const pingRef = doc(collection(db, "driverPings")); // Create a new doc
+                await setDoc(pingRef, {
+                    driverId: order.driver.id,
+                    orderId: orderId,
+                    warehouse: currentManager.warehouse,
+                    createdAt: serverTimestamp(),
+                    type: 'LOAD_REQUEST' // Specific type for loading
+                });
+                
+                SmartLog.info(`Driver ping sent`, "CRUD.Ping", { orderId, driverId: order.driver.id });
+                btn.innerHTML = 'קריאה נשלחה <i class="fas fa-check"></i>';
+                setTimeout(() => { // Reset button after 3s
+                     btn.disabled = false;
+                     btn.innerHTML = 'קריאה לנהג להעמסה <i class="fas fa-bullhorn"></i>';
+                }, 3000);
+
+            } catch (error) {
+                 SmartLog.error(error, "CRUD.Ping", { orderId, driverId: order.driver.id });
+                 alert("שגיאה בשליחת הקריאה.");
+                 btn.disabled = false;
+                 btn.innerHTML = 'קריאה לנהג להעמסה <i class="fas fa-bullhorn"></i>';
+            }
+        }
+        window.callDriverForLoading = callDriverForLoading; // Make global
+
         
         async function updateOrderStatus(event, orderId, newStatus) {
             SmartLog.info(`Updating order ${orderId} to status: ${newStatus}`, "CRUD.Order");
@@ -532,11 +590,11 @@
             }
         }
         
-        async function playNotificationSound() {
+        async function playNotificationSound(note = "C5", duration = "8n") {
             try {
                 await Tone.start();
                 const synth = new Tone.Synth().toDestination();
-                synth.triggerAttackRelease("C5", "8n");
+                synth.triggerAttackRelease(note, duration);
                 SmartLog.info("Notification sound played.", 'Notifications');
             } catch (e) {
                 SmartLog.error(e, "Notifications.Sound");
