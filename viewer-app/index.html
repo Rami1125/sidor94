@@ -3,21 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster Viewer v50.2 (Counters & Future Orders)</title>
+    <title>DeliveryMaster Viewer v50.3 (PWA & Map Fix)</title>
     <!-- 
-      DeliveryMaster Live Viewer App v50.2 (Counters & Future Orders)
+      DeliveryMaster Live Viewer App v50.3 (PWA & Map Fix)
       
       Changelog:
+      - v50.3 (FIX):
+        - Fixed critical error "ISRAEL_CENTER is not defined" by adding the constant.
+        - This resolves the "blank page" / "doesn't load" issue.
+        - Added PWA meta tags (`apple-mobile-web-app-capable`, `mobile-web-app-capable`).
+        - Linked to `manifest.json` file.
       - v50.2: Added Header Counters, Future Orders Tab, and Order Type Styling.
-        - Added header counters for Active, Completed Today, and Future orders.
-        - Requires a new listener (`listenToAllOrdersViewer`) for accurate counts.
-        - Added "Future Orders" tab and list (`#viewer-future-orders-list`).
-        - Orders are now styled with icons/colors based on `deliveryType`.
-        - Order cards now display creation date and time (`createdAt`).
-        - Refactored order listeners and state management (`allOrders` vs. `activeOrders`).
       - v50.1 (FIX): Resolved Firestore index error in `listenToActiveOrdersViewer`.
       - v50.0: Rebuilt viewer app based on Admin App v31.7.2.
     -->
+    
+    <!-- PWA Manifest & Theme -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/ryPT3r29/image.png">
     
     <!-- TailwindCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -321,12 +328,15 @@
     </div>
 
     <!-- No Modals needed for viewer -->
+     <!-- Toast Container -->
+    <div id="toast-container"></div>
+
 
     <script type="module">
         // --- Inlined Firebase SDK Imports ---
         import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, where } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
+        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, where, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
         import { serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
 
         // --- Inlined Config Logic ---
@@ -397,6 +407,7 @@
         };
 
         // --- CONFIG & STATE ---
+        // *** FIX: ISRAEL_CENTER was missing ***
         const ISRAEL_CENTER = [32.0853, 34.7818];
         const ACTIVE_ORDER_STATUSES = ["חדש", "שויך", "בדרך"]; // Statuses for active count & list
 
@@ -432,10 +443,10 @@
         });
         
         async function initializeViewerApplication() {
-            SmartLog.info("v50.2 Viewer: Initializing...", "Init"); // Version bump
+            SmartLog.info("v50.3 Viewer: Initializing...", "Init"); // Version bump
             try {
                 updateConnectionStatus('connecting', 'מפעיל מפה...');
-                initViewerMap();
+                initViewerMap(); // This will now work
                 showLoader('viewer-orders-active-list', true);
                  showLoader('viewer-orders-future-list', true);
                 showLoader('viewer-drivers-list', true);
@@ -471,7 +482,7 @@
                      viewerMap = null;
                  }
 
-                viewerMap = L.map('viewer-map').setView(ISRAEL_CENTER, 9);
+                viewerMap = L.map('viewer-map').setView(ISRAEL_CENTER, 9); // *** USES ISRAEL_CENTER ***
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
                     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -946,9 +957,14 @@
              // Simple console log for viewer, or implement toast if needed
              console.log(`[Toast-${type.toUpperCase()}]: ${message}`);
             // If you want the visual toast: Add <div id="toast-container"></div> to HTML
-            /*
+            
             const container = document.getElementById('toast-container'); 
-            if (!container) return;
+            if (!container) { // Create container if it doesn't exist
+                 const newContainer = document.createElement('div');
+                 newContainer.id = 'toast-container';
+                 document.body.appendChild(newContainer);
+                 container = newContainer;
+            }
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.innerText = message;
@@ -958,10 +974,8 @@
                 toast.classList.remove('show');
                 setTimeout(() => { if (container.contains(toast)) container.removeChild(toast); }, 300);
             }, 3000);
-            */
         }
 
     </script>
 </body>
 </html>
-
