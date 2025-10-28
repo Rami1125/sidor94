@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DeliveryMaster Viewer v50.3</title>
+    <!-- 
+      DeliveryMaster Live Viewer App v50.3 (PWA & Ping)
+      
+      Changelog:
+      - v50.3:
+        - Added PWA manifest link and Apple PWA tags.
+        - Redesigned to be mobile-first: map is full screen, sidebar is a bottom sheet.
+        - Added floating toggle button for sidebar on mobile.
+        - Added Tone.js script for sound.
+        - Added listener for `globalPings` collection.
+        - Triggers sound and toast notification on 'FUTURE_REPORT' ping.
+      - v50.2: Added Header Counters, Future Orders Tab, and Order Type Styling.
+      - v50.1 (FIX): Resolved Firestore index error.
+      - v50.0: Rebuilt viewer app with Firebase.
+    -->
+    
+    <!-- PWA Manifest & Theme -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1f2937">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/ryPT3r29/image.png">
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- LeafletJS (Map) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Icons (Feather) -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Google Font: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Tone.js for Sound -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #3b82f6; /* blue-500 */
+            --primary-dark: #2563eb; /* blue-600 */
+            --bg-light: #f3f4f6; /* gray-100 */
+            --bg-white: #ffffff;
+            --border-color: #e5e7eb; /* gray-200 */
+            --text-dark: #1f2937; /* gray-800 */
+            --text-light: #6b7280; /* gray-500 */
+             /* Order Type Colors */
+             --color-manof-bg: #e0f2fe; /* sky-100 */
+             --color-masait-bg: #dcfce7; /* green-100 */
+             --color-isuf-bg: #f3f4f6;   /* gray-100 */
+             --color-future-bg: #f9fafb; /* gray-50 */
+             --color-future-text: #9ca3af; /* gray-400 */
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden; /* Prevent body scroll */
+        }
+        body {
+            font-family: 'Rubik', 'Inter', 'Arial', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+        }
+        
+        .viewer-layout {
+            display: grid;
+            grid-template-rows: auto auto 1fr; /* Header, Counters, Main */
+            height: 100vh;
+        }
+        
+        #viewer-counters {
+            background-color: #e5e7eb; /* gray-200 */
+            padding: 0.5rem 1rem;
+            display: flex;
+            justify-content: space-around;
+            gap: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .counter-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+             color: var(--text-dark);
+             background-color: var(--bg-white);
+             padding: 0.25rem 0.75rem;
+             border-radius: 99px; /* Pill shape */
+             font-size: 0.9rem;
+        }
+         .counter-item .count {
+             font-weight: 700;
+             color: var(--primary-dark);
+             min-width: 1.5rem; /* Ensure space for number */
+             text-align: center;
+         }
+
+        /* Mobile-First Layout: Map covers all, sidebar is bottom sheet */
+        #viewer-main-content {
+            display: grid;
+            grid-template-columns: 1fr; /* Single column */
+            height: 100%; /* Take remaining height */
+            overflow: hidden;
+            position: relative; /* For stacking map and sidebar */
+        }
+        
+        #viewer-map-container {
+            position: absolute; /* Take full space */
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #e0e0e0;
+            z-index: 1;
+        }
+        #viewer-map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        /* Sidebar (Bottom Sheet on Mobile) */
+        #viewer-side-panel {
+            background-color: var(--bg-white);
+            border-top: 1px solid var(--border-color);
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            
+            position: fixed; /* Bottom sheet behavior */
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60vh; /* 60% of viewport height */
+            z-index: 20;
+            
+            transform: translateY(100%); /* Hidden by default */
+            transition: transform 0.3s ease-out;
+        }
+        #viewer-side-panel.open {
+            transform: translateY(0); /* Visible */
+        }
+        
+        /* Sidebar Toggle Button (Mobile Only) */
+        #sidebar-toggle {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            border-radius: 99px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            display: flex; /* Show on mobile */
+            align-items: center;
+            gap: 0.5rem;
+        }
+        #sidebar-toggle.hidden {
+            display: none;
+        }
+
+        /* Desktop Layout (md: breakpoint) */
+        @media (min-width: 768px) {
+            #viewer-main-content {
+                grid-template-columns: 1fr 350px; /* Map left, Sidebar right */
+                position: relative;
+            }
+            #viewer-map-container {
+                position: relative; /* Back to normal flow */
+                z-index: 1;
+            }
+            #viewer-side-panel {
+                position: relative; /* Back to normal flow */
+                height: 100%;
+                transform: translateY(0); /* Always visible */
+                border-right: 1px solid var(--border-color);
+                border-top: none;
+                z-index: 10;
+            }
+            #sidebar-toggle {
+                display: none; /* Hide toggle button on desktop */
+            }
+        }
+        
+        /* Side Panel */
+        .panel-list-container {
+            flex: 1;
+            overflow-y: auto;
+            position: relative; /* For loader */
+        }
+        .panel-list {
+            overflow-y: auto;
+            position: relative; /* For loader */
+        }
+        .order-card, .driver-card {
+            padding: 0.75rem 1rem; /* Slightly smaller padding */
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+        .order-card:hover, .driver-card:hover {
+            background-color: #fafafa;
+        }
+         .order-card.active, .driver-card.active {
+             background-color: #eff6ff; /* blue-50 */
+             border-right: 3px solid var(--primary-color);
+         }
+        .order-card .font-bold {
+            color: var(--primary-dark);
+        }
+        /* Styling for different order types */
+        .order-card.type-manof { background-color: var(--color-manof-bg); }
+        .order-card.type-masait { background-color: var(--color-masait-bg); }
+        .order-card.type-isuf { background-color: var(--color-isuf-bg); }
+         .order-card.future-order { 
+             background-color: var(--color-future-bg); 
+             opacity: 0.8; /* Slightly faded */
+         }
+        .order-card.future-order .font-semibold { color: var(--text-light); } /* Dim text */
+        .order-type-icon { margin-left: 0.5rem; font-size: 1.1em; } /* Emoji styling */
+
+        /* Status Colors */
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .status-active { background-color: #22c55e; } /* green-500 */
+        .status-stuck { background-color: #ef4444; } /* red-500 */
+        .status-inactive { background-color: #9ca3af; } /* gray-400 */
+        
+        /* Leaflet Customizations */
+        .leaflet-popup-content-wrapper { border-radius: 8px; }
+        .leaflet-popup-content { margin: 13px 20px; font-family: 'Rubik', sans-serif; }
+        .leaflet-popup-content h4 { font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; }
+        .leaflet-popup-content p { margin: 4px 0; color: var(--text-light); }
+        
+        /* Loader */
+        .loader-container {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.7); display: flex;
+            align-items: center; justify-content: center; z-index: 10;
+        }
+        .loader {
+            border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color);
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Connection Status */
+         #connection-status {
+             font-size: 0.8rem;
+             font-weight: 500;
+             padding: 4px 8px;
+             border-radius: 99px;
+             display: inline-flex;
+             align-items: center;
+             gap: 4px;
+         }
+         #connection-status.connected { background-color: #dcfce7; color: #166534; } /* green */
+         #connection-status.connecting { background-color: #fef9c3; color: #854d0e; } /* yellow */
+         #connection-status.error { background-color: #fee2e2; color: #991b1b; } /* red */
+         #connection-status .dot { width: 6px; height: 6px; border-radius: 50%; }
+         #connection-status.connected .dot { background-color: #22c55e; }
+         #connection-status.connecting .dot { background-color: #facc15; }
+         #connection-status.error .dot { background-color: #ef4444; }
+
+         /* Side Panel Tabs */
+         #viewer-side-panel .tab-button {
+             flex: 1; 
+             padding: 0.75rem 0.5rem; /* Adjusted padding */
+             font-weight: 500; 
+             text-align: center; 
+             border-bottom: 3px solid transparent; 
+             color: var(--text-light);
+             font-size: 0.9rem; /* Smaller font */
+             cursor: pointer;
+             white-space: nowrap; /* Prevent wrapping */
+         }
+          #viewer-side-panel .tab-button.active {
+             border-bottom-color: var(--primary-color);
+             color: var(--primary-color);
+         }
+         
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            padding: 12px 20px;
+            background-color: var(--text-dark);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.success { background-color: #22c55e; }
+        .toast.error { background-color: #ef4444; }
+
+
+        /* Responsive */
+        @media (max-width: 767px) { /* md breakpoint minus 1px */
+             .viewer-layout { grid-template-rows: auto auto 1fr; } /* Header, Counters, Main */
+             #viewer-counters { flex-wrap: wrap; justify-content: center; } /* Wrap counters */
+            #viewer-side-panel .tab-button { font-size: 0.8rem; padding: 0.5rem; } /* Smaller tabs */
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <div class="viewer-layout">
+        <header class="bg-white shadow-sm p-4 flex justify-between items-center z-10">
+             <div class="flex items-center space-x-2 space-x-reverse">
+                 <i data-feather="truck" class="w-7 h-7 text-blue-500"></i>
+                 <h1 class="text-xl font-bold">DeliveryMaster Viewer</h1>
+             </div>
+             <div id="connection-status" class="connecting">
+                 <span class="dot"></span>
+                 <span>מתחבר...</span>
+             </div>
+        </header>
+        
+        <!-- Counters -->
+        <div id="viewer-counters">
+             <div class="counter-item">
+                 🔄
+                 <span>בסידור:</span>
+                 <span id="count-active" class="count">-</span>
+             </div>
+             <div class="counter-item">
+                 ✅
+                 <span>סופקו היום:</span>
+                 <span id="count-completed-today" class="count">-</span>
+             </div>
+             <div class="counter-item">
+                 📅
+                 <span>צפי עתידי:</span>
+                 <span id="count-future" class="count">-</span>
+             </div>
+        </div>
+
+        <!-- Main Content (Map + Side Panel) -->
+        <main id="viewer-main-content">
+            <!-- Map Container -->
+            <div id="viewer-map-container">
+                <div id="viewer-map"></div>
+                <div id="viewer-map-loader" class="loader-container">
+                    <div class="loader"></div>
+                    <span class="ml-4 font-semibold">טוען מפה ונתונים...</span>
+                </div>
+                <!-- Sidebar Toggle Button (Mobile Only) -->
+                <button id="sidebar-toggle" onclick="toggleSidebar()">
+                    <i data-feather="list" class="w-6 h-6"></i>
+                    <span id="sidebar-toggle-text">הצג רשימה</span>
+                </button>
+            </div>
+
+            <!-- Side Panel (Lists) -->
+            <aside id="viewer-side-panel">
+                 <!-- Handle for dragging (optional) -->
+                <div class="w-full py-2 flex justify-center items-center cursor-ns-resize md:hidden" onclick="toggleSidebar()">
+                    <div class="w-16 h-1.5 bg-gray-300 rounded-full"></div>
+                </div>
+                <!-- Tabs -->
+                <div class="flex border-b border-gray-200">
+                    <button id="tab-orders-active" class="tab-button active" onclick="showViewerPanelTab('orders-active')">
+                        הזמנות פעילות
+                    </button>
+                    <button id="tab-orders-future" class="tab-button" onclick="showViewerPanelTab('orders-future')">
+                        הזמנות עתידיות
+                    </button>
+                    <button id="tab-drivers" class="tab-button" onclick="showViewerPanelTab('drivers')">
+                        נהגים
+                    </button>
+                </div>
+                
+                <!-- Search -->
+                <div class="p-3 border-b border-gray-200">
+                    <input type="text" id="viewer-search-input" placeholder="חפש הזמנה או נהג..." class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300" onkeyup="filterViewerLists()">
+                </div>
+                
+                <!-- Lists Container -->
+                <div class="panel-list-container">
+                    <!-- Active Orders List -->
+                    <div id="viewer-orders-active-list" class="panel-list">
+                        <div class="loader-container"><div class="loader"></div></div>
+                    </div>
+                    
+                     <!-- Future Orders List -->
+                    <div id="viewer-orders-future-list" class="panel-list" style="display: none;">
+                        <div class="loader-container"><div class="loader"></div></div>
+                    </div>
+                    
+                    <!-- Drivers List -->
+                    <div id="viewer-drivers-list" class="panel-list" style="display: none;">
+                        <div class="loader-container"><div class="loader"></div></div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- No Modals needed for viewer -->
+
+    <script type="module">
+        // --- Inlined Firebase SDK Imports ---
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, where } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
+        import { serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
+
+        // --- Inlined Config Logic ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
+          storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
+        };
+        let app, auth, db;
+        let initializationError = null;
+        try {
+            app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+            auth = getAuth(app); db = getFirestore(app);
+            console.log("Firebase initialized for Viewer");
+        } catch (error) { console.error("CRITICAL: Firebase init failed!", error); initializationError = error; }
+
+        const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
+        async function ensureAuth() {
+            console.log("ensureAuth: Starting..."); let tries = 0;
+            updateConnectionStatus('connecting', 'מאמת...');
+            while (tries < MAX_AUTH_RETRIES) {
+                tries++;
+                try {
+                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
+                    if (!auth) throw new Error("Auth object missing");
+                    const userCredential = await signInAnonymously(auth);
+                    console.log("ensureAuth: Success.", userCredential.user.uid);
+                    updateConnectionStatus('connecting', 'מאזין...'); // Stage after auth
+                    return userCredential.user;
+                } catch (e) {
+                    console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
+                    if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; }
+                    console.log(`ensureAuth: Retrying in ${RETRY_DELAY_MS / 1000}s...`); await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+                }
+            } throw new Error("ensureAuth: Max retries reached.");
+        }
+        const authReadyPromise = ensureAuth();
+
+        // --- Inlined SmartLog Logic ---
+        const LOG_COLLECTION = 'system_logs_v3_viewer'; // Separate collection?
+        const sessionId = (Date.now() + Math.random()).toString(36);
+        let isDbAvailable = !!db; let authChecked = false;
+        const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => {
+            const consoleArgs = [`[${origin}] ${level}:`, message]; if (Object.keys(context).length > 0) consoleArgs.push(context); if (category) consoleArgs.push(`[Cat: ${category}]`); if (solution) consoleArgs.push(`[Sol: ${solution}]`);
+            switch (level) { case 'INFO': console.log(...consoleArgs); break; case 'WARN': console.warn(...consoleArgs); break; case 'ERROR': console.error(...consoleArgs); break; default: console.log(...consoleArgs); }
+            if (!isDbAvailable) { return; }
+            try {
+                if (!authChecked || !auth?.currentUser) {
+                    await authReadyPromise; authChecked = true;
+                }
+                const user = auth?.currentUser; if (!user) { console.warn("Viewer SmartLog: User missing after authReady."); return; }
+                const userContext = { uid: user.uid, isAnonymous: user.isAnonymous };
+                const logEntry = {
+                    timestamp: serverTimestamp(), level, message: String(message), origin: `Viewer-${origin}`, // Add prefix
+                    context: { ...JSON.parse(JSON.stringify(context || {})), sessionId, userAgent: navigator.userAgent || 'N/A', page: 'ViewerApp' },
+                    user: userContext, category: category || null, solution: solution || null
+                };
+                 addDoc(collection(db, LOG_COLLECTION), logEntry).catch(e => console.error("Viewer SmartLog write error:", e));
+            } catch (error) {
+                console.error("Viewer SmartLog FATAL ERROR.", error, { originalMessage: message });
+                if (error.code === 'permission-denied' || error.message.includes('permissions')) { console.warn("Viewer SmartLog: Disabling Firestore logging."); isDbAvailable = false; }
+            }
+        };
+        const SmartLog = {
+            info: (msg, origin, ctx = {}) => { writeLog('INFO', msg, origin, ctx); },
+            warn: (msg, origin, ctx = {}, cat = null, sol = null) => { writeLog('WARN', msg, origin, ctx, cat, sol); },
+            error: (err, origin, ctx = {}, cat = null, sol = null) => { const msg = err instanceof Error ? err.message : String(err); const stack = err instanceof Error ? err.stack : 'N/A'; writeLog('ERROR', msg, origin, { ...ctx, stack }, cat, sol); }
+        };
+
+        // --- CONFIG & STATE ---
+        const ISRAEL_CENTER = [32.0853, 34.7818];
+        const ACTIVE_ORDER_STATUSES = ["חדש", "שויך", "בדרך"]; // Statuses for active count & list
+
+        let viewerState = {
+            allOrders: [], // Holds ALL orders for counting/future list
+            activeOrders: [], // Filtered active orders for main list/map
+            futureOrders: [], // Filtered future orders
+            drivers: [],
+            liveLocations: {},
+        };
+        
+        let viewerMap;
+        let viewerDriverMarkers = {};
+        let viewerOrderMarkers = {}; // Will only hold markers for ACTIVE orders
+        
+        // --- ICONS & STYLING ---
+        const driverIconActive = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41] });
+        const driverIconStuck = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41] });
+        const orderIconActive = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41] });
+
+        const orderTypeDetails = {
+            'הובלת מנוף': { icon: '🏗️', className: 'type-manof' },
+            'הובלת משאית': { icon: '🚚', className: 'type-masait' },
+            'איסוף עצמי': { icon: '👤', className: 'type-isuf' },
+            'default': { icon: '📦', className: '' } // Fallback
+        };
+
+        
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+            initializeViewerApplication();
+        });
+        
+        async function initializeViewerApplication() {
+            SmartLog.info("v50.3 Viewer: Initializing...", "Init"); // Version bump
+            try {
+                updateConnectionStatus('connecting', 'מפעיל מפה...');
+                initViewerMap();
+                showLoader('viewer-orders-active-list', true);
+                 showLoader('viewer-orders-future-list', true);
+                showLoader('viewer-drivers-list', true);
+                
+                await authReadyPromise; // Waits for ensureAuth to complete
+                SmartLog.info(`Firebase Auth successful for viewer.`, "Init.Auth");
+                
+                // Auth is ready, now attach listeners
+                listenToDriversViewer();
+                listenToAllOrdersViewer(); // Changed to listen for ALL orders
+                listenToLocationsViewer();
+                listenToGlobalPings(); // *** NEW LISTENER ***
+                
+                showLoader('viewer-map-loader', false);
+                updateConnectionStatus('connected', 'מחובר'); // Final connected status
+                
+            } catch (error) {
+                SmartLog.error(error, "Init.Critical", { message: "Viewer initialization failed." });
+                updateConnectionStatus('error', `שגיאת אתחול: ${error.message}`);
+                document.getElementById('viewer-map-loader').innerHTML = `<span class="text-red-600">שגיאת אתחול קריטית.</span>`;
+                showToast(`שגיאת אתחול: ${error.message}`, 'error');
+            }
+        }
+
+        function initViewerMap() {
+            try {
+                // Ensure map container exists
+                const mapContainer = document.getElementById('viewer-map');
+                if (!mapContainer) throw new Error("Map container #viewer-map not found");
+                 
+                // If map instance exists, remove it first
+                 if (viewerMap) {
+                     viewerMap.remove();
+                     viewerMap = null;
+                 }
+
+                viewerMap = L.map('viewer-map').setView(ISRAEL_CENTER, 9);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                }).addTo(viewerMap);
+                SmartLog.info("Viewer Map initialized", "Init.Map");
+            } catch (error) {
+                SmartLog.error(error, "Init.Map");
+                 const mapContainer = document.getElementById('viewer-map');
+                 if(mapContainer) mapContainer.innerHTML = `<div class="p-8 text-center text-red-600">שגיאה בטעינת המפה.</div>`;
+            }
+        }
+        
+        function updateConnectionStatus(statusClass, message) {
+             const el = document.getElementById('connection-status');
+             if (el) {
+                 el.className = statusClass; // 'connecting', 'connected', 'error'
+                 const span = el.querySelector('span:last-child');
+                 if (span) span.innerText = message;
+             }
+         }
+
+        // --- FIRESTORE LISTENERS (REAL-TIME for Viewer) ---
+        
+        function listenToDriversViewer() {
+            SmartLog.info("Listening to Drivers...", "Firestore.Listen");
+            const q = query(collection(db, "drivers"), orderBy("name"));
+            onSnapshot(q, (snapshot) => {
+                SmartLog.info(`Drivers: ${snapshot.docs.length} docs.`, "Firestore.Snapshot");
+                viewerState.drivers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderViewerDriversList();
+                renderViewerMapMarkers(); // Update map markers which depend on driver data
+                showLoader('viewer-drivers-list', false);
+            }, e => { 
+                SmartLog.error(e, "Firestore.Drivers.Listener"); 
+                updateConnectionStatus("error", "שגיאת נהגים"); 
+            });
+        }
+        
+        // Listener for ALL orders - used for counts and future orders list
+        function listenToAllOrdersViewer() {
+            SmartLog.info("Listening to ALL Orders (for counts & future)...", "Firestore.Listen");
+            // Listen without status filter, but keep the ordering
+            const q = query(collection(db, "orders"), orderBy("createdAt", "desc")); 
+            onSnapshot(q, (snapshot) => {
+                SmartLog.info(`All Orders: ${snapshot.docs.length} docs.`, "Firestore.Snapshot");
+                
+                viewerState.allOrders = snapshot.docs.map(doc => ({ id:
