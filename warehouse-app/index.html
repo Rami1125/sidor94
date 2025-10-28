@@ -3,24 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DeliveryMaster - טרמינל מחסן v50.5</title>
+    <title>DeliveryMaster - טרמינל מחסן v50.6</title>
     <!-- 
-      Warehouse App v50.5 (Firebase + Live Map + Driver Ping)
+      Warehouse App v50.6 (Global Ping)
       
       Changelog:
+      - v50.6:
+         - Added listener for `globalPings` collection to receive admin alerts.
+         - Added `listenToGlobalPings` and modified `playNotificationSound` to support it.
       - v50.5:
         - Updated warehouse coordinates (`warehouseCoords`) to new accurate locations in Hod Hasharon.
-        - Added "Call Driver for Loading" button (`.btn-call-driver`) to orders with 'באיסוף' status.
-        - Implemented `callDriverForLoading` function:
-          - Plays a local confirmation sound (beep).
-          - Creates a new document in `driverPings` collection in Firestore to alert the driver's app.
-      - v50.4.1 (FIX): Renamed `initializeApp` to `initWarehouseApp` to resolve conflict.
+        - Added "Call Driver for Loading" button (`.btn-call-driver`) to orders with 'שויך' status.
+        - Implemented `callDriverForLoading` function to create a `driverPings` doc.
+      - v50.4.1 (FIX): Renamed `initializeApp` to `initWarehouseApp`.
       - v50.4: Migrated to Firebase, added live map, and real-time listeners.
     -->
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ffffff">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -102,6 +104,32 @@
         /* Loader */
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: inline-block; margin-right: 10px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Toast (for global ping) */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            padding: 12px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -136,11 +164,14 @@
         </main>
     </div>
 
+    <!-- Toast container for pings -->
+    <div id="toast-container"></div>
+
     <script type="module">
         // --- Inlined Firebase SDK Imports ---
         import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, doc, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where, setDoc, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
         // --- Inlined Config Logic ---
         const firebaseConfig = {
@@ -299,6 +330,7 @@
                 listenToDrivers();
                 listenToLocations();
                 listenToOrders(); // This replaces startPolling
+                listenToGlobalPings(); // Listen for admin pings
 
                 if (OneSignalInstance) {
                     initializeNotifications(manager.id, OneSignalInstance);
@@ -486,6 +518,39 @@
             });
         }
         
+        // --- New Listener for Global Pings ---
+        function listenToGlobalPings() {
+             SmartLog.info("Listening for Global Pings...", "Firestore.Listen");
+             // Listen for pings created in the last 60 seconds
+             const since = new Date(Date.now() - 60000); 
+             const q = query(
+                 collection(db, "globalPings"), 
+                 where("createdAt", ">", since),
+                 orderBy("createdAt", "desc"),
+                 limit(1) // We only care about the latest one
+             );
+             
+             let initialLoad = true;
+             onSnapshot(q, (snapshot) => {
+                 if (initialLoad) {
+                     initialLoad = false; // Don't beep on first load
+                     return; 
+                 }
+                 
+                 snapshot.docChanges().forEach(change => {
+                     if (change.type === "added") {
+                         const ping = change.doc.data();
+                         SmartLog.info("Global Ping Received!", "Pings", ping);
+                         // Play sound and show toast
+                         playNotificationSound('A5', '4n'); // Louder, longer note
+                         showToast(`התראה מהמנהל: ${ping.message}`);
+                     }
+                 });
+             }, e => { 
+                SmartLog.error(e, "Firestore.Pings.Listener"); 
+            });
+        }
+        
         function renderOrderLists() {
             newOrdersList.innerHTML = '';
             inProgressOrdersList.innerHTML = '';
@@ -508,7 +573,7 @@
             if (type === 'acknowledge') { // 'חדש' status
                 buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.id}', 'באיסוף')">אשר קבלת הזמנה</button>`;
             } else if (order.status === 'שויך') {
-                buttonHtml = `<button class="btn-call-driver" onclick="callDriverForLoading(event, '${order.id}')">קריאה לנהג להעמסה <i class="fas fa-bullhorn"></i></button>`;
+                buttonHtml = `<button class="btn-call-driver" onclick="callDriverForLoading(event, '${order.id}')"><i class="fas fa-bullhorn" style="margin-left: 8px;"></i> קריאה לנהג להעמסה</button>`;
             } else if (order.status === 'באיסוף') {
                 buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.id}', 'טעון')">סמן כטעון</button>`;
             } else { // 'טעון'
@@ -557,14 +622,14 @@
                 btn.innerHTML = 'קריאה נשלחה <i class="fas fa-check"></i>';
                 setTimeout(() => { // Reset button after 3s
                      btn.disabled = false;
-                     btn.innerHTML = 'קריאה לנהג להעמסה <i class="fas fa-bullhorn"></i>';
+                     btn.innerHTML = '<i class="fas fa-bullhorn" style="margin-left: 8px;"></i> קריאה לנהג להעמסה';
                 }, 3000);
 
             } catch (error) {
                  SmartLog.error(error, "CRUD.Ping", { orderId, driverId: order.driver.id });
                  alert("שגיאה בשליחת הקריאה.");
                  btn.disabled = false;
-                 btn.innerHTML = 'קריאה לנהג להעמסה <i class="fas fa-bullhorn"></i>';
+                 btn.innerHTML = '<i class="fas fa-bullhorn" style="margin-left: 8px;"></i> קריאה לנהג להעמסה';
             }
         }
         window.callDriverForLoading = callDriverForLoading; // Make global
@@ -625,6 +690,32 @@
              } catch (e) {
                  SmartLog.error(e, "OneSignal.Register");
              }
+        }
+
+        // --- Toast Helper (for Global Pings) ---
+        function showToast(message) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerText = message;
+            
+            container.appendChild(toast);
+            
+            // Trigger transition
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (container.contains(toast)) {
+                        container.removeChild(toast);
+                    }
+                }, 300);
+            }, 5000);
         }
         
         // --- Add global access for inline JS ---
