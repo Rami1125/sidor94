@@ -3,26 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v31.5 (Customer Edit & History Prep)</title>
+    <title>DeliveryMaster v31.6 (Update Orders on Address Change)</title>
     <!-- 
-      DeliveryMaster Admin App v31.5 (Customer Edit & History Prep)
+      DeliveryMaster Admin App v31.6 (Update Orders on Address Change)
       
       Changelog:
+      - v31.6: Dynamically update active orders when customer default address changes.
+        - `handleSaveCustomer` now geocodes the new address if changed and no coords pasted.
+        - After customer update, queries active orders ("חדש", "שויך") linked to the customer 
+          AND matching the *old* default address.
+        - Updates the `address`, `latitude`, `longitude` of matched orders to the new values.
+        - Added user feedback (toast) about updating linked orders.
       - v31.5.1 (FIX): Corrected usage of timestamp in customer audit log for arrayUnion.
       - v31.5: Address separation, Customer editing, Coordinate pasting, Driver History structure.
-      - Separated Address into Street, Number, City in New Order form for better geocoding.
-      - Added "Manage Customers" tab within the History page.
-      - Customer table rows are now clickable, opening an edit modal.
-      - New Customer Edit Modal (#customer-edit-modal):
-        - Allows editing Name, Phone, Customer #, Contact, Address (separated).
-        - Added field to paste coordinates ("lat, lon") which saves to `customLat`, `customLon`.
-        - `submitNewOrder` now uses `customLat`/`customLon` if address matches default & coords exist.
-        - Saves changes directly to Firestore (`updateDoc`).
-        - Implemented basic `auditLog` array on customer documents for tracking changes.
-      - Added "Driver History" page structure (#view-driver-history).
-        - Includes map container and sidebar placeholder for filters.
-        - Added placeholder functions and comments explaining backend data requirements 
-          (need `locationHistory` collection for actual route drawing).
       - v31.4: Added optional, user-defined Order & Customer Numbers.
       - v31.3: Added History Page, Geocoding, and UI clean-up.
       - v31.2: UI Refresh & Smart Details Panel.
@@ -747,7 +740,7 @@
         // --- Inlined Firebase SDK Imports ---
         import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // Added arrayUnion
+        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc, arrayUnion, where, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // Added arrayUnion, where, getDocs
         import { getFunctions } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 
         // --- Inlined Config Logic ---
@@ -800,6 +793,7 @@
                     context: { ...JSON.parse(JSON.stringify(context || {})), sessionId, userAgent: navigator.userAgent || 'N/A', page: window.location.pathname || 'N/A' },
                     user: userContext, category: category || null, solution: solution || null
                 };
+                // Use addDoc for logging
                 await addDoc(collection(db, LOG_COLLECTION), logEntry);
             } catch (error) {
                 console.error("SmartLog FATAL ERROR writing to Firestore.", error, { originalMessage: message });
@@ -853,11 +847,12 @@
             initializeApplication();
             
             // Set default date for new order
-            document.getElementById('order-date').value = new Date().toISOString().split('T')[0];
+             const orderDateInput = document.getElementById('order-date');
+             if(orderDateInput) orderDateInput.value = new Date().toISOString().split('T')[0];
         });
         
         async function initializeApplication() {
-            SmartLog.info("v31.5.1-FB: Initializing...", "Init"); // Version bump for fix
+            SmartLog.info("v31.6-FB: Initializing...", "Init"); // Version bump for fix
             try {
                 updateStatus("מפעיל מפות...");
                 initMap(); // Dashboard map
@@ -1129,7 +1124,8 @@
                         .bindPopup(popupContent)
                         .on('click', () => focusOnMapItem(driverLoc.id, 'driver')); // Add click focus
                 }
-                bounds.extend(latLng);
+                 // Only extend bounds if driver is active and not stuck? Maybe optional later.
+                 if (!driverLoc.isStuck) bounds.extend(latLng);
             });
             
             // Render Unassigned Orders
@@ -1170,9 +1166,12 @@
                 bounds.extend(latLng);
             });
 
-            if (bounds.isValid() && (unassignedOrders.length > 0 || Object.keys(driverMarkers).length > 0)) {
-                // Only fit bounds if there's something to show
+            if (bounds.isValid() && (unassignedOrders.length > 0 || Object.keys(driverMarkers).some(id => !state.liveLocations[id]?.isStuck) )) {
+                 // Only fit bounds if there's something *visible* to show (active drivers or new orders)
                  try { map.fitBounds(bounds, { padding: [50, 50] }); } catch (e) { console.warn("FitBounds error:", e); }
+            } else if (!bounds.isValid()) {
+                // If no markers at all, reset to center
+                map.setView(ISRAEL_CENTER, 9);
             }
         }
         
@@ -1522,8 +1521,17 @@
                     // 1. Warehouse Distances
                     html += `<h4 class="mt-4">מרחק ממחסנים</h4><ul>`;
                     Object.entries(WAREHOUSE_LOCATIONS).forEach(([name, coords]) => {
-                        const dist = orderLatLng.distanceTo(L.latLng(coords));
-                        html += `<li><span class="dist">${(dist / 1000).toFixed(1)} ק"מ</span> - ${name}</li>`;
+                         // Check if coords is a valid array
+                        if (Array.isArray(coords) && coords.length === 2) {
+                            try {
+                                const dist = orderLatLng.distanceTo(L.latLng(coords));
+                                html += `<li><span class="dist">${(dist / 1000).toFixed(1)} ק"מ</span> - ${name}</li>`;
+                            } catch (e) {
+                                console.warn(`Error calculating distance to warehouse ${name}:`, e);
+                            }
+                        } else {
+                             console.warn(`Invalid coordinates for warehouse ${name}:`, coords);
+                        }
                     });
                     html += `</ul>`;
 
@@ -1532,10 +1540,17 @@
                         .filter(d => state.liveLocations[d.id] && !state.liveLocations[d.id].isStuck)
                         .map(driver => {
                             const location = state.liveLocations[driver.id];
-                            const driverLatLng = L.latLng(location.latitude, location.longitude);
-                            const dist = orderLatLng.distanceTo(driverLatLng);
-                            return { name: driver.name, dist: dist };
+                             if (!location || !location.latitude || !location.longitude) return null; // Skip if location invalid
+                            try {
+                                const driverLatLng = L.latLng(location.latitude, location.longitude);
+                                const dist = orderLatLng.distanceTo(driverLatLng);
+                                return { name: driver.name, dist: dist };
+                            } catch (e) {
+                                console.warn(`Error calculating distance to driver ${driver.name}:`, e);
+                                return null;
+                            }
                         })
+                        .filter(d => d !== null) // Remove drivers with errors
                         .sort((a, b) => a.dist - b.dist);
 
                     html += `<h4 class="mt-4">נהגים זמינים (לפי מרחק)</h4><ul>`;
@@ -1828,7 +1843,7 @@
             const logList = document.getElementById('customer-audit-log');
             if (customer.auditLog && Array.isArray(customer.auditLog) && customer.auditLog.length > 0) {
                  logList.innerHTML = customer.auditLog
-                    // Ensure timestamp exists and is a Firestore Timestamp before converting
+                    // Ensure timestamp exists and has toDate method (covers both JS Date and Firestore Timestamp)
                     .filter(log => log.timestamp && typeof log.timestamp.toDate === 'function') 
                     .sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()) // Newest first
                     .slice(0, 5) // Show last 5 changes
@@ -1861,21 +1876,31 @@
              const customerId = document.getElementById('customer-edit-id').value;
              const customerRef = doc(db, "customers", customerId);
              const originalCustomerData = state.customers.find(c => c.id === customerId); // Get original data for comparison
+              if (!originalCustomerData) {
+                  showToast('שגיאה: לא ניתן למצוא נתוני לקוח מקוריים', 'error');
+                  btn.disabled = false;
+                  btn.innerText = 'שמור שינויים';
+                  return;
+              }
+             const originalAddress = originalCustomerData.defaultAddress || ''; // Store original full address
              
              try {
                  const street = document.getElementById('customer-edit-street').value;
                  const number = document.getElementById('customer-edit-streetnum').value;
                  const city = document.getElementById('customer-edit-city').value;
-                 const fullAddress = `${street} ${number}, ${city}`;
+                 const fullAddress = `${street} ${number}, ${city}`; // New full address
                  
                  const coordsString = document.getElementById('customer-edit-coords').value.trim();
                  let customLat = null;
                  let customLon = null;
+                 let newCoords = null; // Will hold [lat, lon] array if coords are available
+                 
                  if (coordsString) {
                      const parts = coordsString.split(',');
                      if (parts.length === 2 && !isNaN(parseFloat(parts[0])) && !isNaN(parseFloat(parts[1]))) {
                          customLat = parseFloat(parts[0]);
                          customLon = parseFloat(parts[1]);
+                         newCoords = [customLat, customLon]; // Use pasted coords
                      } else {
                          throw new Error("פורמט קואורדינטות לא תקין. השתמש ב- lat, lon");
                      }
@@ -1894,37 +1919,98 @@
                     customLon: customLon
                  };
                  
-                 // --- Audit Log Logic ---
+                 // --- Audit Log Logic & Address Change Check ---
                  const changes = {};
-                 let hasChanges = false; // Flag to track if actual data changed
+                 let hasChanges = false;
+                 let addressChanged = false; // Flag specifically for address change
                  for (const key in updatedData) {
-                      // Compare simple values; note this won't deeply compare objects if added later
-                      // Use || '' to handle comparison between null/undefined and empty string
                      if ((updatedData[key] || '') !== (originalCustomerData[key] || '')) {
                           changes[key] = { from: originalCustomerData[key] ?? null, to: updatedData[key] };
                           hasChanges = true;
+                          if (['defaultAddress', 'addressStreet', 'addressNumber', 'addressCity'].includes(key)) {
+                             addressChanged = true;
+                          }
                      }
                  }
+
+                 // Geocode if address changed and no custom coords were pasted
+                 if (addressChanged && !newCoords) {
+                     btn.innerText = 'מאתר כתובת...';
+                     const geocodedCoords = await geocodeAddress(fullAddress);
+                     if (geocodedCoords) {
+                         newCoords = geocodedCoords;
+                         SmartLog.info("Geocoded new address during customer update", "CRUD.Customer", { customerId, coords: newCoords });
+                     } else {
+                         showToast('אזהרה: לא ניתן לאתר קואורדינטות עבור הכתובת החדשה', 'warn');
+                         // Proceed without coordinates, orders won't be updated with new location
+                     }
+                      btn.innerText = 'שומר...';
+                 }
                  
+                 // --- Save Customer Data ---
                  if (hasChanges) {
                      const logEntry = {
                          timestamp: new Date(), // *** THE FIX: Use JS Date() instead of serverTimestamp() ***
                          action: "Updated",
                          changes: changes
                      };
-                      // Add the log entry using arrayUnion and update data
                       await updateDoc(customerRef, {
                           ...updatedData,
                           auditLog: arrayUnion(logEntry) 
                       });
                       SmartLog.info("Customer updated with audit log", "CRUD.Customer", { id: customerId, changes: Object.keys(changes) });
                  } else {
-                      // No actual changes, maybe just update lastModified if needed, or do nothing
                       SmartLog.info("No changes detected for customer update", "CRUD.Customer", { id: customerId });
                  }
 
                  showToast('פרטי לקוח עודכנו בהצלחה', 'success');
                  closeCustomerEditModal();
+                 
+                 // --- Update Linked Active Orders (if address changed and new coords available) ---
+                 if (addressChanged && newCoords) {
+                     showToast('מעדכן הזמנות פעילות עם הכתובת החדשה...', 'info');
+                     const ordersQuery = query(
+                         collection(db, "orders"),
+                         where("customer.id", "==", customerId),
+                         where("address", "==", originalAddress), // Match orders with the OLD address
+                         where("status", "in", ["חדש", "שויך"]) // Only active ones
+                     );
+                     
+                     try {
+                         const ordersSnapshot = await getDocs(ordersQuery);
+                         let updatedCount = 0;
+                         const updatePromises = [];
+
+                         ordersSnapshot.forEach((orderDoc) => {
+                             SmartLog.info(`Updating order ${orderDoc.id} with new address/coords`, "CRUD.Order.UpdateOnCustChange", { customerId });
+                             updatePromises.push(
+                                 updateDoc(orderDoc.ref, { 
+                                     address: fullAddress, 
+                                     latitude: newCoords[0], 
+                                     longitude: newCoords[1],
+                                     lastModified: serverTimestamp() // Update modification time
+                                 })
+                             );
+                             updatedCount++;
+                         });
+
+                         await Promise.all(updatePromises); // Wait for all updates to finish
+
+                         if (updatedCount > 0) {
+                             showToast(`עדכון מיקום הושלם עבור ${updatedCount} הזמנות פעילות`, 'success');
+                             SmartLog.info(`Updated location for ${updatedCount} active orders`, "CRUD.Order.UpdateOnCustChange", { customerId });
+                         } else {
+                              SmartLog.info(`No active orders found matching old address ${originalAddress}`, "CRUD.Order.UpdateOnCustChange", { customerId });
+                         }
+
+                     } catch (orderUpdateError) {
+                          SmartLog.error(orderUpdateError, "CRUD.Order.UpdateOnCustChange", { customerId });
+                          showToast('שגיאה בעדכון הזמנות מקושרות', 'error');
+                     }
+                 } else if (addressChanged && !newCoords) {
+                      showToast('כתובת לקוח עודכנה, אך לא ניתן היה לעדכן מיקום בהזמנות (שגיאת איתור)', 'warn');
+                 }
+
                  // Data will refresh via the listener automatically
 
              } catch (error) {
