@@ -2,12 +2,12 @@
   "name": "סידור ח.סבן - לוח בקרה",
   "short_name": "סידור ח.סבן",
   "description": "לוח בקרה לניהול ומעקב אחר הזמנות משלוחים",
-  "start_url": "https://rami1125.github.io/sidor94/viewer-app/",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#1a365d",
   "theme_color": "#1a365d",
   "orientation": "portrait",
-  "scope": "/sidor94/viewer-app/",
+  "scope": "./",
   "lang": "he",
   "dir": "rtl",
   "categories": ["business", "productivity", "utilities"],
@@ -23,22 +23,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "screenshots/mobile-view.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "תצוגת קוביות במובייל"
-    },
-    {
-      "src": "screenshots/table-view.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "תצוגת טבלה במחשב"
     }
   ]
 }
