@@ -3,21 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v31.2 (Smart Panel)</title>
+    <title>DeliveryMaster v31.3 (History & Geocode)</title>
     <!-- 
-      DeliveryMaster Admin App v31.2 (Smart Panel)
+      DeliveryMaster Admin App v31.3 (History & Geocode)
       
       Changelog:
-      - v31.2: UI Refresh & Smart Details Panel
-      - Upgraded font to 'Inter' for a cleaner look.
-      - Navbar is now dark-themed.
-      - Added "Smart Details Panel" at the bottom of the sidebar.
-      - Clicking an order (list or map) now shows:
-        - Distance from warehouses.
-        - Sorted list of available drivers by distance to the order.
-      - Clicking a driver shows their currently assigned orders.
-      - Driver cards now show assigned order count.
-      - Order cards now show creation time.
+      - v31.3: Added History Page, Geocoding, and UI clean-up.
+      - Added "Order History" page with dynamic table, search, and date filters.
+      - Implemented `showView` logic to switch between Dashboard and History.
+      - Implemented Nominatim (OpenStreetMap) geocoding on new order creation.
+        - Order pin now tries to find the customer address.
+        - Falls back to warehouse location if address not found.
+      - Removed "Internal ID" field from new order form per user request.
+      - v31.2: UI Refresh & Smart Details Panel.
       - v31.1 (FIX): New orders get warehouse coordinates.
       - v31.0 (Firebase Edition): Migrated to Firebase.
     -->
@@ -63,12 +61,24 @@
             grid-template-columns: auto 1fr;
             height: 100vh;
         }
-        #main-content {
+        
+        /* App Views */
+        .app-view {
+            width: 100%;
+            height: 100vh;
+        }
+        
+        #view-dashboard {
             display: grid;
             grid-template-columns: 1fr 350px;
-            height: 100vh;
             overflow: hidden;
         }
+        
+        #view-history {
+            display: none;
+            overflow-y: auto;
+        }
+        
         #map-container {
             position: relative;
             background-color: #e0e0e0;
@@ -270,7 +280,7 @@
         
         /* Responsive */
         @media (max-width: 1024px) {
-            #main-content {
+            #view-dashboard {
                 grid-template-columns: 1fr; /* Stack map and list */
             }
             #side-panel {
@@ -323,6 +333,10 @@
                 <i data-feather="map" class="w-6 h-6"></i>
                 <span class="font-semibold text-lg hidden lg:block">דשבורד</span>
             </a>
+            <a href="#" class="nav-link flex items-center p-3 space-x-4 space-x-reverse rounded-lg" onclick="showView('history')">
+                <i data-feather="archive" class="w-6 h-6"></i>
+                <span class="font-semibold text-lg hidden lg:block">היסטוריית הזמנות</span>
+            </a>
             <a href="#" class="nav-link flex items-center p-3 space-x-4 space-x-reverse rounded-lg" onclick="openNewOrderForm()">
                 <i data-feather="plus-circle" class="w-6 h-6"></i>
                 <span class="font-semibold text-lg hidden lg:block">הזמנה חדשה</span>
@@ -340,54 +354,93 @@
             </div>
         </nav>
 
-        <!-- Main Content (Map + Side Panel) -->
-        <main id="main-content">
-            <!-- Map Container -->
-            <div id="map-container">
-                <div id="map"></div>
-                <div id="map-loader" class="loader-container">
-                    <div class="loader"></div>
-                    <span class="ml-4 font-semibold">טוען מפה ומאמת...</span>
+        <!-- Main Content Wrapper -->
+        <div class="relative">
+            <!-- Main Content (Map + Side Panel) -->
+            <main id="view-dashboard" class="app-view">
+                <!-- Map Container -->
+                <div id="map-container">
+                    <div id="map"></div>
+                    <div id="map-loader" class="loader-container">
+                        <div class="loader"></div>
+                        <span class="ml-4 font-semibold">טוען מפה ומאמת...</span>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Side Panel (Lists) -->
-            <aside id="side-panel">
-                <!-- Tabs -->
-                <div class="flex border-b border-gray-200">
-                    <button id="tab-orders" class="flex-1 p-4 font-semibold text-center border-b-2 border-blue-500 text-blue-500" onclick="showPanelTab('orders')">
-                        הזמנות
-                    </button>
-                    <button id="tab-drivers" class="flex-1 p-4 font-semibold text-center border-b-2 border-transparent text-gray-500" onclick="showPanelTab('drivers')">
-                        נהגים
-                    </button>
-                </div>
-                
-                <!-- Search -->
-                <div class="p-3 border-b border-gray-200">
-                    <input type="text" id="search-input" placeholder="חפש הזמנה או נהג..." class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300" onkeyup="filterLists()">
-                </div>
-                
-                <!-- Lists Wrapper -->
-                <div id="side-panel-lists" class="relative">
-                    <!-- Orders List -->
-                    <div id="orders-list" class="panel-list">
-                        <div class="loader-container"><div class="loader"></div></div>
+                <!-- Side Panel (Lists) -->
+                <aside id="side-panel">
+                    <!-- Tabs -->
+                    <div class="flex border-b border-gray-200">
+                        <button id="tab-orders" class="flex-1 p-4 font-semibold text-center border-b-2 border-blue-500 text-blue-500" onclick="showPanelTab('orders')">
+                            הזמנות
+                        </button>
+                        <button id="tab-drivers" class="flex-1 p-4 font-semibold text-center border-b-2 border-transparent text-gray-500" onclick="showPanelTab('drivers')">
+                            נהגים
+                        </button>
                     </div>
                     
-                    <!-- Drivers List -->
-                    <div id="drivers-list" class="panel-list" style="display: none;">
-                        <div class="loader-container"><div class="loader"></div></div>
+                    <!-- Search -->
+                    <div class="p-3 border-b border-gray-200">
+                        <input type="text" id="search-input" placeholder="חפש הזמנה או נהג..." class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300" onkeyup="filterLists()">
                     </div>
+                    
+                    <!-- Lists Wrapper -->
+                    <div id="side-panel-lists" class="relative">
+                        <!-- Orders List -->
+                        <div id="orders-list" class="panel-list">
+                            <div class="loader-container"><div class="loader"></div></div>
+                        </div>
+                        
+                        <!-- Drivers List -->
+                        <div id="drivers-list" class="panel-list" style="display: none;">
+                            <div class="loader-container"><div class="loader"></div></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Details Panel (New) -->
+                    <div id="details-panel">
+                        <!-- Content injected by renderDetailsPanel() -->
+                        <div class="text-center text-gray-500 p-8">בחר נהג או הזמנה להצגת פרטים</div>
+                    </div>
+                </aside>
+            </main>
+            
+            <!-- History View (New) -->
+            <div id="view-history" class="app-view p-4 lg:p-8">
+                <h2 class="text-3xl font-bold mb-6">היסטוריית הזמנות</h2>
+                
+                <!-- Tools -->
+                <div class="flex flex-col lg:flex-row gap-4 mb-4 p-4 bg-white rounded-lg shadow-sm">
+                    <input type="text" id="history-search" placeholder="חפש לפי מזהה, לקוח, נהג, כתובת..." class="flex-grow p-2 border rounded-md">
+                    <div class="flex gap-4">
+                        <input type="date" id="history-date-from" class="p-2 border rounded-md" title="מתאריך">
+                        <input type="date" id="history-date-to" class="p-2 border rounded-md" title="עד תאריך">
+                    </div>
+                    <button id="history-filter-btn" class="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">סנן</button>
                 </div>
                 
-                <!-- Details Panel (New) -->
-                <div id="details-panel">
-                    <!-- Content injected by renderDetailsPanel() -->
-                    <div classs="text-center text-gray-500 p-8">בחר נהג או הזמנה להצגת פרטים</div>
+                <!-- Table -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">מזהה</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">לקוח</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">נהג</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">כתובת</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">סטטוס</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">תאריך</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="6" class="text-center p-8 text-gray-500">טוען היסטוריה...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </aside>
-        </main>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Container -->
@@ -417,7 +470,7 @@
                     <input type="hidden" id="customer-id-new"> <!-- This is not used, just for structure -->
                     <input type="text" id="customer-name-new" placeholder="שם לקוח מלא" class="w-full p-2 border rounded-md" required>
                     <input type="text" id="customer-phone-new" placeholder="טלפון" class="w-full p-2 border rounded-md" required>
-                    <input type="text" id="customer-address-new" placeholder="כתובת ברירת מחדל" class="w-full p-2 border rounded-md" required>
+                    <input type="text" id="customer-address-new" placeholder="כתובת ברירת מחדל (עבור מיקום)" class="w-full p-2 border rounded-md" required>
                     <input type="text" id="customer-contact-new" placeholder="איש קשר" class="w-full p-2 border rounded-md">
                 </div>
                 
@@ -433,7 +486,6 @@
                 
                 <!-- Order Details -->
                 <div class="grid grid-cols-2 gap-4">
-                    <input type="text" id="order-internal-id" placeholder="מספר פנימי (אופציונלי)" class="w-full p-2 border rounded-md">
                     <input type="date" id="order-date" class="w-full p-2 border rounded-md" required>
                     <select id="order-delivery-type" class="w-full p-2 border rounded-md" required>
                         <option value="">סוג הובלה</option>
@@ -574,7 +626,7 @@
         });
         
         async function initializeApplication() {
-            SmartLog.info("v31.2-FB: Initializing...", "Init");
+            SmartLog.info("v31.3-FB: Initializing...", "Init");
             try {
                 updateStatus("מפעיל מפה...");
                 initMap();
@@ -590,6 +642,9 @@
                 listenToOrders();
                 listenToLocations();
                 listenToCustomers();
+                
+                // Init History Page Button
+                document.getElementById('history-filter-btn').addEventListener('click', renderHistoryTable);
                 
                 showLoader('map-loader', false);
                 updateStatus("מחובר ומאזין");
@@ -647,8 +702,9 @@
             onSnapshot(q, (snapshot) => {
                 SmartLog.info(`Orders: ${snapshot.docs.length} docs.`, "Firestore.Snapshot");
                 state.orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                renderOrders();
-                renderMapMarkers();
+                renderOrders(); // Renders sidebar
+                renderMapMarkers(); // Renders map
+                renderHistoryTable(); // Renders history page table
                 showLoader('orders-list', false);
             }, e => { 
                 SmartLog.error(e, "Firestore.Orders.Listener"); 
@@ -851,13 +907,99 @@
                 bounds.extend(latLng);
             });
 
-            if (bounds.isValid() && unassignedOrders.length > 0) {
+            if (bounds.isValid() && (unassignedOrders.length > 0 || Object.keys(driverMarkers).length > 0)) {
                 map.fitBounds(bounds, { padding: [50, 50] });
             }
         }
         
+        // --- HISTORY TABLE RENDER ---
+        function renderHistoryTable() {
+            const list = document.getElementById('history-table-body');
+            if (!list) return;
+
+            // Get filters
+            const search = document.getElementById('history-search').value.toLowerCase();
+            const dateFrom = document.getElementById('history-date-from').value;
+            const dateTo = document.getElementById('history-date-to').value;
+
+            let filteredOrders = state.orders;
+
+            // 1. Filter by Search
+            if (search) {
+                filteredOrders = filteredOrders.filter(o =>
+                    (o.id.toLowerCase().includes(search)) ||
+                    (o.customer?.name?.toLowerCase().includes(search)) ||
+                    (o.driver?.name?.toLowerCase().includes(search)) ||
+                    (o.address?.toLowerCase().includes(search))
+                );
+            }
+
+            // 2. Filter by Date
+            if (dateFrom) {
+                const fromMs = new Date(dateFrom).getTime();
+                filteredOrders = filteredOrders.filter(o => {
+                    const orderDate = o.createdAt?.toDate ? o.createdAt.toDate().getTime() : (new Date(o.orderDate).getTime());
+                    return orderDate >= fromMs;
+                });
+            }
+            if (dateTo) {
+                const toMs = new Date(dateTo).setHours(23, 59, 59, 999); // Include end of day
+                filteredOrders = filteredOrders.filter(o => {
+                    const orderDate = o.createdAt?.toDate ? o.createdAt.toDate().getTime() : (new Date(o.orderDate).getTime());
+                    return orderDate <= toMs;
+                });
+            }
+
+            // Build HTML
+            let html = '';
+            if (filteredOrders.length === 0) {
+                html = '<tr><td colspan="6" class="text-center p-8 text-gray-500">לא נמצאו הזמנות תואמות</td></tr>';
+            } else {
+                filteredOrders.forEach(order => {
+                    const orderDate = order.createdAt?.toDate ? order.createdAt.toDate().toLocaleDateString('he-IL') : (new Date(order.orderDate).toLocaleDateString('he-IL'));
+                    html += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${order.id.slice(-6)}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.customer?.name || '...'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.driver?.name || '---'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" title="${order.address || ''}">${order.address || '...'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.status || '...'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${orderDate}</td>
+                        </tr>
+                    `;
+                });
+            }
+            list.innerHTML = html;
+        }
+        
         
         // --- UI & MAP INTERACTIONS ---
+        
+        function showView(viewName) {
+            // Hide all views
+            document.querySelectorAll('.app-view').forEach(v => v.style.display = 'none');
+            // Show the selected view
+            const viewEl = document.getElementById(`view-${viewName}`);
+            if (viewEl) {
+                if (viewName === 'dashboard') {
+                    viewEl.style.display = 'grid'; // The dashboard uses grid
+                } else {
+                    viewEl.style.display = 'block';
+                }
+            }
+            
+            // Update active nav link
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            const navLink = document.querySelector(`.nav-link[onclick="showView('${viewName}')"]`);
+            if (navLink) navLink.classList.add('active');
+
+            // Refresh map size if dashboard is shown
+            if (viewName === 'dashboard' && map) {
+                setTimeout(() => map.invalidateSize(), 10);
+            }
+            SmartLog.info(`Switched to view: ${viewName}`, "UI.Nav");
+        }
+        window.showView = showView; // Make global
         
         function showPanelTab(tabName) {
             document.getElementById('orders-list').style.display = (tabName === 'orders') ? 'block' : 'none';
@@ -1071,6 +1213,30 @@
             document.querySelectorAll('.driver-card, .order-card').forEach(c => c.classList.remove('active'));
         }
         window.closeDetailsPanel = closeDetailsPanel; // Make global
+        
+        // --- Geocoding Function ---
+        async function geocodeAddress(address) {
+            if (!address) return null;
+            // Added country code for relevance
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=il`;
+            SmartLog.info(`Geocoding address: ${address}`, "Geocode.Nominatim");
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Nominatim API failed: ${response.status}`);
+                const data = await response.json();
+                if (data && data.length > 0) {
+                    const { lat, lon } = data[0];
+                    SmartLog.info(`Geocode success: [${lat}, ${lon}]`, "Geocode.Nominatim");
+                    return [parseFloat(lat), parseFloat(lon)];
+                } else {
+                    SmartLog.warn(`Geocode found no results for: ${address}`, "Geocode.Nominatim");
+                    return null;
+                }
+            } catch (error) {
+                SmartLog.error(error, "Geocode.Nominatim", { address });
+                return null;
+            }
+        }
 
         
         // --- NEW ORDER FORM (v31.0 - Firebase) ---
@@ -1184,9 +1350,20 @@
                     throw new Error('יש לבחור לקוח קיים או ליצור לקוח חדש');
                 }
                 
+                // *** NEW GEOCODING STEP ***
+                btn.innerText = 'מאתר כתובת...';
+                const coords = await geocodeAddress(customerAddress);
+                
                 // Step 2: Create Order
                 const selectedWarehouse = document.getElementById('order-warehouse').value;
-                const warehouseCoords = WAREHOUSE_LOCATIONS[selectedWarehouse] || ISRAEL_CENTER; // Default to center if warehouse not found
+                // Fallback to warehouse only if geocoding fails
+                const warehouseCoords = WAREHOUSE_LOCATIONS[selectedWarehouse] || ISRAEL_CENTER;
+                const finalCoords = coords || warehouseCoords; // Use geocoded coords, or fallback
+                if (!coords) {
+                    showToast('לא ניתן היה לאתר כתובת, ההזמנה תוצג במיקום המחסן', 'info');
+                }
+                
+                btn.innerText = 'יוצר הזמנה...'; // Update status for user
 
                 const newOrder = {
                     customer: {
@@ -1195,13 +1372,12 @@
                         phone: customerPhone
                     },
                     address: customerAddress, // Use the address from the customer (new or existing)
-                    internalId: document.getElementById('order-internal-id').value || null,
                     orderDate: document.getElementById('order-date').value,
                     deliveryType: document.getElementById('order-delivery-type').value,
                     warehouse: selectedWarehouse,
                     notes: document.getElementById('order-notes').value,
-                    latitude: warehouseCoords[0], // <-- *** THE FIX ***
-                    longitude: warehouseCoords[1], // <-- *** THE FIX ***
+                    latitude: finalCoords[0], // <-- *** THE NEW FIX ***
+                    longitude: finalCoords[1], // <-- *** THE NEW FIX ***
                     status: "חדש",
                     createdAt: serverTimestamp(),
                     lastModified: serverTimestamp()
@@ -1279,12 +1455,6 @@
         }
 
         // Make functions globally accessible for inline event handlers
-        window.showView = (view) => {
-            // This function seems to be a remnant, but we'll keep it harmless
-            if (view === 'dashboard') {
-                SmartLog.info("Dashboard view selected", "UI.Nav");
-            }
-        };
         window.showPanelTab = showPanelTab;
         window.filterLists = filterLists;
         window.showAssignDriverModal = showAssignDriverModal;
