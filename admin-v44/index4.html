@@ -8,6 +8,7 @@
       DeliveryMaster Admin App v31.5 (Customer Edit & History Prep)
       
       Changelog:
+      - v31.5.1 (FIX): Corrected usage of timestamp in customer audit log for arrayUnion.
       - v31.5: Address separation, Customer editing, Coordinate pasting, Driver History structure.
       - Separated Address into Street, Number, City in New Order form for better geocoding.
       - Added "Manage Customers" tab within the History page.
@@ -856,7 +857,7 @@
         });
         
         async function initializeApplication() {
-            SmartLog.info("v31.5-FB: Initializing...", "Init");
+            SmartLog.info("v31.5.1-FB: Initializing...", "Init"); // Version bump for fix
             try {
                 updateStatus("מפעיל מפות...");
                 initMap(); // Dashboard map
@@ -1006,6 +1007,7 @@
         
         function renderDrivers() {
             const list = document.getElementById('drivers-list');
+            if (!list) return; // Add guard clause
             list.innerHTML = ''; // Clear
             
             if (state.drivers.length === 0) {
@@ -1054,6 +1056,7 @@
         
         function renderOrders() {
             const list = document.getElementById('orders-list');
+            if (!list) return; // Add guard clause
             list.innerHTML = ''; // Clear
             
             const unassignedOrders = state.orders.filter(o => o.status === 'חדש');
@@ -1168,7 +1171,8 @@
             });
 
             if (bounds.isValid() && (unassignedOrders.length > 0 || Object.keys(driverMarkers).length > 0)) {
-                map.fitBounds(bounds, { padding: [50, 50] });
+                // Only fit bounds if there's something to show
+                 try { map.fitBounds(bounds, { padding: [50, 50] }); } catch (e) { console.warn("FitBounds error:", e); }
             }
         }
         
@@ -1261,6 +1265,9 @@
                  );
             }
             
+             // Sort customers alphabetically by name
+            filteredCustomers.sort((a, b) => a.name?.localeCompare(b.name || '') || 0);
+
             let html = '';
             if (filteredCustomers.length === 0) {
                  html = '<tr><td colspan="4" class="text-center p-8 text-gray-500">לא נמצאו לקוחות תואמים</td></tr>';
@@ -1584,6 +1591,7 @@
         
         function populateCustomerDatalist() {
             const datalist = document.getElementById('customer-list');
+             if (!datalist) return; // Add guard clause
             datalist.innerHTML = '';
             state.customers.forEach(cust => {
                 const option = document.createElement('option');
@@ -1596,17 +1604,28 @@
         }
         
         function openNewOrderForm() {
-            document.getElementById('new-order-modal').showModal();
+             const modal = document.getElementById('new-order-modal');
+             if (modal) modal.showModal();
         }
         window.openNewOrderForm = openNewOrderForm; // Make global
 
         function closeNewOrderForm() {
-            document.getElementById('new-order-modal').close();
-            // Reset form
-            document.getElementById('new-order-modal').querySelector('form').reset();
-            document.getElementById('order-date').value = new Date().toISOString().split('T')[0];
-            document.getElementById('new-customer-fields').style.display = 'none';
-            document.getElementById('existing-customer-display').style.display = 'none';
+            const modal = document.getElementById('new-order-modal');
+            if (modal) {
+                 modal.close();
+                // Reset form
+                 const form = modal.querySelector('form');
+                 if (form) form.reset();
+                 
+                 const orderDateInput = document.getElementById('order-date');
+                 if(orderDateInput) orderDateInput.value = new Date().toISOString().split('T')[0];
+                 
+                 const newCustomerFields = document.getElementById('new-customer-fields');
+                 if(newCustomerFields) newCustomerFields.style.display = 'none';
+                 
+                 const existingCustomerDisplay = document.getElementById('existing-customer-display');
+                 if(existingCustomerDisplay) existingCustomerDisplay.style.display = 'none';
+            }
         }
         window.closeNewOrderForm = closeNewOrderForm; // Make global
         
@@ -1686,7 +1705,7 @@
                         addressCity: city,
                         contactPerson: document.getElementById('customer-contact-new').value,
                         customerNumber: document.getElementById('customer-number-new').value || null,
-                        auditLog: [{ timestamp: serverTimestamp(), action: "Created" }] // Initial log
+                        auditLog: [{ timestamp: new Date(), action: "Created" }] // Use JS Date for creation log
                     };
                     
                     if (!newCustomer.name || !newCustomer.phone || !street || !number || !city) {
@@ -1754,8 +1773,8 @@
                     latitude: finalCoords[0], 
                     longitude: finalCoords[1],
                     status: "חדש",
-                    createdAt: serverTimestamp(),
-                    lastModified: serverTimestamp()
+                    createdAt: serverTimestamp(), // Use server timestamp for creation time
+                    lastModified: serverTimestamp() // Use server timestamp for modification time
                 };
                 
                 const orderDocRef = await addDoc(collection(db, "orders"), newOrder);
@@ -1809,11 +1828,14 @@
             const logList = document.getElementById('customer-audit-log');
             if (customer.auditLog && Array.isArray(customer.auditLog) && customer.auditLog.length > 0) {
                  logList.innerHTML = customer.auditLog
+                    // Ensure timestamp exists and is a Firestore Timestamp before converting
+                    .filter(log => log.timestamp && typeof log.timestamp.toDate === 'function') 
                     .sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis()) // Newest first
                     .slice(0, 5) // Show last 5 changes
                     .map(log => {
                         const time = log.timestamp.toDate().toLocaleString('he-IL');
                         let changes = log.action === "Created" ? "נוצר" : Object.keys(log.changes || {}).join(', ');
+                         if (changes.length > 50) changes = changes.substring(0, 50) + '...'; // Truncate long change lists
                         return `<li>${time}: ${changes}</li>`;
                     }).join('');
             } else {
@@ -1874,16 +1896,19 @@
                  
                  // --- Audit Log Logic ---
                  const changes = {};
+                 let hasChanges = false; // Flag to track if actual data changed
                  for (const key in updatedData) {
                       // Compare simple values; note this won't deeply compare objects if added later
-                     if (updatedData[key] !== originalCustomerData[key]) {
+                      // Use || '' to handle comparison between null/undefined and empty string
+                     if ((updatedData[key] || '') !== (originalCustomerData[key] || '')) {
                           changes[key] = { from: originalCustomerData[key] ?? null, to: updatedData[key] };
+                          hasChanges = true;
                      }
                  }
                  
-                 if (Object.keys(changes).length > 0) {
+                 if (hasChanges) {
                      const logEntry = {
-                         timestamp: serverTimestamp(),
+                         timestamp: new Date(), // *** THE FIX: Use JS Date() instead of serverTimestamp() ***
                          action: "Updated",
                          changes: changes
                      };
