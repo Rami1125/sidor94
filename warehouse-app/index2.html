@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DeliveryMaster - טרמינל מחסן v50.4</title>
+    <title>DeliveryMaster - טרמינל מחסן v50.4.1</title>
     <!-- 
-      Warehouse App v50.4 (Firebase + Live Map)
+      Warehouse App v50.4.1 (Firebase + Live Map)
       
       Changelog:
+      - v50.4.1 (FIX): Renamed local `initializeApp` function to `initWarehouseApp` 
+        to resolve "Identifier has already been declared" conflict with Firebase SDK.
       - v50.4: Migrated from API_URL (Apps Script) to full Firebase integration.
       - Added live Leaflet map showing warehouse location and drivers.
       - Map icons show driver status: "coming to load" (yellow) vs "available" (green).
@@ -238,14 +240,15 @@
         OneSignalDeferred.push(async function(OneSignal) {
             try {
                 await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
-                initializeApp(OneSignal);
+                initWarehouseApp(OneSignal); // <-- FIX: Renamed function
             } catch (e) {
                 SmartLog.error(e, "OneSignal.Init");
-                initializeApp(null); // Initialize without OneSignal
+                initWarehouseApp(null); // <-- FIX: Renamed function
             }
         });
 
-        function initializeApp(OneSignalInstance) {
+        // *** FIX: Renamed function to avoid conflict with Firebase's initializeApp ***
+        function initWarehouseApp(OneSignalInstance) {
             SmartLog.info("Initializing app...");
             loginBtn.addEventListener('click', () => onLogin(OneSignalInstance));
             logoutBtn.addEventListener('click', onLogout);
@@ -328,6 +331,7 @@
             if (!map) return;
             SmartLog.info("Rendering warehouse map markers...", "Map.Render");
 
+            // Check locations and update markers
             Object.values(state.locations).forEach(loc => {
                 const driverId = loc.id;
                 const driverData = state.drivers[driverId];
@@ -375,6 +379,17 @@
                         .bindPopup(popupText);
                 }
             });
+
+             // Remove markers for drivers that are no longer in the locations list
+             Object.keys(driverMarkers).forEach(driverId => {
+                 if (!state.locations[driverId]) {
+                     if (map.hasLayer(driverMarkers[driverId])) {
+                         map.removeLayer(driverMarkers[driverId]);
+                     }
+                     delete driverMarkers[driverId];
+                 }
+             });
+
              SmartLog.info("Map markers rendered", "Map.Render");
         }
 
@@ -397,7 +412,11 @@
              onSnapshot(q, (snapshot) => {
                  SmartLog.info(`Locations snapshot: ${snapshot.docChanges().length} changes`, "Firestore.Snapshot");
                  snapshot.docChanges().forEach(change => {
-                      state.locations[change.doc.id] = { id: change.doc.id, ...change.doc.data() };
+                     if (change.type === "removed") {
+                         delete state.locations[change.doc.id];
+                     } else {
+                        state.locations[change.doc.id] = { id: change.doc.id, ...change.doc.data() };
+                     }
                  });
                  renderWarehouseMap(); // Update map with locations
              }, e => SmartLog.error(e, "Firestore.Listen.Locations"));
@@ -559,7 +578,7 @@
         setTimeout(() => {
             if (!currentManager && !document.getElementById('mainView').classList.contains('active')) {
                  SmartLog.warn("OneSignal failed to load, initializing app manually.", "Init");
-                 initializeApp(null);
+                 initWarehouseApp(null); // <-- FIX: Renamed function
             }
         }, 3000); // 3-second timeout
 
