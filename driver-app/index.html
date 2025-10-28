@@ -198,9 +198,9 @@
         } catch (error) { console.error("CRITICAL: Firebase init failed!", error); initializationError = error; }
 
         const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
-        async function ensureAuth() { /* ... Same ensureAuth logic ... */
+        async function ensureAuth() { 
             console.log("ensureAuth: Starting..."); let tries = 0;
-            updateStatus("connecting", "מאמת..."); // Update status indicator
+            // updateStatus("connecting", "מאמת..."); // *** REMOVED: Called too early ***
             while (tries < MAX_AUTH_RETRIES) {
                 tries++;
                 try {
@@ -209,7 +209,7 @@
                     console.log(`ensureAuth: Attempt ${tries}/${MAX_AUTH_RETRIES}...`);
                     const userCredential = await signInAnonymously(auth);
                     console.log("ensureAuth: Success.", userCredential.user.uid); 
-                    updateStatus("connecting", "מאזין..."); // Update status indicator
+                    // updateStatus("connecting", "מאזין..."); // *** REMOVED: Called too early ***
                     return userCredential.user;
                 } catch (e) {
                     console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
@@ -274,45 +274,46 @@
 
         // --- Initialization ---
         async function initializeDriverApp() {
-            DOM = {
-                 driverNameDisplay: document.getElementById('driver-name-display'), 
-                 statusIndicator: document.getElementById('status-indicator'), // Main indicator div
-                 statusText: document.getElementById('status-text'), 
-                 statusDot: document.getElementById('status-dot'),
-                 permissionSection: document.getElementById('permission-section'), 
-                 requestPermsBtn: document.getElementById('request-perms-btn'), 
-                 locationInfo: document.getElementById('location-info'),
-                 currentLocationText: document.getElementById('current-location-text'), 
-                 etaText: document.getElementById('eta-text'), 
-                 mapElement: document.getElementById('map'), 
-                 orderList: document.getElementById('order-list'), 
-                 loadingOrders: document.getElementById('loading-orders'),
-                 loginErrorOverlay: document.getElementById('login-error-overlay'), // Error overlay
-                 mainContainer: document.getElementById('main-container') // Main content container
-            };
-            SmartLog.info("DOM elements referenced.", "Init.DOM");
-            if (!DOM.driverNameDisplay || !DOM.statusIndicator || !DOM.mapElement || !DOM.orderList || !DOM.loginErrorOverlay || !DOM.mainContainer) {
-                 // Log the error but maybe let the login overlay handle it if possible
-                 console.error("Essential DOM elements missing!"); 
-                 SmartLog.error("Essential DOM elements missing during init!", "Init.DOM");
-                 // Show a basic alert as a fallback if the overlay itself is missing
-                 if (!DOM.loginErrorOverlay) alert("שגיאה קריטית בטעינת האפליקציה.");
-                 showLoginErrorOverlay("שגיאת טעינה."); // Try to show the overlay anyway
-                 return; // Stop initialization
-            }
+            try { // *** MOVED try block to wrap DOM initialization ***
+                DOM = {
+                     driverNameDisplay: document.getElementById('driver-name-display'), 
+                     statusIndicator: document.getElementById('status-indicator'), // Main indicator div
+                     statusText: document.getElementById('status-text'), 
+                     statusDot: document.getElementById('status-dot'),
+                     permissionSection: document.getElementById('permission-section'), 
+                     requestPermsBtn: document.getElementById('request-perms-btn'), 
+                     locationInfo: document.getElementById('location-info'),
+                     currentLocationText: document.getElementById('current-location-text'), 
+                     etaText: document.getElementById('eta-text'), 
+                     mapElement: document.getElementById('map'), 
+                     orderList: document.getElementById('order-list'), 
+                     loadingOrders: document.getElementById('loading-orders'),
+                     loginErrorOverlay: document.getElementById('login-error-overlay'), // Error overlay
+                     mainContainer: document.getElementById('main-container') // Main content container
+                };
+                SmartLog.info("DOM elements referenced.", "Init.DOM");
+                
+                // Check for essential elements *after* defining them
+                if (!DOM.driverNameDisplay || !DOM.statusIndicator || !DOM.mapElement || !DOM.orderList || !DOM.loginErrorOverlay || !DOM.mainContainer) {
+                     throw new Error("Essential DOM elements missing!"); 
+                }
+    
+                SmartLog.info("Initializing Driver App (v50.3.1)...", "Init");
+                
+                // Now safe to update status
+                updateStatus("connecting", "מאמת..."); 
 
-            SmartLog.info("Initializing Driver App (v50.3.1)...", "Init");
-            try {
                 // Check for saved driver ID FIRST
                 if (!currentDriverId || !currentDriverName) {
                     SmartLog.error(new Error("Missing driverId/Name"), "Auth", null, "Auth", "הנהג אינו מחובר.");
                     showLoginErrorOverlay(); // Show the overlay instead of redirecting
                     return; // Stop initialization
                 }
-                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`;
+                DOM.driverNameDisplay.textContent = `נהג: ${currentDriverName}`; // Moved here
 
                 await authReadyPromise;
                 SmartLog.info("Firebase Auth Ready.", "Init");
+                updateStatus("connecting", "בודק הרשאות..."); // Moved from ensureAuth
 
                 await checkAndRequestPermissions(); 
 
@@ -345,7 +346,8 @@
 
         // --- Login Error Handling ---
         function showLoginErrorOverlay(message = "לא זוהו פרטי נהג.") {
-             if (DOM.loginErrorOverlay && DOM.mainContainer) {
+             // Check if DOM object and its properties are populated
+             if (DOM && DOM.loginErrorOverlay && DOM.mainContainer) {
                  const messageParagraphs = DOM.loginErrorOverlay.querySelectorAll('p');
                  if (messageParagraphs.length > 0) messageParagraphs[0].textContent = message;
                  if (messageParagraphs.length > 1) messageParagraphs[1].textContent = "אנא חזור למסך הראשי והתחבר מחדש.";
@@ -354,7 +356,8 @@
                  DOM.mainContainer.style.display = 'none'; // Hide the main app content
                  try { if(feather) feather.replace(); } catch(e){} // Redraw icon in overlay
              } else {
-                 // Fallback if overlay elements are missing
+                 // Fallback if DOM elements aren't ready (which caused the error)
+                 console.error("Login Error Overlay failed to display, DOM not ready.", message);
                  alert(message + "\nאנא חזור למסך הראשי והתחבר מחדש.");
              }
          }
@@ -372,7 +375,10 @@
 
         // --- Status Update ---
         function updateStatus(statusClass, text) { // Simplified args
-             if (!DOM.statusIndicator || !DOM.statusText || !DOM.statusDot) { console.warn("Status elements not ready for update:", text); return; }
+             if (!DOM.statusIndicator || !DOM.statusText || !DOM.statusDot) { 
+                 console.warn("Status elements not ready for update:", text); 
+                 return; 
+             }
              SmartLog.info(`Updating Status: ${text}`, "UI.Status", { class: statusClass });
              DOM.statusIndicator.className = statusClass; // 'connecting', 'connected', 'error'
              DOM.statusText.textContent = text;
@@ -850,4 +856,7 @@
 
 </body>
 </html>
+
+
+}
 
