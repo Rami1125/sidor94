@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DeliveryMaster - טרמינל מחסן v50.4</title>
+    <!-- 
+      Warehouse App v50.4 (Firebase + Live Map)
+      
+      Changelog:
+      - v50.4: Migrated from API_URL (Apps Script) to full Firebase integration.
+      - Added live Leaflet map showing warehouse location and drivers.
+      - Map icons show driver status: "coming to load" (yellow) vs "available" (green).
+      - Replaced API polling with live Firestore listeners for Orders, Drivers, and Locations.
+      - Kept Tone.js for new order sound alerts, now triggered by Firestore snapshot 'added'.
+      - Replaced API update calls with Firestore `updateDoc` for order status changes.
+      - Retained simple sessionStorage login (OREN/TAMIR).
+      - Injected Firebase SDKs, ensureAuth, and SmartLog.
+    -->
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- LeafletJS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- OneSignal (Kept from original) -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <!-- Tone.js for Sound (Kept from original) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --shadow-light: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        body { 
+            font-family: 'Rubik', sans-serif; 
+            margin: 0; 
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+            color: #333;
+        }
+        .view { display: none !important; height: 100vh; }
+        .view.active { display: flex !important; flex-direction: column; }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.4);
+            box-shadow: var(--shadow-light);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+
+        #loginView { justify-content: center; align-items: center; }
+        .login-card { padding: 40px; text-align: center; width: 90%; max-width: 400px; }
+        .login-card h2 { font-size: 1.8rem; margin-bottom: 20px; }
+        .login-card input { width: 100%; padding: 15px; margin-bottom: 20px; border: none; border-radius: 12px; font-size: 1.2rem; text-align: center; background-color: rgba(255,255,255,0.5); color: #333; }
+        .login-card button { width: 100%; padding: 15px; background-color: var(--primary-color); color:white; border:none; border-radius: 12px; font-size: 1.2rem; cursor: pointer; transition: transform 0.2s; }
+        .login-card button:hover { transform: scale(1.05); }
+
+        .app-header { padding: 15px 20px; z-index: 10; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        #welcomeMessage { margin:0; font-size: 1.5em; }
+        
+        main { flex-grow: 1; overflow-y: auto; padding: 0 15px; }
+        #warehouse-map {
+            height: 300px;
+            border-radius: 20px;
+            margin: 15px 0;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+             box-shadow: var(--shadow-light);
+        }
+        .order-section { margin-bottom: 30px; }
+        .order-section h2 { padding-bottom: 10px; display: flex; align-items: center; gap: 10px; font-size: 1.5rem; }
+        .order-card { margin: 10px 0; padding: 20px; }
+        .order-card h4 { font-size: 1.2rem; margin-bottom: 10px; }
+        .order-card p { opacity: 0.8; }
+        .order-card button { width: 100%; padding: 12px; border: none; border-radius: 12px; color: white; cursor: pointer; font-size: 1em; margin-top: 15px; }
+        .btn-acknowledge { background-color: var(--success); }
+        .btn-load { background-color: var(--warning); }
+        button:disabled { background-color: #999; cursor: not-allowed; opacity: 0.7; }
+        
+        /* Loader */
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: inline-block; margin-right: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="loginView" class="view active">
+        <div class="login-card glass-card">
+            <h2>כניסת מנהל מחסן</h2>
+            <input type="text" id="managerIdInput" placeholder="הזן קוד מנהל (OREN/TAMIR)">
+            <button id="loginBtn">כניסה</button>
+        </div>
+    </div>
+
+    <div id="mainView" class="view">
+        <header class="app-header glass-card" style="margin: 15px; height: 70px;">
+            <h1 id="welcomeMessage"></h1>
+            <button id="logoutBtn" style="background:none; border:none; color:#333; font-size: 1.5em;">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </header>
+        <main>
+            <!-- New Map Element -->
+            <div id="warehouse-map" class="glass-card" style="padding:0; overflow:hidden;"></div>
+            
+            <div id="newOrders" class="order-section">
+                <h2><i class="fas fa-inbox"></i> הזמנות חדשות לאישור</h2>
+                <div id="newOrdersList"><p>טוען...</p></div>
+            </div>
+            <div id="inProgressOrders" class="order-section">
+                <h2><i class="fas fa-tasks"></i> הזמנות בתהליך</h2>
+                <div id="inProgressOrdersList"><p>טוען...</p></div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        // --- Inlined Firebase SDK Imports ---
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, query, addDoc, updateDoc, serverTimestamp, where, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+        // --- Inlined Config Logic ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
+          storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
+        };
+        let app, auth, db; let initializationError = null;
+        try {
+            app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+            auth = getAuth(app); db = getFirestore(app);
+        } catch (error) { console.error("CRITICAL: Firebase init failed!", error); initializationError = error; }
+
+        const MAX_AUTH_RETRIES = 3; const RETRY_DELAY_MS = 3000;
+        async function ensureAuth() {
+            console.log("ensureAuth: Starting..."); let tries = 0;
+            while (tries < MAX_AUTH_RETRIES) {
+                tries++;
+                try {
+                    if (initializationError) throw new Error(`Init failed: ${initializationError.message}`);
+                    if (!auth) throw new Error("Auth object missing");
+                    const userCredential = await signInAnonymously(auth);
+                    console.log("ensureAuth: Success.", userCredential.user.uid); return userCredential.user;
+                } catch (e) {
+                    console.warn(`[FirebaseAuth] Attempt ${tries} failed:`, e.code, e.message);
+                    if (tries >= MAX_AUTH_RETRIES) { console.error("ensureAuth: All attempts failed."); throw e; }
+                    await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+                }
+            } throw new Error("ensureAuth: Max retries reached.");
+        }
+        const authReadyPromise = ensureAuth();
+        
+        // --- Inlined SmartLog Logic ---
+        const LOG_COLLECTION = 'system_logs_v3'; const sessionId = (Date.now() + Math.random()).toString(36);
+        let isDbAvailable = !!db; let authChecked = false;
+        const writeLog = async (level, message, origin, context = {}, category = null, solution = null) => {
+            const consoleArgs = [`[${origin}] ${level}:`, message]; if (Object.keys(context).length > 0) consoleArgs.push(context);
+            switch (level) { case 'INFO': console.log(...consoleArgs); break; case 'WARN': console.warn(...consoleArgs); break; case 'ERROR': console.error(...consoleArgs); break; default: console.log(...consoleArgs); }
+            if (!isDbAvailable) return;
+            try {
+                if (!authChecked || !auth?.currentUser) {
+                    await authReadyPromise; authChecked = true;
+                }
+                const user = auth?.currentUser; if (!user) { return; }
+                const userContext = { uid: user.uid, isAnonymous: user.isAnonymous };
+                const logEntry = {
+                    timestamp: serverTimestamp(), level, message: String(message), origin: `Warehouse-${origin}`,
+                    context: { ...JSON.parse(JSON.stringify(context || {})), sessionId, page: '/warehouse-app/' },
+                    user: userContext, category: category || null, solution: solution || null
+                };
+                 addDoc(collection(db, LOG_COLLECTION), logEntry).catch(e => console.error("SmartLog write error:", e));
+            } catch (error) { console.error("SmartLog FATAL ERROR.", error); }
+         };
+        const SmartLog = {
+            info: (msg, origin, ctx = {}) => { writeLog('INFO', msg, origin, ctx); },
+            warn: (msg, origin, ctx = {}, cat = null, sol = null) => { writeLog('WARN', msg, origin, ctx, cat, sol); },
+            error: (err, origin, ctx = {}, cat = null, sol = null) => { const msg = err instanceof Error ? err.message : String(err); writeLog('ERROR', msg, origin, { ...ctx }, cat, sol); }
+        };
+        // End SmartLog
+
+        // --- Original App Logic (Modified for Firebase) ---
+        const loginView = document.getElementById('loginView');
+        const mainView = document.getElementById('mainView');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const managerIdInput = document.getElementById('managerIdInput');
+        const welcomeMessage = document.getElementById('welcomeMessage');
+        const newOrdersList = document.getElementById('newOrdersList');
+        const inProgressOrdersList = document.getElementById('inProgressOrdersList');
+
+        let currentManager = null;
+        let knownOrderIds = new Set();
+        
+        // --- State for Map ---
+        let state = {
+            drivers: {},    // { id: { name, ... } }
+            orders: {},     // { id: { status, driver, ... } }
+            locations: {}   // { id: { latitude, longitude, isStuck, ... } }
+        };
+        
+        // --- Map Variables ---
+        let map;
+        let driverMarkers = {};
+        const warehouseCoords = { "החרש": [32.0573, 34.7963], "התלמיד": [32.0853, 34.7818] };
+        // Map Icons
+        const driverIconAvailable = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41] });
+        const driverIconLoading = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41] });
+        const driverIconInactive = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41] });
+        const warehouseIcon = L.icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', shadowSize: [41, 41] });
+
+
+        // Use OneSignal logic from original file
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        OneSignalDeferred.push(async function(OneSignal) {
+            try {
+                await OneSignal.init({ appId: "c711df10-6c87-4d81-889c-8e13963a155b" });
+                initializeApp(OneSignal);
+            } catch (e) {
+                SmartLog.error(e, "OneSignal.Init");
+                initializeApp(null); // Initialize without OneSignal
+            }
+        });
+
+        function initializeApp(OneSignalInstance) {
+            SmartLog.info("Initializing app...");
+            loginBtn.addEventListener('click', () => onLogin(OneSignalInstance));
+            logoutBtn.addEventListener('click', onLogout);
+            const loggedInManager = JSON.parse(sessionStorage.getItem('warehouseManager'));
+            if (loggedInManager) {
+                initApp(loggedInManager, OneSignalInstance);
+            } else {
+                switchView('loginView');
+            }
+        }
+        
+        function onLogin(OneSignalInstance) {
+            const managerId = managerIdInput.value.trim().toUpperCase();
+            if(!managerId || (managerId !== 'OREN' && managerId !== 'TAMIR')) {
+                 alert('קוד מנהל לא תקין. הזן OREN או TAMIR');
+                 return;
+            }
+            const managerData = { id: managerId, name: managerId === 'OREN' ? 'אורן' : 'תמיר', warehouse: managerId === 'OREN' ? 'החרש' : 'התלמיד' };
+            sessionStorage.setItem('warehouseManager', JSON.stringify(managerData));
+            initApp(managerData, OneSignalInstance);
+        }
+
+        function onLogout() {
+            SmartLog.info("User logged out", "Auth");
+            sessionStorage.removeItem('warehouseManager');
+            // Unsubscribe from listeners (logic to be added if listeners are global)
+            if(window.OneSignal) OneSignal.logout();
+            switchView('loginView');
+             location.reload(); // Force reload to clear all state and listeners
+        }
+
+        async function initApp(manager, OneSignalInstance) {
+            SmartLog.info(`Initializing session for manager: ${manager.id}`, "Auth", { manager });
+            currentManager = manager;
+            welcomeMessage.textContent = `מחסן ${manager.warehouse} | ברוך הבא ${manager.name}`;
+            switchView('mainView');
+            
+            try {
+                await authReadyPromise; // Ensure Firebase auth is ready
+                SmartLog.info("Firebase Auth ready, initializing app components.", "Init");
+                
+                initMap(); // Initialize the map
+                
+                // Start live listeners
+                listenToDrivers();
+                listenToLocations();
+                listenToOrders(); // This replaces startPolling
+
+                if (OneSignalInstance) {
+                    initializeNotifications(manager.id, OneSignalInstance);
+                } else {
+                    SmartLog.warn("OneSignal failed to init, skipping notifications.", "Init");
+                }
+            } catch (error) {
+                 SmartLog.error(error, "Init.Critical", { message: "Failed during initApp async phase." });
+                 welcomeMessage.textContent = `שגיאת התחברות לשרת.`;
+            }
+        }
+        
+        // --- New Map Functions ---
+        function initMap() {
+            if (map) map.remove(); // Remove existing map if any
+            if (!currentManager || !warehouseCoords[currentManager.warehouse]) {
+                SmartLog.error(new Error("Cannot init map, warehouse location unknown"), "Map.Init");
+                document.getElementById('warehouse-map').innerHTML = "שגיאה: מיקום מחסן לא ידוע";
+                return;
+            }
+            const center = warehouseCoords[currentManager.warehouse];
+            map = L.map('warehouse-map').setView(center, 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(map);
+            
+            // Add marker for the warehouse itself
+            L.marker(center, { icon: warehouseIcon }).addTo(map).bindPopup(`<b>המחסן שלך (${currentManager.warehouse})</b>`);
+            SmartLog.info("Map initialized", "Map.Init");
+        }
+
+        function renderWarehouseMap() {
+            if (!map) return;
+            SmartLog.info("Rendering warehouse map markers...", "Map.Render");
+
+            Object.values(state.locations).forEach(loc => {
+                const driverId = loc.id;
+                const driverData = state.drivers[driverId];
+                if (!driverData) return; // Driver details not loaded yet
+
+                let icon = driverIconInactive;
+                let popupText = `<b>${driverData.name}</b><br>${loc.isStuck ? 'תקוע' : 'לא פעיל/במשלוח אחר'}`;
+
+                // Check if driver is assigned to an order from THIS warehouse
+                const assignedOrder = Object.values(state.orders).find(o => 
+                    o.driver?.id === driverId && 
+                    o.status === 'שויך' && // Status is 'Assigned'
+                    o.warehouse === currentManager.warehouse // Order is from this warehouse
+                );
+                
+                // Check if driver is on another delivery
+                const onOtherDelivery = Object.values(state.orders).some(o => 
+                     o.driver?.id === driverId && o.status === 'בדרך'
+                );
+
+                if (assignedOrder) {
+                    icon = driverIconLoading; // Yellow - Coming to load
+                    const orderDisplayId = assignedOrder.orderNumber || assignedOrder.id.slice(-6);
+                    popupText = `<b>${driverData.name}</b><br>בדרך להעמיס הזמנה #${orderDisplayId}`;
+                } else if (loc.isStuck) {
+                     icon = driverIconInactive; // Use inactive (gray) for stuck
+                     popupText = `<b>${driverData.name}</b><br>תקוע`;
+                } else if (!onOtherDelivery && loc.lastUpdate) { 
+                    // Check if update is recent (e.g., last 15 mins)
+                     const minutesAgo = (Date.now() - loc.lastUpdate.toDate().getTime()) / 60000;
+                     if (minutesAgo < 15) {
+                        icon = driverIconAvailable; // Green - Available
+                        popupText = `<b>${driverData.name}</b><br>פנוי באזור (עדכון לפני ${Math.round(minutesAgo)} דק')`;
+                     } else {
+                         popupText = `<b>${driverData.name}</b><br>לא פעיל (עדכון אחרון לפני ${Math.round(minutesAgo)} דק')`;
+                     }
+                }
+                
+                const latLng = [loc.latitude, loc.longitude];
+                if (driverMarkers[driverId]) {
+                    driverMarkers[driverId].setLatLng(latLng).setIcon(icon).setPopupContent(popupText);
+                } else {
+                    driverMarkers[driverId] = L.marker(latLng, { icon })
+                        .addTo(map)
+                        .bindPopup(popupText);
+                }
+            });
+             SmartLog.info("Map markers rendered", "Map.Render");
+        }
+
+        // --- New Firebase Listeners ---
+        function listenToDrivers() {
+            SmartLog.info("Listening to Drivers...", "Firestore.Listen");
+            const q = query(collection(db, "drivers"));
+            onSnapshot(q, (snapshot) => {
+                SmartLog.info(`Drivers snapshot: ${snapshot.docChanges().length} changes`, "Firestore.Snapshot");
+                snapshot.docChanges().forEach(change => {
+                     state.drivers[change.doc.id] = { id: change.doc.id, ...change.doc.data() };
+                });
+                renderWarehouseMap(); // Update map with driver names
+            }, e => SmartLog.error(e, "Firestore.Listen.Drivers"));
+        }
+        
+        function listenToLocations() {
+             SmartLog.info("Listening to Locations...", "Firestore.Listen");
+             const q = query(collection(db, "driverLocations"));
+             onSnapshot(q, (snapshot) => {
+                 SmartLog.info(`Locations snapshot: ${snapshot.docChanges().length} changes`, "Firestore.Snapshot");
+                 snapshot.docChanges().forEach(change => {
+                      state.locations[change.doc.id] = { id: change.doc.id, ...change.doc.data() };
+                 });
+                 renderWarehouseMap(); // Update map with locations
+             }, e => SmartLog.error(e, "Firestore.Listen.Locations"));
+        }
+
+        function listenToOrders() {
+            if (!currentManager) return;
+            SmartLog.info(`Listening to orders for warehouse: ${currentManager.warehouse}...`, "Firestore.Listen");
+
+            const q = query(
+                collection(db, "orders"),
+                where("warehouse", "==", currentManager.warehouse),
+                where("status", "in", ["חדש", "שויך", "באיסוף", "טעון"]) // Listen to all relevant statuses
+            );
+            
+            onSnapshot(q, (snapshot) => {
+                 SmartLog.info(`Orders snapshot: ${snapshot.docChanges().length} changes`, "Firestore.Snapshot");
+                 let newOrderDetected = false;
+                 
+                 snapshot.docChanges().forEach(change => {
+                      const orderId = change.doc.id;
+                      const orderData = { id: orderId, ...change.doc.data() };
+                      
+                      if (change.type === "added") {
+                           state.orders[orderId] = orderData;
+                           if (orderData.status === 'חדש') {
+                               if (knownOrderIds.size > 0) { // Don't beep on initial load
+                                   newOrderDetected = true;
+                               }
+                               knownOrderIds.add(orderId);
+                           }
+                      } else if (change.type === "modified") {
+                           state.orders[orderId] = orderData;
+                      } else if (change.type === "removed") {
+                           delete state.orders[orderId];
+                           knownOrderIds.delete(orderId);
+                      }
+                 });
+                 
+                 // On first load, populate knownOrderIds without beeping
+                 if (knownOrderIds.size === 0) {
+                      Object.values(state.orders).forEach(o => knownOrderIds.add(o.id));
+                 }
+
+                 if (newOrderDetected) {
+                     SmartLog.info("New order detected, playing sound.", "Orders");
+                     playNotificationSound();
+                 }
+
+                 renderOrderLists(); // Update UI lists
+                 renderWarehouseMap(); // Update driver status on map (e.g., 'coming to load')
+
+            }, (error) => {
+                SmartLog.error(error, "Firestore.Listen.Orders");
+                newOrdersList.innerHTML = `<p style="color:red; font-weight:bold;">שגיאת סנכרון הזמנות.</p>`;
+            });
+        }
+        
+        function renderOrderLists() {
+            newOrdersList.innerHTML = '';
+            inProgressOrdersList.innerHTML = '';
+            
+            const allWarehouseOrders = Object.values(state.orders);
+            
+            const newOrders = allWarehouseOrders.filter(o => o.status === 'חדש');
+            const inProgress = allWarehouseOrders.filter(o => ['באיסוף', 'טעון'].includes(o.status));
+
+            if (newOrders.length === 0) newOrdersList.innerHTML = '<p>אין הזמנות חדשות.</p>';
+            newOrders.forEach(order => newOrdersList.innerHTML += createOrderCard(order, 'acknowledge'));
+
+            if (inProgress.length === 0) inProgressOrdersList.innerHTML = '<p>אין הזמנות בתהליך.</p>';
+            inProgress.forEach(order => inProgressOrdersList.innerHTML += createOrderCard(order, 'load'));
+        }
+
+        function createOrderCard(order, type) {
+            let buttonHtml = '';
+            if (type === 'acknowledge') {
+                buttonHtml = `<button class="btn-acknowledge" onclick="updateOrderStatus(event, '${order.id}', 'באיסוף')">אשר קבלת הזמנה</button>`;
+            } else if (order.status === 'באיסוף') {
+                buttonHtml = `<button class="btn-load" onclick="updateOrderStatus(event, '${order.id}', 'טעון')">סמן כטעון</button>`;
+            } else { // 'טעון'
+                 buttonHtml = `<p style="color:var(--success); font-weight:bold; text-align:center; margin-top: 15px;">הועמס בהצלחה ✔️</p>`;
+            }
+            
+            const displayId = order.orderNumber || order.id.slice(-6);
+
+            return `
+                <div class="order-card glass-card" data-order-id="${order.id}">
+                    <h4>${order.customer?.name || '?'} (${displayId})</h4>
+                    <p><strong>כתובת:</strong> ${order.address || '?'}</p>
+                    <p><strong>סוג:</strong> ${order.deliveryType || 'לא צוין'}</p>
+                    ${buttonHtml}
+                </div>`;
+        }
+        
+        async function updateOrderStatus(event, orderId, newStatus) {
+            SmartLog.info(`Updating order ${orderId} to status: ${newStatus}`, "CRUD.Order");
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מעדכן...';
+             try {
+                 const orderRef = doc(db, "orders", orderId);
+                 await updateDoc(orderRef, {
+                     status: newStatus,
+                     lastModified: serverTimestamp()
+                 });
+                SmartLog.info(`Update success for order ${orderId}.`, "CRUD.Order");
+                // Listener will handle the UI update
+            } catch (error) {
+                SmartLog.error(error, "CRUD.Order.Update", { orderId, newStatus });
+                btn.disabled = false;
+                btn.innerHTML = 'נסה שוב';
+            }
+        }
+        
+        async function playNotificationSound() {
+            try {
+                await Tone.start();
+                const synth = new Tone.Synth().toDestination();
+                synth.triggerAttackRelease("C5", "8n");
+                SmartLog.info("Notification sound played.", 'Notifications');
+            } catch (e) {
+                SmartLog.error(e, "Notifications.Sound");
+            }
+        }
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+        
+        async function initializeNotifications(managerId, OneSignal) {
+             try {
+                await OneSignal.Notifications.requestPermission();
+                await OneSignal.login(managerId);
+                const playerId = OneSignal.User.onesignalId;
+                if (playerId) {
+                    SmartLog.info(`Registering device with OneSignal Player ID for manager ${managerId}`, "OneSignal");
+                    // Register device in Firestore
+                    const deviceRef = doc(db, "warehouseDevices", playerId);
+                    await setDoc(deviceRef, {
+                         managerId: managerId,
+                         warehouse: currentManager.warehouse,
+                         registeredAt: serverTimestamp()
+                    });
+                     SmartLog.info("Device registered in Firestore", "OneSignal");
+                }
+             } catch (e) {
+                 SmartLog.error(e, "OneSignal.Register");
+             }
+        }
+        
+        // --- Add global access for inline JS ---
+        window.updateOrderStatus = updateOrderStatus;
+        
+        // --- Start App ---
+        // The OneSignal script loader will call initializeApp
+        // We add a fallback in case OneSignal fails to load
+        setTimeout(() => {
+            if (!currentManager && !document.getElementById('mainView').classList.contains('active')) {
+                 SmartLog.warn("OneSignal failed to load, initializing app manually.", "Init");
+                 initializeApp(null);
+            }
+        }, 3000); // 3-second timeout
+
+    </script>
+</body>
+</html>
