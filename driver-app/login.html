@@ -157,8 +157,11 @@
                     localStorage.setItem('driverName', foundDriverName); // Save the name from Firestore
                     console.log(`Driver logged in: ID=${driverId}, Name=${foundDriverName}`);
 
+                    localStorage.setItem('driverName', foundDriverName); // Save the name from Firestore
+                    console.log(`Driver logged in: ID=${driverId}, Name=${foundDriverName}`);
+
                     // Redirect to the main driver app page using a relative path starting with ./
-                    window.location.href = './index.html'; // *** THE FIX ***
+                    window.location.href = './index.html'; // *** התיקון: שונה מ-'index (53).html' ***
                 }
 
             } catch (error) {
