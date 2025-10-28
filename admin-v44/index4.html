@@ -3,17 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster v31.6 (Update Orders on Address Change)</title>
+    <title>DeliveryMaster v31.7 (Status Update Button)</title>
     <!-- 
-      DeliveryMaster Admin App v31.6 (Update Orders on Address Change)
+      DeliveryMaster Admin App v31.7 (Status Update Button)
       
       Changelog:
+      - v31.7: Added functionality to update order status directly.
+        - Added "Change Status" button in the Order Details Panel on the dashboard.
+        - Added "Update Status" button in the Actions column of the Order History table.
+        - Both buttons trigger `promptForStatusChange(orderId, currentStatus)`.
+        - `promptForStatusChange`: Uses prompt() to get new status input from predefined list.
+        - `updateOrderStatus`: New async function to update Firestore document with new status 
+          and lastModified timestamp, includes error handling and logging.
+        - UI updates automatically via existing Firestore listeners.
       - v31.6: Dynamically update active orders when customer default address changes.
-        - `handleSaveCustomer` now geocodes the new address if changed and no coords pasted.
-        - After customer update, queries active orders ("חדש", "שויך") linked to the customer 
-          AND matching the *old* default address.
-        - Updates the `address`, `latitude`, `longitude` of matched orders to the new values.
-        - Added user feedback (toast) about updating linked orders.
       - v31.5.1 (FIX): Corrected usage of timestamp in customer audit log for arrayUnion.
       - v31.5: Address separation, Customer editing, Coordinate pasting, Driver History structure.
       - v31.4: Added optional, user-defined Order & Customer Numbers.
@@ -187,6 +190,11 @@
             margin-bottom: 4px;
             color: var(--text-light);
         }
+         #details-panel .status-line {
+             display: flex;
+             align-items: center;
+             gap: 0.5rem; /* Space between status and button */
+         }
         #details-panel li .dist {
             font-weight: 500;
             color: var(--text-dark);
@@ -204,6 +212,21 @@
         #details-close-btn:hover {
             color: var(--text-dark);
         }
+         .status-change-btn {
+             background: none;
+             border: none;
+             color: var(--primary-color);
+             font-size: 0.8rem;
+             font-weight: 500;
+             cursor: pointer;
+             padding: 2px 4px;
+             border-radius: 4px;
+         }
+         .status-change-btn:hover {
+             background-color: #eff6ff; /* blue-50 */
+             color: var(--primary-dark);
+         }
+
 
         /* History & Customer Management View */
          #view-history .tab-button {
@@ -219,7 +242,20 @@
          }
         .history-table tbody tr:hover, .customer-table tbody tr:hover {
              background-color: #f9fafb; /* gray-50 */
+         }
+         .customer-table tbody tr:hover {
+              cursor: pointer; /* Only customer table is clickable */
+         }
+         .history-table .action-button {
+             background-color: var(--primary-color);
+             color: white;
+             padding: 4px 8px;
+             border-radius: 4px;
+             font-size: 0.8rem;
              cursor: pointer;
+         }
+         .history-table .action-button:hover {
+              background-color: var(--primary-dark);
          }
         
         /* Driver History View */
@@ -500,10 +536,11 @@
                                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">כתובת</th>
                                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">סטטוס</th>
                                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">תאריך</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">פעולות</th> <!-- New Column -->
                                     </tr>
                                 </thead>
                                 <tbody id="history-table-body" class="bg-white divide-y divide-gray-200">
-                                    <tr><td colspan="6" class="text-center p-8 text-gray-500">טוען היסטוריה...</td></tr>
+                                    <tr><td colspan="7" class="text-center p-8 text-gray-500">טוען היסטוריה...</td></tr> <!-- Updated colspan -->
                                 </tbody>
                             </table>
                         </div>
@@ -809,6 +846,7 @@
         // --- CONFIG & STATE ---
         const ISRAEL_CENTER = [32.0853, 34.7818];
         const WAREHOUSE_LOCATIONS = { "החרש": [32.0573, 34.7963], "התלמיד": [32.0853, 34.7818] };
+        const ALLOWED_STATUSES = ["חדש", "שויך", "בדרך", "הושלם", "בוטל"]; // Define statuses globally
 
         let state = {
             orders: [],
@@ -852,7 +890,7 @@
         });
         
         async function initializeApplication() {
-            SmartLog.info("v31.6-FB: Initializing...", "Init"); // Version bump for fix
+            SmartLog.info("v31.7-FB: Initializing...", "Init"); // Version bump
             try {
                 updateStatus("מפעיל מפות...");
                 initMap(); // Dashboard map
@@ -1226,7 +1264,7 @@
             // Build HTML
             let html = '';
             if (filteredOrders.length === 0) {
-                html = '<tr><td colspan="6" class="text-center p-8 text-gray-500">לא נמצאו הזמנות תואמות</td></tr>';
+                html = '<tr><td colspan="7" class="text-center p-8 text-gray-500">לא נמצאו הזמנות תואמות</td></tr>'; // Updated colspan
             } else {
                 filteredOrders.forEach(order => {
                     const orderDate = order.createdAt?.toDate ? order.createdAt.toDate().toLocaleDateString('he-IL') : (order.orderDate ? new Date(order.orderDate).toLocaleDateString('he-IL') : 'N/A');
@@ -1239,6 +1277,9 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" title="${order.address || ''}">${order.address || '...'}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${order.status || '...'}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${orderDate}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <button class="action-button" onclick="promptForStatusChange('${order.id}', '${order.status || 'חדש'}')">עדכן סטטוס</button>
+                            </td>
                         </tr>
                     `;
                 });
@@ -1507,12 +1548,15 @@
                     return;
                 }
                 const displayId = order.orderNumber || `#${order.id.slice(-6)}`;
+                const currentStatus = order.status || 'חדש';
                 
                 html += `<h4>הזמנה ${displayId}</h4>`;
                 html += `<ul>`;
                 html += `<li><strong>לקוח:</strong> ${order.customer?.name || '...'}</li>`;
                 html += `<li><strong>כתובת:</strong> ${order.address || '...'}</li>`;
-                html += `<li><strong>סטטוס:</strong> ${order.status || 'חדש'}</li>`;
+                html += `<li class="status-line"><strong>סטטוס:</strong> ${currentStatus} 
+                             <button class="status-change-btn" onclick="promptForStatusChange('${order.id}', '${currentStatus}')">שנה סטטוס</button>
+                         </li>`; // Added status change button here
                 html += `</ul>`;
                 
                 if (order.latitude && order.longitude) {
@@ -1601,6 +1645,51 @@
             }
         }
 
+        // --- STATUS UPDATE FUNCTIONS ---
+        
+        function promptForStatusChange(orderId, currentStatus) {
+            const order = state.orders.find(o => o.id === orderId);
+            const displayId = order?.orderNumber || `#${orderId.slice(-6)}`;
+            const promptMessage = `הזמנה ${displayId}\nסטטוס נוכחי: ${currentStatus}\n\nהזן סטטוס חדש מהרשימה:\n${ALLOWED_STATUSES.join(', ')}`;
+            
+            const newStatus = prompt(promptMessage);
+            
+            if (newStatus === null) {
+                return; // User cancelled
+            }
+            
+            const trimmedStatus = newStatus.trim();
+            if (ALLOWED_STATUSES.includes(trimmedStatus)) {
+                if (trimmedStatus === currentStatus) {
+                    showToast('הסטטוס שנבחר זהה לסטטוס הנוכחי.', 'info');
+                } else {
+                    updateOrderStatus(orderId, trimmedStatus);
+                }
+            } else {
+                showToast(`סטטוס לא תקין: "${trimmedStatus}". יש לבחור מהרשימה.`, 'error');
+            }
+        }
+        window.promptForStatusChange = promptForStatusChange; // Make global for onclick
+
+        async function updateOrderStatus(orderId, newStatus) {
+             const orderRef = doc(db, "orders", orderId);
+             const order = state.orders.find(o => o.id === orderId);
+             const displayId = order?.orderNumber || `#${orderId.slice(-6)}`;
+             SmartLog.info(`Attempting to update status for order ${orderId} to ${newStatus}`, "CRUD.StatusUpdate");
+             
+             try {
+                await updateDoc(orderRef, {
+                    status: newStatus,
+                    lastModified: serverTimestamp()
+                });
+                showToast(`סטטוס הזמנה ${displayId} עודכן ל: ${newStatus}`, 'success');
+                SmartLog.info(`Order ${orderId} status updated to ${newStatus}`, "CRUD.StatusUpdate");
+                closeDetailsPanel(); // Close details panel if open after update
+             } catch (error) {
+                 showToast(`שגיאה בעדכון סטטוס: ${error.message}`, 'error');
+                 SmartLog.error(error, "CRUD.StatusUpdate", { orderId, newStatus });
+             }
+        }
         
         // --- NEW ORDER FORM ---
         
