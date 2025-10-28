@@ -8,6 +8,7 @@
       DeliveryMaster Admin App v31.7 (Status Update Button)
       
       Changelog:
+      - v31.7.1 (FIX): Corrected element ID targeting in showView function for driver-history page.
       - v31.7: Added functionality to update order status directly.
         - Added "Change Status" button in the Order Details Panel on the dashboard.
         - Added "Update Status" button in the Actions column of the Order History table.
@@ -890,7 +891,7 @@
         });
         
         async function initializeApplication() {
-            SmartLog.info("v31.7-FB: Initializing...", "Init"); // Version bump
+            SmartLog.info("v31.7.1-FB: Initializing...", "Init"); // Version bump for fix
             try {
                 updateStatus("מפעיל מפות...");
                 initMap(); // Dashboard map
@@ -1334,7 +1335,9 @@
             // Hide all views
             document.querySelectorAll('.app-view').forEach(v => v.style.display = 'none');
             // Show the selected view
-            const viewEl = document.getElementById(`view-${viewName.replace('-', '_')}`); // Handle driver-history ID
+            // const viewEl = document.getElementById(`view-${viewName.replace('-', '_')}`); // OLD - Incorrect for driver-history
+             const viewId = `view-${viewName}`; // CORRECT ID
+             const viewEl = document.getElementById(viewId); 
             if (viewEl) {
                  if (viewName === 'dashboard') {
                     viewEl.style.display = 'grid'; // The dashboard uses grid
@@ -1343,6 +1346,9 @@
                 } else {
                     viewEl.style.display = 'block';
                 }
+            } else {
+                 console.error(`View element with ID ${viewId} not found!`); // Debugging
+                 SmartLog.error(`View element not found`, "UI.Nav", { viewId });
             }
             
             // Update active nav link
