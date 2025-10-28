@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeliveryMaster Viewer v50.3 (PWA & Map Fix)</title>
+    <title>DeliveryMaster Viewer v50.4 (Global Ping)</title>
     <!-- 
-      DeliveryMaster Live Viewer App v50.3 (PWA & Map Fix)
+      DeliveryMaster Live Viewer App v50.4 (Global Ping)
       
       Changelog:
+      - v50.4:
+        - Added listener for `globalPings` collection to receive admin alerts.
+        - Added Tone.js library for audio alerts.
+        - Implemented `playNotificationSound` and `listenToGlobalPings`.
+        - Wrapped `feather.replace()` in a try...catch block for robustness.
       - v50.3 (FIX):
         - Fixed critical error "ISRAEL_CENTER is not defined" by adding the constant.
-        - This resolves the "blank page" / "doesn't load" issue.
         - Added PWA meta tags (`apple-mobile-web-app-capable`, `mobile-web-app-capable`).
         - Linked to `manifest.json` file.
       - v50.2: Added Header Counters, Future Orders Tab, and Order Type Styling.
@@ -35,6 +39,9 @@
     
     <!-- Icons (Feather) -->
     <script src="https://unpkg.com/feather-icons"></script>
+
+    <!-- Tone.js for Sound -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     
     <!-- Google Font: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -218,6 +225,35 @@
              border-bottom-color: var(--primary-color);
              color: var(--primary-color);
          }
+         
+        /* Toast Notification */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .toast {
+            padding: 12px 20px;
+            background-color: var(--text-dark);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.success { background-color: #22c55e; }
+        .toast.error { background-color: #ef4444; }
+        .toast.ping { background-color: var(--primary-color); } /* Style for pings */
 
 
         /* Responsive */
@@ -407,7 +443,6 @@
         };
 
         // --- CONFIG & STATE ---
-        // *** FIX: ISRAEL_CENTER was missing ***
         const ISRAEL_CENTER = [32.0853, 34.7818];
         const ACTIVE_ORDER_STATUSES = ["חדש", "שויך", "בדרך"]; // Statuses for active count & list
 
@@ -438,12 +473,16 @@
         
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
-            feather.replace();
+            try {
+                feather.replace();
+            } catch (e) {
+                SmartLog.error(e, "Init.Feather");
+            }
             initializeViewerApplication();
         });
         
         async function initializeViewerApplication() {
-            SmartLog.info("v50.3 Viewer: Initializing...", "Init"); // Version bump
+            SmartLog.info("v50.4 Viewer: Initializing...", "Init"); // Version bump
             try {
                 updateConnectionStatus('connecting', 'מפעיל מפה...');
                 initViewerMap(); // This will now work
@@ -458,6 +497,7 @@
                 listenToDriversViewer();
                 listenToAllOrdersViewer(); // Changed to listen for ALL orders
                 listenToLocationsViewer();
+                listenToGlobalPings(); // Add listener for admin pings
                 
                 showLoader('viewer-map-loader', false);
                 updateConnectionStatus('connected', 'מחובר'); // Final connected status
@@ -587,6 +627,39 @@
             });
         }
         
+        // --- New Listener for Global Pings ---
+        function listenToGlobalPings() {
+             SmartLog.info("Listening for Global Pings...", "Firestore.Listen");
+             // Listen for pings created in the last 60 seconds
+             const since = new Date(Date.now() - 60000); 
+             const q = query(
+                 collection(db, "globalPings"), 
+                 where("createdAt", ">", since),
+                 orderBy("createdAt", "desc"),
+                 limit(1) // We only care about the latest one
+             );
+             
+             let initialLoad = true;
+             onSnapshot(q, (snapshot) => {
+                 if (initialLoad) {
+                     initialLoad = false; // Don't beep on first load
+                     return; 
+                 }
+                 
+                 snapshot.docChanges().forEach(change => {
+                     if (change.type === "added") {
+                         const ping = change.doc.data();
+                         SmartLog.info("Global Ping Received!", "Pings", ping);
+                         // Play sound and show toast
+                         playNotificationSound('A5', '4n'); // Louder, longer note
+                         showToast(`התראה מהמנהל: ${ping.message}`, 'ping');
+                     }
+                 });
+             }, e => { 
+                SmartLog.error(e, "Firestore.Pings.Listener"); 
+                updateConnectionStatus("error", "שגיאת התראות"); 
+            });
+        }
 
         // --- RENDER FUNCTIONS for Viewer ---
         
@@ -924,6 +997,17 @@
         
         // --- HELPERS ---
         
+        async function playNotificationSound(note = "C5", duration = "8n") {
+            try {
+                await Tone.start();
+                const synth = new Tone.Synth().toDestination();
+                synth.triggerAttackRelease(note, duration);
+                SmartLog.info("Notification sound played.", 'Notifications');
+            } catch (e) {
+                SmartLog.error(e, "Notifications.Sound");
+            }
+        }
+
         function showLoader(elementId, show) {
             const container = document.getElementById(elementId);
             if (!container) return;
@@ -960,10 +1044,8 @@
             
             const container = document.getElementById('toast-container'); 
             if (!container) { // Create container if it doesn't exist
-                 const newContainer = document.createElement('div');
-                 newContainer.id = 'toast-container';
-                 document.body.appendChild(newContainer);
-                 container = newContainer;
+                 console.error("Toast container not found!");
+                 return;
             }
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
@@ -973,9 +1055,10 @@
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => { if (container.contains(toast)) container.removeChild(toast); }, 300);
-            }, 3000);
+            }, 5000); // Show for 5 seconds
         }
 
     </script>
 </body>
 </html>
+
