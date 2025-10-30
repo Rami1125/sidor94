@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DeliveryMaster — Viewer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+<style>
+body{font-family:Inter,system-ui;background:#f3f4f6}
+.order-card{background:white;padding:0.75rem;border-radius:8px;border:1px solid #e6e6e6}
+.blink {animation: blink 1s infinite}
+@keyframes blink{0%{opacity:1}50%{opacity:0.15}100%{opacity:1}}
+</style>
+</head>
+<body class="p-4">
+
+<header class="flex justify-between items-center mb-4">
+  <h1 class="text-xl font-semibold">סידור — Viewer</h1>
+  <div>
+    <input id="viewer-search" placeholder="חפש הזמנה..." class="border rounded p-2" />
+  </div>
+</header>
+
+<main class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <section id="orders-col" class="col-span-2 space-y-3">
+    <div id="orders-container" class="space-y-2 max-h-[70vh] overflow-y-auto">
+      <div class="text-gray-500">טוען הזמנות...</div>
+    </div>
+  </section>
+
+  <aside class="space-y-4">
+    <div class="bg-white p-4 rounded shadow">
+      <h3 class="font-semibold mb-2">פעולות מהירות</h3>
+      <button id="btn-new-note" class="w-full mb-2 px-3 py-2 bg-blue-600 text-white rounded">הוסף הערה כללית</button>
+    </div>
+    <div id="note-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center">
+      <div class="bg-white rounded p-4 w-[480px]">
+        <h4 class="font-semibold mb-2">הוספת הערה</h4>
+        <input id="note-sender" placeholder="שמך" class="w-full border rounded p-2 mb-2" />
+        <textarea id="note-text" rows="4" class="w-full border rounded p-2" placeholder="תוכן ההערה"></textarea>
+        <div class="flex justify-end gap-2 mt-2">
+          <button id="note-cancel" class="px-3 py-2 border rounded">ביטול</button>
+          <button id="note-send" class="px-3 py-2 bg-green-600 text-white rounded">שלח</button>
+        </div>
+      </div>
+    </div>
+    <div id="history-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-40">
+      <div class="bg-white rounded p-4 w-[650px] max-h-[80vh] overflow-y-auto">
+        <h4 class="font-semibold mb-2">היסטוריית הודעות</h4>
+        <div id="history-list" class="space-y-2 text-sm text-gray-700"></div>
+        <div class="flex justify-end mt-3">
+          <button id="history-close" class="px-3 py-2 border rounded">סגור</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+import { getFirestore, collection, query, where, onSnapshot, getDocs, addDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+import { doc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+const firebaseConfig = { /* ... */ };
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const ordersContainer = document.getElementById('orders-container');
+let orderCards = {}; // cache listeners per order
+let mainOrders = [];  // cache orders list
+
+/* load active orders (דוגמה פשוטה) */
+async function loadActiveOrders() {
+  ordersContainer.innerHTML = '<div class="text-gray-500">טוען...</div>';
+  try {
+    const q = query(collection(db,'orders'), orderBy('delivery_date','asc'));
+    const snap = await getDocs(q);
+    mainOrders = [];
+    snap.forEach(d => {
+      const o = d.data(); o._docId = d.id;
+      mainOrders.push(o);
+    });
+    renderOrders(mainOrders);
+    attachPerOrderListeners(mainOrders);
+  } catch (err) {
+    console.error(err);
+    ordersContainer.innerHTML = '<div class="text-red-500">שגיאה בטעינת הזמנות</div>';
+  }
+}
+
+/* render cards */
+function renderOrders(list) {
+  if (!list.length) { ordersContainer.innerHTML = '<div class="text-gray-500">אין הזמנות</div>'; return; }
+  ordersContainer.innerHTML = list.map(o => {
+    return `
+      <div class="order-card" data-docid="${o._docId}">
+        <div class="flex justify-between">
+          <div>
+            <div class="font-semibold">#${o.order_id || o._docId} — ${o.customer_name || '-'}</div>
+            <div class="text-sm text-gray-600">${o.customer_address || '-'}</div>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            <div class="text-xs text-gray-500">${o.delivery_date || '-'}</div>
+            <div>
+              <button class="px-2 py-1 text-sm border rounded btn-add-note" data-doc="${o._docId}">הוסף הערה</button>
+              <button class="px-2 py-1 text-sm border rounded btn-view-history" data-doc="${o._docId}">צפה בהיסטוריה</button>
+              <span class="ml-2 text-lg lamp-placeholder" data-doc="${o._docId}"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  // attach handlers
+  document.querySelectorAll('.btn-add-note').forEach(b => b.addEventListener('click', onAddNote));
+  document.querySelectorAll('.btn-view-history').forEach(b => b.addEventListener('click', onViewHistory));
+}
+
+/* per order listener for messages (מנורה מהבהבת) */
+function attachPerOrderListeners(orders) {
+  orders.forEach(o => {
+    const docId = o._docId;
+    if (orderCards[docId]) return; // already listening
+    const messagesRef = collection(db,'orders',docId,'messages');
+    const q = query(messagesRef, where('type','==','message_to_admin'), where('readByViewer','==', false), orderBy('timestamp','desc'));
+    const unsub = onSnapshot(q, snap => {
+      const lampEl = document.querySelector(`.lamp-placeholder[data-doc="${docId}"]`);
+      if (!lampEl) return;
+      if (!snap.empty) {
+        lampEl.innerHTML = '💡';
+        lampEl.classList.add('blink');
+      } else {
+        lampEl.innerHTML = '';
+        lampEl.classList.remove('blink');
+      }
+    }, err => console.error('order messages listen err', err));
+    orderCards[docId] = { unsub };
+  });
+}
+
+/* Add internal note (opens modal) */
+document.getElementById('btn-new-note').addEventListener('click', ()=> {
+  document.getElementById('note-modal').style.display = 'flex';
+});
+document.getElementById('note-cancel').addEventListener('click', ()=> document.getElementById('note-modal').style.display = 'none');
+document.getElementById('note-send').addEventListener('click', async ()=>{
+  const sender = document.getElementById('note-sender').value.trim() || 'סדרן';
+  const text = document.getElementById('note-text').value.trim();
+  if (!text) return alert('כתוב תוכן');
+  try {
+    // יצירת הערה כללית — כאן נניח שיש order id מוגדר ידנית (ניתן לשנות לפי בחירה)
+    const targetOrderId = mainOrders[0]?._docId;
+    if (!targetOrderId) { alert('אין הזמנה זמינה להוספת הערה'); return; }
+    await addDoc(collection(db,'orders',targetOrderId,'messages'), {
+      type: "internal_note",
+      text,
+      senderName: sender,
+      timestamp: serverTimestamp(),
+      readByViewer: true
+    });
+    alert('הערה נוצרה');
+    document.getElementById('note-modal').style.display = 'none';
+    document.getElementById('note-sender').value = '';
+    document.getElementById('note-text').value = '';
+  } catch (err) {
+    console.error(err); alert('שגיאה ביצירת הערה');
+  }
+});
+
+/* Add note for specific order (from card) */
+async function onAddNote(e) {
+  const docId = e.currentTarget.dataset.doc;
+  const sender = prompt('שם שולח (הצג):', 'סדרן') || 'סדרן';
+  const text = prompt('תוכן ההערה:');
+  if (!text) return;
+  try {
+    await addDoc(collection(db,'orders',docId,'messages'), {
+      type: "internal_note",
+      text,
+      senderName: sender,
+      timestamp: serverTimestamp(),
+      readByViewer: true
+    });
+    alert('הערה נשלחה');
+  } catch (err) {
+    console.error(err); alert('שגיאה');
+  }
+}
+
+/* view full history for an order — פותח מודל ומציג כל ההודעות מכל הסוגים */
+async function onViewHistory(e) {
+  const docId = e.currentTarget.dataset.doc;
+  const histList = document.getElementById('history-list');
+  histList.innerHTML = 'טוען...';
+  try {
+    const q = query(collection(db,'orders',docId,'messages'), orderBy('timestamp','asc'));
+    const snap = await getDocs(q);
+    if (snap.empty) { histList.innerHTML = '<div class="text-gray-500">אין היסטוריה</div>'; }
+    else {
+      const html = [];
+      snap.forEach(ds => {
+        const d = ds.data();
+        const time = d.timestamp ? new Date(d.timestamp.seconds*1000).toLocaleString() : '-';
+        html.push(`<div class="p-2 border-b"><div class="font-semibold">${d.senderName || '-' } • <span class="text-xs text-gray-500">${time}</span></div><div class="text-sm">${d.text}</div><div class="text-xs text-gray-400">${d.type}</div></div>`);
+      });
+      histList.innerHTML = html.join('');
+    }
+    document.getElementById('history-modal').style.display = 'flex';
+  } catch (err) {
+    console.error(err); histList.innerHTML = '<div class="text-red-500">שגיאה בטעינה</div>';
+  }
+}
+
+document.getElementById('history-close').addEventListener('click', ()=> document.getElementById('history-modal').style.display = 'none');
+
+/* init */
+loadActiveOrders();
+
+</script>
+</body>
+</html>
