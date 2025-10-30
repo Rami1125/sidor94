@@ -70,14 +70,17 @@ body{font-family:Inter,system-ui,Arial;background:#f3f4f6}
 <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 hidden bg-black text-white px-4 py-2 rounded"></div>
 
 <script type="module">
-/* Admin app — Firebase v9 modular */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-import { getFirestore, collection, query, where, onSnapshot, getDocs, addDoc, serverTimestamp, doc, writeBatch, updateDoc, collectionGroup, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        // --- Inlined Firebase SDK Imports ---
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, where, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
+        import { serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
 
-const firebaseConfig = {
-  // <-- החלף בקונפיג שלך -->
-  apiKey: "AIza...","authDomain":"...",projectId:"..."
-};
+        // --- Inlined Config Logic ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
+          storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
+        };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
