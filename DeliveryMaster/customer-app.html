@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>DeliveryMaster — Customer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+<style>
+body{font-family:Inter,system-ui,Arial;background:#f3f4f6}
+#notification-banner{position:fixed;top:-120px;left:50%;transform:translateX(-50%);width:95%;max-width:700px;z-index:50}
+</style>
+</head>
+<body class="p-4">
+
+<header class="mb-4">
+  <h1 class="text-xl font-bold">מעקב הזמנה</h1>
+  <p id="order-header" class="text-sm text-gray-600">טוען...</p>
+</header>
+
+<main id="app" class="max-w-2xl mx-auto bg-white p-4 rounded shadow hidden">
+  <section id="order-details" class="mb-4">
+    <div><strong>מספר הזמנה:</strong> <span id="order-id">-</span></div>
+    <div><strong>לקוח:</strong> <span id="customer-name">-</span></div>
+    <div><strong>כתובת:</strong> <span id="customer-address">-</span></div>
+  </section>
+
+  <!-- notification banner will slide down when admin sends notification_to_customer -->
+  <div id="notification-banner" class="bg-green-600 text-white p-3 rounded shadow hidden">
+    <div id="notification-text" class="font-medium"></div>
+  </div>
+
+  <section>
+    <h3 class="font-semibold mb-2">שלח הודעה למנהל</h3>
+    <textarea id="customer-message" rows="4" class="w-full border rounded p-2" placeholder="כתוב את ההודעה כאן..."></textarea>
+    <div class="flex gap-2 mt-2">
+      <button id="send-message" class="px-4 py-2 bg-blue-600 text-white rounded">שלח הודעה למנהל</button>
+      <button id="share-ws" class="px-4 py-2 bg-green-600 text-white rounded">שתף בוואטסאפ</button>
+    </div>
+  </section>
+</main>
+
+<div id="loading" class="p-8 text-center"><i class="fas fa-spinner fa-spin mr-2"></i> טוען הזמנה...</div>
+<div id="error" class="hidden text-red-600 p-4"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+import { getFirestore, collection, query, where, limit, getDocs, onSnapshot, addDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  // החלף בקונפיג שלך
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const params = new URLSearchParams(window.location.search);
+const idFromUrl = params.get('id'); // value like 6715504 (order_id field)
+if (!idFromUrl) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error').innerText = 'Missing order id in URL (?id=...)';
+  document.getElementById('error').classList.remove('hidden');
+}
+
+let orderData = null;
+let orderDocId = null;
+let unsubOrder = null;
+let unsubMessages = null;
+
+/* 1) Query orders where order_id == idFromUrl (NOT getDoc by id) */
+async function findOrder() {
+  try {
+    document.getElementById('loading').style.display = '';
+    const q = query(collection(db, 'orders'), where('order_id', '==', idFromUrl), limit(1));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      showError(`ההזמנה ${idFromUrl} לא נמצאה.`);
+      return;
+    }
+    const docSnap = snap.docs[0];
+    orderData = docSnap.data();
+    orderDocId = docSnap.id;
+    populateOrder();
+    startOrderListener(orderDocId);
+    startMessagesListener(orderDocId);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').classList.remove('hidden');
+  } catch (err) {
+    console.error('findOrder err', err);
+    showError('שגיאה בטעינת ההזמנה');
+  }
+}
+
+/* populate */
+function populateOrder(){
+  document.getElementById('order-id').innerText = orderData.order_id || orderDocId;
+  document.getElementById('customer-name').innerText = orderData.customer_name || '-';
+  document.getElementById('customer-address').innerText = orderData.customer_address || '-';
+  document.getElementById('order-header').innerText = `הזמנה מס' ${orderData.order_id || orderDocId}`;
+}
+
+/* listen for order changes (status etc) */
+function startOrderListener(docId){
+  if (unsubOrder) unsubOrder();
+  const ref = collection(db, 'orders');
+  // using onSnapshot on the doc
+  const docRef = doc(db, 'orders', docId);
+  unsubOrder = onSnapshot(docRef, ds => {
+    if (ds.exists()){
+      orderData = ds.data();
+      populateOrder();
+    }
+  }, err => console.error('order listener err', err));
+}
+
+/* listen for messages in orders/{orderId}/messages and show notification_to_customer */
+import { doc, collection as coll, query as fq, where as fw, orderBy as forderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+function startMessagesListener(docId){
+  if (unsubMessages) unsubMessages();
+  const messagesRef = collection(db, 'orders', docId, 'messages');
+  const q = query(messagesRef, orderBy('timestamp','asc'));
+  unsubMessages = onSnapshot(q, snap => {
+    snap.docChanges().forEach(ch => {
+      if (ch.type === 'added') {
+        const m = ch.doc.data();
+        if (m.type === 'notification_to_customer') {
+          showNotificationBanner(m.text || 'עדכון חדש');
+        }
+      }
+    });
+  }, err => console.error('messages listen err', err));
+}
+
+/* show banner */
+function showNotificationBanner(text){
+  const banner = document.getElementById('notification-banner');
+  const txt = document.getElementById('notification-text');
+  txt.innerText = text;
+  banner.classList.remove('hidden');
+  banner.style.top = '20px';
+  setTimeout(()=> { banner.style.top = '-120px'; }, 7000);
+}
+
+/* send message to admin: create doc in orders/{orderId}/messages with readByViewer:false */
+document.getElementById('send-message').addEventListener('click', async ()=>{
+  const txt = document.getElementById('customer-message').value.trim();
+  if (!txt) return alert('כתוב הודעה');
+  if (!orderDocId) return alert('פרטי הזמנה חסרים');
+  try {
+    const messagesRef = collection(db, 'orders', orderDocId, 'messages');
+    await addDoc(messagesRef, {
+      type: "message_to_admin",
+      text: txt,
+      senderName: orderData.customer_name || 'לקוח',
+      timestamp: serverTimestamp(),
+      readByViewer: false
+    });
+    alert('נשלח למנהל');
+    document.getElementById('customer-message').value = '';
+  } catch (err) {
+    console.error(err);
+    alert('שגיאה בשליחת ההודעה');
+  }
+});
+
+/* share to whatsapp */
+document.getElementById('share-ws').addEventListener('click', ()=>{
+  const phone = "972508860896"; // your number
+  const body = `הזמנה ${orderData?.order_id || orderDocId}\nשם: ${orderData?.customer_name || '-'}\nכתובת: ${orderData?.customer_address || '-'}\n\n`;
+  const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(body)}`;
+  window.open(url,'_blank');
+});
+
+function showError(msg){
+  document.getElementById('loading').style.display = 'none';
+  const err = document.getElementById('error');
+  err.innerText = msg;
+  err.classList.remove('hidden');
+}
+
+/* start */
+await findOrder();
+
+</script>
+</body>
+</html>
