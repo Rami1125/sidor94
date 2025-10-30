@@ -57,12 +57,12 @@ body{font-family:Inter,system-ui;background:#f3f4f6}
   </aside>
 </main>
 
-<script type="module">
+    <script type="module">
         // --- Inlined Firebase SDK Imports ---
         import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, where, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
-        import { serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
+        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, serverTimestamp, deleteDoc, arrayUnion, where, getDocs } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; // Added arrayUnion, where, getDocs
+        import { getFunctions } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-functions.js";
 
         // --- Inlined Config Logic ---
         const firebaseConfig = {
