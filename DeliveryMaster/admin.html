@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>DeliveryMaster — Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+<style>
+/* קטן — עיצוב בסיסי */
+body{font-family:Inter,system-ui,Arial;background:#f3f4f6}
+.badge{background:#ef4444;color:white;padding:0.125rem 0.5rem;border-radius:999px;font-weight:700}
+.bell {position:relative}
+.bell .count{position:absolute; top:-6px; left:-6px; background:#ef4444;color:white;border-radius:999px;padding:2px 6px;font-size:12px}
+.message-row{border-bottom:1px solid #e5e7eb;padding:0.5rem}
+</style>
+</head>
+<body class="p-4">
+
+<header class="flex justify-between items-center mb-4">
+  <h1 class="text-xl font-bold">DeliveryMaster — ניהול</h1>
+  <div class="flex items-center gap-4">
+    <div class="bell" title="הודעות מלקוחות">
+      <i class="fas fa-bell fa-2x"></i>
+      <span id="unread-count" class="count hidden">0</span>
+    </div>
+    <button id="btn-refresh" class="px-3 py-2 bg-blue-600 text-white rounded">רענן</button>
+  </div>
+</header>
+
+<main class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <!-- Orders list / מרכזי -->
+  <section id="orders-section" class="col-span-2 bg-white p-4 rounded shadow">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="font-semibold">הזמנות (לוח ניהול)</h2>
+      <input id="search-order" type="text" placeholder="חפש לפי מס' הזמנה או כתובת" class="border rounded p-2 w-64" />
+    </div>
+    <div id="orders-list" class="space-y-2 max-h-[60vh] overflow-y-auto">
+      <!-- כרטיסי הזמנות יתמלאו כאן -->
+      <div class="text-gray-500 p-4">טוען הזמנות...</div>
+    </div>
+  </section>
+
+  <!-- Messages / תצוגה -->
+  <aside id="messages-panel" class="bg-white p-4 rounded shadow">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="font-semibold">הודעות מלקוחות</h3>
+      <button id="btn-mark-all" class="text-sm text-gray-600">סמן נקראו</button>
+    </div>
+    <div id="messages-list" class="max-h-[55vh] overflow-y-auto">
+      <div class="text-gray-500">טוען הודעות...</div>
+    </div>
+  </aside>
+</main>
+
+<!-- Modals -->
+<div id="reply-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded p-4 w-[520px] shadow">
+    <h4 class="font-semibold mb-2">שלח תשובה ללקוח</h4>
+    <div id="reply-context" class="text-sm text-gray-600 mb-2"></div>
+    <textarea id="reply-text" class="w-full border rounded p-2 mb-3" rows="4" placeholder="תוכן ההודעה..."></textarea>
+    <div class="flex justify-end gap-2">
+      <button id="reply-cancel" class="px-3 py-2 border rounded">ביטול</button>
+      <button id="reply-send" class="px-3 py-2 bg-green-600 text-white rounded">שלח</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 hidden bg-black text-white px-4 py-2 rounded"></div>
+
+<script type="module">
+/* Admin app — Firebase v9 modular */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+import { getFirestore, collection, query, where, onSnapshot, getDocs, addDoc, serverTimestamp, doc, writeBatch, updateDoc, collectionGroup, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  // <-- החלף בקונפיג שלך -->
+  apiKey: "AIza...","authDomain":"...",projectId:"..."
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* UI */
+const ordersListEl = document.getElementById('orders-list');
+const messagesListEl = document.getElementById('messages-list');
+const unreadCountEl = document.getElementById('unread-count');
+const replyModal = document.getElementById('reply-modal');
+const replyText = document.getElementById('reply-text');
+const replyContext = document.getElementById('reply-context');
+const toastEl = document.getElementById('toast');
+
+let unreadCount = 0;
+let lastMessages = []; // cache
+let selectedMsg = null;
+
+/* 1) CollectionGroup listener — קולט הודעות מסוג message_to_admin שלא נקראו */
+function startMessagesListener() {
+  // Collection group query: messages where type == "message_to_admin" AND readByViewer == false
+  const q = query(
+    collectionGroup(db, 'messages'),
+    where('type', '==', 'message_to_admin'),
+    where('readByViewer', '==', false),
+    orderBy('timestamp', 'desc'),
+    limit(200)
+  );
+
+  onSnapshot(q, snap => {
+    const arr = [];
+    snap.forEach(docSnap => {
+      const d = docSnap.data();
+      arr.push({ id: docSnap.id, ref: docSnap.ref, ...d });
+    });
+    lastMessages = arr;
+    renderMessages(arr);
+    unreadCount = arr.length;
+    updateUnreadBadge();
+  }, err => {
+    console.error('messages listener error', err);
+    showToast('שגיאה בהאזנה להודעות');
+  });
+}
+
+/* render messages list */
+function renderMessages(msgs) {
+  if (!msgs || msgs.length === 0) {
+    messagesListEl.innerHTML = '<div class="text-gray-500">אין הודעות חדשות.</div>';
+    return;
+  }
+  messagesListEl.innerHTML = msgs.map(m => {
+    const time = m.timestamp ? (new Date(m.timestamp.seconds*1000)).toLocaleString() : '-';
+    // extract order id from ref path: orders/{docId}/messages/{msgId}
+    const pathParts = m.ref.path.split('/');
+    const parentOrderDocId = pathParts[1] || '';
+    return `
+      <div class="message-row" data-msgid="${m.ref.path}">
+        <div class="flex justify-between items-start">
+          <div>
+            <div class="font-semibold">${m.senderName || 'לקוח'}</div>
+            <div class="text-sm text-gray-600">${m.text}</div>
+            <div class="text-xs text-gray-400 mt-1">הזמנה: ${m.order_id || m.orderId || parentOrderDocId} • ${time}</div>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            <button class="px-2 py-1 text-sm border rounded btn-reply" data-path="${m.ref.path}">שלח תשובה</button>
+            <button class="px-2 py-1 text-sm border rounded btn-mark" data-path="${m.ref.path}">סימן נקרא</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  // attach listeners
+  messagesListEl.querySelectorAll('.btn-reply').forEach(b => b.addEventListener('click', onReplyClick));
+  messagesListEl.querySelectorAll('.btn-mark').forEach(b => b.addEventListener('click', onMarkClick));
+}
+
+/* update unread badge */
+function updateUnreadBadge() {
+  if (unreadCount > 0) {
+    unreadCountEl.innerText = unreadCount;
+    unreadCountEl.classList.remove('hidden');
+  } else {
+    unreadCountEl.classList.add('hidden');
+  }
+}
+
+/* reply flow — open modal */
+async function onReplyClick(e) {
+  const path = e.currentTarget.dataset.path; // full doc path
+  selectedMsg = path;
+  // try to extract parent order id from path and show context
+  const parts = path.split('/');
+  const orderDocId = parts[1] || '';
+  replyContext.innerText = `תשובה עבור הזמנה: ${orderDocId}`;
+  replyText.value = '';
+  replyModal.style.display = 'flex';
+}
+
+/* mark single message as read */
+async function onMarkClick(e) {
+  const path = e.currentTarget.dataset.path;
+  try {
+    const msgRef = doc(db, ...path.split('/'));
+    await updateDoc(msgRef, { readByViewer: true });
+    showToast('סומן נקרא');
+  } catch (err) {
+    console.error(err);
+    showToast('שגיאה בסימון נקרא');
+  }
+}
+
+/* modal buttons */
+document.getElementById('reply-cancel').addEventListener('click', () => replyModal.style.display = 'none');
+document.getElementById('reply-send').addEventListener('click', async () => {
+  const text = replyText.value.trim();
+  if (!text || !selectedMsg) { showToast('כתוב תוכן לפני שליחה'); return; }
+  // selectedMsg path like: orders/{docId}/messages/{msgId}
+  const parts = selectedMsg.split('/');
+  const orderDocId = parts[1];
+  const originalMsgRef = doc(db, ...selectedMsg.split('/'));
+  const messagesColRef = collection(db, 'orders', orderDocId, 'messages');
+
+  try {
+    // writeBatch: update original readByViewer true + add notification_to_customer
+    const batch = writeBatch(db);
+    batch.update(originalMsgRef, { readByViewer: true });
+    const newDocRef = doc(messagesColRef); // auto id
+    batch.set(newDocRef, {
+      type: "notification_to_customer",
+      text: text,
+      senderName: "שירות לקוחות",
+      timestamp: serverTimestamp(),
+      readByViewer: true
+    });
+    await batch.commit();
+    showToast('התראה נשלחה ללקוח');
+    replyModal.style.display = 'none';
+  } catch (err) {
+    console.error('reply send error', err);
+    showToast('שגיאה בשליחת התשובה');
+  }
+});
+
+/* mark all as read (במחיקה / עדכון) */
+document.getElementById('btn-mark-all').addEventListener('click', async () => {
+  if (!confirm('האם לסמן את כל ההודעות שנמצאו כנקראות?')) return;
+  try {
+    // נעדכן כל המסמכים האחרונים ברשימת lastMessages
+    const batch = writeBatch(db);
+    lastMessages.forEach(m => batch.update(doc(db, ...m.ref.path.split('/')), { readByViewer: true }));
+    await batch.commit();
+    showToast('הודעות נסומנו נקראות');
+  } catch (err) {
+    console.error(err);
+    showToast('שגיאה בסימון הכל');
+  }
+});
+
+/* small toast helper */
+function showToast(msg, timeout=3000){
+  toastEl.innerText = msg;
+  toastEl.classList.remove('hidden');
+  setTimeout(()=>toastEl.classList.add('hidden'), timeout);
+}
+
+/* Orders list: פשוט דוגמה להעלאת רשימת ההזמנות (חלקי) */
+async function loadOrders() {
+  ordersListEl.innerHTML = '<div class="text-gray-500">טוען...</div>';
+  try {
+    // קח חלק קטן מהמסמכים (למטרת הדגמה)
+    const q = query(collection(db, 'orders'), limit(80));
+    const snap = await getDocs(q);
+    if (snap.empty) { ordersListEl.innerHTML = '<div class="text-gray-500">אין הזמנות.</div>'; return; }
+    const html = [];
+    snap.forEach(docSnap => {
+      const o = docSnap.data();
+      const id = docSnap.id;
+      html.push(`
+        <div class="p-3 border rounded flex justify-between items-start">
+          <div>
+            <div class="font-semibold">#${o.order_id || id} — ${o.customer_name || '-'}</div>
+            <div class="text-sm text-gray-600">${o.customer_address || '-'}</div>
+          </div>
+          <div class="flex flex-col gap-2">
+            <button class="px-2 py-1 text-sm border rounded" onclick="openOrderDetail('${id}')">פתח</button>
+            <button class="px-2 py-1 text-sm border rounded" onclick="copyCustomerLink('${o.order_id || id}')">העתק לינק</button>
+          </div>
+        </div>
+      `);
+    });
+    ordersListEl.innerHTML = html.join('');
+  } catch (err) {
+    console.error('load orders error', err);
+    ordersListEl.innerHTML = '<div class="text-red-500">שגיאה בטעינת הזמנות</div>';
+  }
+}
+
+/* open order detail (placeholder) */
+window.openOrderDetail = (docId) => {
+  alert('פתח פרטי הזמנה: ' + docId);
+};
+
+/* copy customer link: note — must build link that customer-app expects ?id=order_id (value) */
+window.copyCustomerLink = (orderIdValue) => {
+  const url = new URL(window.location.href);
+  url.pathname = url.pathname.replace(/admin\.html$/,'customer-app.html'); // assume same folder
+  url.search = '?id=' + encodeURIComponent(orderIdValue);
+  navigator.clipboard.writeText(url.href).then(()=> showToast('קישור הועתק'));
+};
+
+/* init */
+startMessagesListener();
+loadOrders();
+document.getElementById('btn-refresh').addEventListener('click', ()=>{ loadOrders(); startMessagesListener(); });
+
+</script>
+</body>
+</html>
