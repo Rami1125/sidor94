@@ -105,21 +105,47 @@ let selectedMsg = null;
 
 /* 1) CollectionGroup listener — קולט הודעות מסוג message_to_admin שלא נקראו */
 function startMessagesListener() {
-  // Collection group query: messages where type == "message_to_admin" AND readByViewer == false
-  const q = query(
-    collectionGroup(db, 'messages'),
-    where('type', '==', 'message_to_admin'),
-    where('readByViewer', '==', false),
-    orderBy('timestamp', 'desc'),
-    limit(200)
-  );
+  try {
+    // יוצרים שאילתת collectionGroup: מאזינה לכל הודעה באוסף-בן בשם 'messages'
+    const q = query(
+      collectionGroup(db, 'messages'),
+      where('type', '==', 'message_to_admin'),
+      where('readByViewer', '==', false),
+      orderBy('timestamp', 'desc'),
+      limit(200)
+    );
 
-  onSnapshot(q, snap => {
-    const arr = [];
-    snap.forEach(docSnap => {
-      const d = docSnap.data();
-      arr.push({ id: docSnap.id, ref: docSnap.ref, ...d });
-    });
+    // מאזין בזמן אמת לשינויים
+    onSnapshot(
+      q,
+      (snapshot) => {
+        const messages = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          messages.push({
+            id: docSnap.id,
+            ref: docSnap.ref,
+            ...data,
+          });
+        });
+
+        // כאן נקרא לפונקציה שמעדכנת את התצוגה
+        renderMessages(messages);
+        unreadCount = messages.length;
+        updateUnreadBadge();
+      },
+      (error) => {
+        console.error('🔥 שגיאה בהאזנה להודעות:', error);
+        showToast('שגיאה בהאזנה להודעות מהלקוחות');
+      }
+    );
+  } catch (err) {
+    console.error('❌ startMessagesListener() error:', err);
+    showToast('שגיאה באתחול ההאזנה להודעות');
+  }
+}
+
+      });
     lastMessages = arr;
     renderMessages(arr);
     unreadCount = arr.length;
