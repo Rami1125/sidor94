@@ -77,10 +77,16 @@ body{font-family:Inter,system-ui,Arial;background:#f3f4f6}
         import { serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
 
         // --- Inlined Config Logic ---
-        const firebaseConfig = {
-          apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo", authDomain: "saban94-78949.firebaseapp.com", projectId: "saban94-78949",
-          storageBucket: "saban94-78949.firebasestorage.app", messagingSenderId: "41553157903", appId: "1:41553157903:web:cc33d252cff023be97a87a", measurementId: "G-XV6RZDESSB"
-        };
+const firebaseConfig = {
+  apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
+  authDomain: "saban94-78949.firebaseapp.com",
+  projectId: "saban94-78949",
+  storageBucket: "saban94-78949.firebasestorage.app",
+  messagingSenderId: "41553157903",
+  appId: "1:41553157903:web:106e1f94182bde5b97a87a",
+  measurementId: "G-10YE9W962M"
+};
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
