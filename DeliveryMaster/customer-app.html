@@ -50,7 +50,7 @@ body{font-family:Inter,system-ui,Arial;background:#f3f4f6}
         import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, where, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
         import { serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
 
-        // --- Inlined Config Logic ---
+// ✅ קונפיג שלך
 const firebaseConfig = {
   apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
   authDomain: "saban94-78949.firebaseapp.com",
@@ -60,7 +60,6 @@ const firebaseConfig = {
   appId: "1:41553157903:web:106e1f94182bde5b97a87a",
   measurementId: "G-10YE9W962M"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
