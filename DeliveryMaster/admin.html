@@ -7,7 +7,6 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
 <style>
-/* קטן — עיצוב בסיסי */
 body{font-family:Inter,system-ui,Arial;background:#f3f4f6}
 .badge{background:#ef4444;color:white;padding:0.125rem 0.5rem;border-radius:999px;font-weight:700}
 .bell {position:relative}
@@ -29,19 +28,16 @@ body{font-family:Inter,system-ui,Arial;background:#f3f4f6}
 </header>
 
 <main class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-  <!-- Orders list / מרכזי -->
   <section id="orders-section" class="col-span-2 bg-white p-4 rounded shadow">
     <div class="flex justify-between items-center mb-3">
       <h2 class="font-semibold">הזמנות (לוח ניהול)</h2>
       <input id="search-order" type="text" placeholder="חפש לפי מס' הזמנה או כתובת" class="border rounded p-2 w-64" />
     </div>
     <div id="orders-list" class="space-y-2 max-h-[60vh] overflow-y-auto">
-      <!-- כרטיסי הזמנות יתמלאו כאן -->
       <div class="text-gray-500 p-4">טוען הזמנות...</div>
     </div>
   </section>
 
-  <!-- Messages / תצוגה -->
   <aside id="messages-panel" class="bg-white p-4 rounded shadow">
     <div class="flex justify-between items-center mb-3">
       <h3 class="font-semibold">הודעות מלקוחות</h3>
@@ -53,7 +49,7 @@ body{font-family:Inter,system-ui,Arial;background:#f3f4f6}
   </aside>
 </main>
 
-<!-- Modals -->
+<!-- Reply Modal -->
 <div id="reply-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
   <div class="bg-white rounded p-4 w-[520px] shadow">
     <h4 class="font-semibold mb-2">שלח תשובה ללקוח</h4>
@@ -70,13 +66,25 @@ body{font-family:Inter,system-ui,Arial;background:#f3f4f6}
 <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 hidden bg-black text-white px-4 py-2 rounded"></div>
 
 <script type="module">
-        // --- Inlined Firebase SDK Imports ---
-        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
-        import { getFirestore, collection, doc, onSnapshot, query, orderBy, addDoc, where, limit } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
-        import { serverTimestamp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js"; 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  collectionGroup,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+  doc,
+  writeBatch,
+  updateDoc
+} from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
 
-        // --- Inlined Config Logic ---
+// ✅ קונפיג שלך
 const firebaseConfig = {
   apiKey: "AIzaSyDq0oVwS6zbEfsgrYBRkeBq80dDUKMedzo",
   authDomain: "saban94-78949.firebaseapp.com",
@@ -90,7 +98,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* UI */
+// DOM references
 const ordersListEl = document.getElementById('orders-list');
 const messagesListEl = document.getElementById('messages-list');
 const unreadCountEl = document.getElementById('unread-count');
@@ -100,13 +108,12 @@ const replyContext = document.getElementById('reply-context');
 const toastEl = document.getElementById('toast');
 
 let unreadCount = 0;
-let lastMessages = []; // cache
+let lastMessages = [];
 let selectedMsg = null;
 
-/* 1) CollectionGroup listener — קולט הודעות מסוג message_to_admin שלא נקראו */
+/* ✅ מאזין לכל הודעות הלקוחות שלא נקראו */
 function startMessagesListener() {
   try {
-    // יוצרים שאילתת collectionGroup: מאזינה לכל הודעה באוסף-בן בשם 'messages'
     const q = query(
       collectionGroup(db, 'messages'),
       where('type', '==', 'message_to_admin'),
@@ -115,80 +122,58 @@ function startMessagesListener() {
       limit(200)
     );
 
-    // מאזין בזמן אמת לשינויים
-    onSnapshot(
-      q,
-      (snapshot) => {
-        const messages = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          messages.push({
-            id: docSnap.id,
-            ref: docSnap.ref,
-            ...data,
-          });
-        });
-
-        // כאן נקרא לפונקציה שמעדכנת את התצוגה
-        renderMessages(messages);
-        unreadCount = messages.length;
-        updateUnreadBadge();
-      },
-      (error) => {
-        console.error('🔥 שגיאה בהאזנה להודעות:', error);
-        showToast('שגיאה בהאזנה להודעות מהלקוחות');
-      }
-    );
+    onSnapshot(q, (snap) => {
+      const arr = [];
+      snap.forEach(docSnap => {
+        const d = docSnap.data();
+        arr.push({ id: docSnap.id, ref: docSnap.ref, ...d });
+      });
+      lastMessages = arr;
+      renderMessages(arr);
+      unreadCount = arr.length;
+      updateUnreadBadge();
+    }, (err) => {
+      console.error('messages listener error', err);
+      showToast('שגיאה בהאזנה להודעות');
+    });
   } catch (err) {
-    console.error('❌ startMessagesListener() error:', err);
-    showToast('שגיאה באתחול ההאזנה להודעות');
+    console.error('startMessagesListener error', err);
+    showToast('שגיאה באתחול ההאזנה');
   }
 }
 
-      });
-    lastMessages = arr;
-    renderMessages(arr);
-    unreadCount = arr.length;
-    updateUnreadBadge();
-  }, err => {
-    console.error('messages listener error', err);
-    showToast('שגיאה בהאזנה להודעות');
-  });
-}
-
-/* render messages list */
+/* ✅ הצגת הודעות */
 function renderMessages(msgs) {
   if (!msgs || msgs.length === 0) {
     messagesListEl.innerHTML = '<div class="text-gray-500">אין הודעות חדשות.</div>';
     return;
   }
   messagesListEl.innerHTML = msgs.map(m => {
-    const time = m.timestamp ? (new Date(m.timestamp.seconds*1000)).toLocaleString() : '-';
-    // extract order id from ref path: orders/{docId}/messages/{msgId}
+    const time = m.timestamp?.seconds ? new Date(m.timestamp.seconds * 1000).toLocaleString() : '-';
     const pathParts = m.ref.path.split('/');
-    const parentOrderDocId = pathParts[1] || '';
+    const orderDocId = pathParts[1] || '';
     return `
-      <div class="message-row" data-msgid="${m.ref.path}">
+      <div class="message-row" data-path="${m.ref.path}">
         <div class="flex justify-between items-start">
           <div>
             <div class="font-semibold">${m.senderName || 'לקוח'}</div>
             <div class="text-sm text-gray-600">${m.text}</div>
-            <div class="text-xs text-gray-400 mt-1">הזמנה: ${m.order_id || m.orderId || parentOrderDocId} • ${time}</div>
+            <div class="text-xs text-gray-400 mt-1">הזמנה: ${m.order_id || orderDocId} • ${time}</div>
           </div>
           <div class="flex flex-col items-end gap-2">
             <button class="px-2 py-1 text-sm border rounded btn-reply" data-path="${m.ref.path}">שלח תשובה</button>
-            <button class="px-2 py-1 text-sm border rounded btn-mark" data-path="${m.ref.path}">סימן נקרא</button>
+            <button class="px-2 py-1 text-sm border rounded btn-mark" data-path="${m.ref.path}">סמן נקרא</button>
           </div>
         </div>
       </div>
     `;
   }).join('');
-  // attach listeners
-  messagesListEl.querySelectorAll('.btn-reply').forEach(b => b.addEventListener('click', onReplyClick));
-  messagesListEl.querySelectorAll('.btn-mark').forEach(b => b.addEventListener('click', onMarkClick));
+
+  document.querySelectorAll('.btn-reply').forEach(b => b.addEventListener('click', onReplyClick));
+  document.querySelectorAll('.btn-mark').forEach(b => b.addEventListener('click', onMarkClick));
 }
 
-/* update unread badge */
+/* ✅ עדכון מונה פעמון */
 function updateUnreadBadge() {
   if (unreadCount > 0) {
     unreadCountEl.innerText = unreadCount;
@@ -198,11 +183,10 @@ function updateUnreadBadge() {
   }
 }
 
-/* reply flow — open modal */
-async function onReplyClick(e) {
-  const path = e.currentTarget.dataset.path; // full doc path
+/* ✅ פתיחת חלון תשובה */
+function onReplyClick(e) {
+  const path = e.currentTarget.dataset.path;
   selectedMsg = path;
-  // try to extract parent order id from path and show context
   const parts = path.split('/');
   const orderDocId = parts[1] || '';
   replyContext.innerText = `תשובה עבור הזמנה: ${orderDocId}`;
@@ -210,7 +194,7 @@ async function onReplyClick(e) {
   replyModal.style.display = 'flex';
 }
 
-/* mark single message as read */
+/* ✅ סימון הודעה כנקראה */
 async function onMarkClick(e) {
   const path = e.currentTarget.dataset.path;
   try {
@@ -223,22 +207,20 @@ async function onMarkClick(e) {
   }
 }
 
-/* modal buttons */
 document.getElementById('reply-cancel').addEventListener('click', () => replyModal.style.display = 'none');
 document.getElementById('reply-send').addEventListener('click', async () => {
   const text = replyText.value.trim();
-  if (!text || !selectedMsg) { showToast('כתוב תוכן לפני שליחה'); return; }
-  // selectedMsg path like: orders/{docId}/messages/{msgId}
+  if (!text || !selectedMsg) return showToast('כתוב תוכן לפני שליחה');
+
   const parts = selectedMsg.split('/');
   const orderDocId = parts[1];
   const originalMsgRef = doc(db, ...selectedMsg.split('/'));
   const messagesColRef = collection(db, 'orders', orderDocId, 'messages');
 
   try {
-    // writeBatch: update original readByViewer true + add notification_to_customer
     const batch = writeBatch(db);
     batch.update(originalMsgRef, { readByViewer: true });
-    const newDocRef = doc(messagesColRef); // auto id
+    const newDocRef = doc(messagesColRef);
     batch.set(newDocRef, {
       type: "notification_to_customer",
       text: text,
@@ -255,36 +237,37 @@ document.getElementById('reply-send').addEventListener('click', async () => {
   }
 });
 
-/* mark all as read (במחיקה / עדכון) */
+/* ✅ סימון כל ההודעות כנקראו */
 document.getElementById('btn-mark-all').addEventListener('click', async () => {
-  if (!confirm('האם לסמן את כל ההודעות שנמצאו כנקראות?')) return;
+  if (!confirm('לסמן את כל ההודעות כנקראו?')) return;
   try {
-    // נעדכן כל המסמכים האחרונים ברשימת lastMessages
     const batch = writeBatch(db);
     lastMessages.forEach(m => batch.update(doc(db, ...m.ref.path.split('/')), { readByViewer: true }));
     await batch.commit();
-    showToast('הודעות נסומנו נקראות');
+    showToast('כל ההודעות סומנו כנקראו');
   } catch (err) {
     console.error(err);
-    showToast('שגיאה בסימון הכל');
+    showToast('שגיאה בסימון הכול');
   }
 });
 
-/* small toast helper */
+/* ✅ Toast */
 function showToast(msg, timeout=3000){
   toastEl.innerText = msg;
   toastEl.classList.remove('hidden');
   setTimeout(()=>toastEl.classList.add('hidden'), timeout);
 }
 
-/* Orders list: פשוט דוגמה להעלאת רשימת ההזמנות (חלקי) */
+/* ✅ טעינת הזמנות */
 async function loadOrders() {
   ordersListEl.innerHTML = '<div class="text-gray-500">טוען...</div>';
   try {
-    // קח חלק קטן מהמסמכים (למטרת הדגמה)
     const q = query(collection(db, 'orders'), limit(80));
     const snap = await getDocs(q);
-    if (snap.empty) { ordersListEl.innerHTML = '<div class="text-gray-500">אין הזמנות.</div>'; return; }
+    if (snap.empty) {
+      ordersListEl.innerHTML = '<div class="text-gray-500">אין הזמנות.</div>';
+      return;
+    }
     const html = [];
     snap.forEach(docSnap => {
       const o = docSnap.data();
@@ -309,24 +292,21 @@ async function loadOrders() {
   }
 }
 
-/* open order detail (placeholder) */
-window.openOrderDetail = (docId) => {
-  alert('פתח פרטי הזמנה: ' + docId);
-};
-
-/* copy customer link: note — must build link that customer-app expects ?id=order_id (value) */
+window.openOrderDetail = (docId) => alert('פתח פרטי הזמנה: ' + docId);
 window.copyCustomerLink = (orderIdValue) => {
   const url = new URL(window.location.href);
-  url.pathname = url.pathname.replace(/admin\.html$/,'customer-app.html'); // assume same folder
+  url.pathname = url.pathname.replace(/admin\.html$/, 'customer-app.html');
   url.search = '?id=' + encodeURIComponent(orderIdValue);
   navigator.clipboard.writeText(url.href).then(()=> showToast('קישור הועתק'));
 };
 
-/* init */
+/* ✅ אתחול */
 startMessagesListener();
 loadOrders();
-document.getElementById('btn-refresh').addEventListener('click', ()=>{ loadOrders(); startMessagesListener(); });
-
+document.getElementById('btn-refresh').addEventListener('click', () => {
+  loadOrders();
+  startMessagesListener();
+});
 </script>
 </body>
 </html>
