@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת ניהול הזמנות ח. סבן</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Rubik', sans-serif;
+        }
+        .simulation-window {
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1), 0 5px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s ease-in-out;
+        }
+        .simulation-window:hover {
+            transform: translateY(-5px);
+        }
+        .step-bubble {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+        .phone-mockup {
+            width: 320px;
+            height: 600px;
+            border: 12px solid #333;
+            border-radius: 40px;
+            background: #f8f9fa;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .dashboard-mockup {
+            width: 100%;
+            border: 8px solid #a0aec0;
+            border-radius: 12px;
+            background: #f8f9fa;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-10">
+
+    <div class="max-w-6xl mx-auto bg-white rounded-xl shadow-2xl p-6 md:p-10">
+        
+        <!-- כותרת והקדמה להראל -->
+        <div class="text-center mb-12">
+            <h1 class="text-3xl md:text-5xl font-bold text-blue-800">הראל, ברוך הבא לחדר הבקרה</h1>
+            <p class="text-lg md:text-xl text-gray-700 mt-4">
+                הלקוחות שלך עדיין עובדים עם וואטסאפים, פתקים וטלפונים שבורים. 
+                <br class="hidden md:block">
+                בוא נראה לך איך אתה הופך להיות <strong class="text-blue-600">מערכת ההפעלה</strong> שלהם, ולא רק עוד ספק.
+            </p>
+        </div>
+
+        <!-- חיצי התהליך -->
+        <div class="flex items-center justify-center space-x-2 md:space-x-8 rtl:space-x-reverse mb-12 flex-wrap">
+            <div class="flex flex-col items-center text-center">
+                <div class="step-bubble bg-blue-600 text-white">1</div>
+                <span class="mt-2 font-semibold">מנהל שטח</span>
+            </div>
+            <svg class="w-6 h-6 md:w-12 md:h-12 text-gray-400 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17l-5-5 5-5m6 10l-5-5 5-5"></path></svg>
+            <div class="flex flex-col items-center text-center">
+                <div class="step-bubble bg-gray-700 text-white">2</div>
+                <span class="mt-2 font-semibold">מנהל פרויקט (עבד)</span>
+            </div>
+            <svg class="w-6 h-6 md:w-12 md:h-12 text-gray-400 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17l-5-5 5-5m6 10l-5-5 5-5"></path></svg>
+            <div class="flex flex-col items-center text-center">
+                <div class="step-bubble bg-gray-700 text-white">3</div>
+                <span class="mt-2 font-semibold">רכש (יוסי)</span>
+            </div>
+            <svg class="w-6 h-6 md:w-12 md:h-12 text-gray-400 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17l-5-5 5-5m6 10l-5-5 5-5"></path></svg>
+            <div class="flex flex-col items-center text-center">
+                <div class="step-bubble bg-green-500 text-white">4</div>
+                <span class="mt-2 font-semibold">צוות ח. סבן</span>
+            </div>
+        </div>
+
+        <!-- שלב 1: מנהל השטח -->
+        <h2 class="text-2xl font-bold text-blue-800 border-r-4 border-blue-500 pr-4 mb-6">שלב 1: מנהל השטח (אבי) תקוע בלי בלוקים</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            
+            <div class="md:order-2">
+                <h3 class="text-xl font-semibold mb-3">הסיפור:</h3>
+                <p class="text-gray-700 mb-4">אבי, מנהל השטח שלך באתר ב"זבולון", גמר את הבלוקים. במקום להתחיל שרשרת טלפונים, הוא פותח את האפליקציה (שאתה סיפקת לו) ורואה את <strong class="text-blue-600">הקטלוג המלא שלך</strong>.</p>
+                
+                <h3 class="text-xl font-semibold mb-3">יכולות מיוחדות:</h3>
+                <ul class="list-inside list-disc text-gray-700 space-y-2">
+                    <li>הזמנה מהקטלוג שלך (מונע טעויות).</li>
+                    <li><strong class="text-green-600">צירוף תמונה:</strong> "זה הבלוק שאני צריך, לא ההוא מאתמול".</li>
+                    <li><strong class="text-red-600">הקלטת קטע קול:</strong> "יוסי, שים לב שהמשאית חייבת להגיע לפני 10:00 כי סוגרים את הציר".</li>
+                </ul>
+            </div>
+
+            <div class="md:order-1 flex justify-center">
+                <!-- סימולציית טלפון -->
+                <div class="phone-mockup overflow-hidden">
+                    <div class="text-center font-bold text-lg mb-4">אתר: זבולון עדירם</div>
+                    <div class="space-y-3">
+                        <div class="bg-white p-3 rounded-lg shadow">
+                            <label class="font-semibold text-sm">בחירת פריט (מהקטלוג שלך):</label>
+                            <input type="text" value="בלוק איטונג 20 ס״מ" class="w-full border-gray-300 rounded" disabled>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg shadow">
+                            <label class="font-semibold text-sm">כמות נדרשת:</label>
+                            <input type="number" value="2" class="w-full border-gray-300 rounded">
+                        </div>
+                        <div class="bg-white p-3 rounded-lg shadow">
+                            <label class="font-semibold text-sm">הערות:</label>
+                            <textarea class="w-full border-gray-300 rounded text-sm" rows="3" disabled>צריך דחוף להיום.</textarea>
+                        </div>
+                        
+                        <!-- כפתורי המדיה -->
+                        <div class="flex justify-around mt-4">
+                            <button class="bg-blue-500 text-white p-3 rounded-full shadow-lg">
+                                <!-- אייקון מצלמה -->
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                <span class="text-xs block">צרף תמונה</span>
+                            </button>
+                            <button class="bg-red-500 text-white p-3 rounded-full shadow-lg">
+                                <!-- אייקון מיקרופון -->
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                                <span class="text-xs block">צרף קול</span>
+                            </button>
+                        </div>
+
+                        <button class="w-full bg-green-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg">שלח לאישור מנהל</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <hr class="my-12 border-gray-300">
+
+        <!-- שלב 4: צוות ח. סבן (הכי חשוב להראל) -->
+        <h2 class="text-2xl font-bold text-green-800 border-r-4 border-green-500 pr-4 mb-6">שלב 4: שולחן העבודה אצלך בצוות ח. סבן</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            
+            <div>
+                <h3 class="text-xl font-semibold mb-3">הפלא:</h3>
+                <p class="text-gray-700 mb-4">ברגע שיוסי (רכש) לחץ "אישור" (בשלב 3), ההזמנה קופצת אוטומטית אצלכם במשרד. לא מייל מבולגן, לא וואטסאפ שמישהו שכח. הזמנה נקייה, סגורה, מאושרת ומוכנה לליקוט.</p>
+                
+                <h3 class="text-xl font-semibold mb-3">איך הצוות שלך רואה את ההזמנה:</h3>
+                <ul class="list-inside list-disc text-gray-700 space-y-2">
+                    <li>הזמנה דיגיטלית מלאה עם מספר PO.</li>
+                    <li><strong class="text-blue-600">צפייה בקבצים:</strong> הצוות רואה את התמונה שאבי צילם בשטח.</li>
+                    <li><strong class="text-red-600">האזנה לקטע קול:</strong> איש הלוגיסטיקה שומע את ההנחיה הקולית של אבי ("להגיע לפני 10:00!").</li>
+                    <li>סטטוס ברור: "חדש", "בטיפול", "נשלח".</li>
+                </ul>
+                <p class="mt-4 text-lg font-bold text-green-700">התוצאה: 0 טעויות. 100% דיוק. לקוח מרוצה. והכי חשוב - איש המכירות שלך פנוי לעשות עוד מכירות במקום לקבל הזמנות.</p>
+            </div>
+
+            <div class="flex justify-center">
+                <!-- סימולציית דשבורד -->
+                <div class="dashboard-mockup overflow-hidden">
+                    <div class="bg-gray-800 p-3 flex justify-between items-center">
+                        <span class="text-white font-bold">מערכת הזמנות ח. סבן</span>
+                        <span class="text-yellow-400">הזמנה חדשה!</span>
+                    </div>
+                    <div class="p-4">
+                        <h4 class="font-bold text-lg mb-2">הזמנות נכנסות (3)</h4>
+                        
+                        <!-- ההזמנה הרלוונטית -->
+                        <div class="bg-blue-100 border-2 border-blue-500 rounded-lg p-4 shadow-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-lg text-blue-800">לקוח: זבולון עדירם בע"מ</span>
+                                <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">דחוף</span>
+                            </div>
+                            <div class="text-sm text-gray-700 mb-3">
+                                <strong>פרויקט:</strong> אתר "הנשיא" זבולון <br>
+                                <strong>PO #:</strong> 2025-452
+                            </div>
+                            
+                            <!-- טבלת פריטים -->
+                            <table class="w-full text-sm mb-3">
+                                <thead class="bg-gray-200">
+                                    <tr>
+                                        <th class="p-2 text-right">פריט</th>
+                                        <th class="p-2 text-center">כמות</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b">
+                                        <td class="p-2">בלוק איטונג 20 ס״מ (מק"ט 100-54)</td>
+                                        <td class="p-2 text-center font-bold">2 משטחים</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- צפייה בקבצים וקול -->
+                            <div class="mt-4">
+                                <h5 class="font-semibold mb-2">קבצים מצורפים:</h5>
+                                <div class="flex space-x-2 rtl:space-x-reverse">
+                                    <button class="bg-blue-600 text-white px-3 py-1 rounded-md text-sm flex items-center">
+                                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l-1-1m6-3l-2 2"></path></svg>
+                                        צפה בתמונה (1)
+                                    </button>
+                                    <button class="bg-red-600 text-white px-3 py-1 rounded-md text-sm flex items-center">
+                                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707a1 1 0 011.707 0v18.414a1 1 0 01-1.707 0L5.586 15z"></path></svg>
+                                        האזן להנחיה (1)
+                                    </button>
+                                </div>
+                            </div>
+                            
+                        </div>
+                        
+                        <div class="bg-white rounded-lg p-4 shadow mt-3">
+                            <span class="font-bold text-gray-600">לקוח: א.א. גינון</span>
+                            <span class="text-sm text-gray-500"> (מחכה לאישור מלאי)</span>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+</html>
+
